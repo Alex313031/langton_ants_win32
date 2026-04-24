@@ -108,22 +108,22 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
-            MENUITEM "&Slow     (250 ms.)", IDM_SLOW
-            MENUITEM "&Medium   (125 ms.)", IDM_MEDIUM
-            MENUITEM "&Fast     (33 ms.)",  IDM_FAST, CHECKED
-            MENUITEM "&Hyper    (16 ms.)",  IDM_HYPER
-            MENUITEM "&Realtime (1 ms.)",   IDM_REALTIME
+            MENUITEM "&Slow        (250 ms.)",  IDM_SLOW
+            MENUITEM "&Medium   (125 ms.)",     IDM_MEDIUM
+            MENUITEM "&Fast        (33 ms.)",  IDM_FAST, CHECKED
+            MENUITEM "&Hyper      (16 ms.)",   IDM_HYPER
+            MENUITEM "&Realtime  (1 ms.)",      IDM_REALTIME
         END
         MENUITEM SEPARATOR
         MENUITEM "&Use MonoChrome", IDM_MONOCHROME
         POPUP "&Background Color"
         BEGIN
             MENUITEM "&White", IDM_WHITE_BKG
-            MENUITEM "&Black", IDM_BLACK_BKG
+            MENUITEM "&Black", IDM_BLACK_BKG, CHECKED
             MENUITEM "&Grey",  IDM_GREY_BKG
             MENUITEM "&Red",   IDM_RED_BKG
             MENUITEM "&Green", IDM_GREEN_BKG
-            MENUITEM "&Blue",  IDM_BLUE_BKG, CHECKED
+            MENUITEM "&Blue",  IDM_BLUE_BKG
         END
     END
     POPUP "&Dev"

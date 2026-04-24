@@ -36,9 +36,9 @@ HBITMAP g_hbmMem = nullptr;
 // (g_hdcMem / g_hbmMem) at the same time.
 CRITICAL_SECTION g_paintCS;
 
-// Current background color. Defaults to blue, changed via the Background
+// Current background color. Defaults to black, changed via the Background
 // Color menu. Used when filling the back buffer on resize and on WM_PAINT.
-COLORREF g_bkg_color = RGB_BLUE;
+COLORREF g_bkg_color = RGB_BLACK;
 
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = is_debug;
@@ -103,7 +103,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   }
 
   InitializeCriticalSection(&g_paintCS);
-  
+
   static constexpr DWORD exStyle =
 #if _WIN32_WINNT > 0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
       WS_EX_OVERLAPPEDWINDOW | WS_EX_COMPOSITED;

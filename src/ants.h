@@ -24,9 +24,9 @@ extern HBITMAP g_hbmMem;
 // Size of one logical ant "pixel" in real hardware pixels. An ant occupies
 // a CELL_PX × CELL_PX square and every path mark quantizes to the same
 // grid, so all coordinates in the automaton are cell-indices and only this
-// constant converts back to the back buffer's pixel space. 4 keeps trails
+// constant converts back to the back buffer's pixel space. 6 keeps trails
 // clearly visible on typical displays without over-coarsening the canvas.
-inline constexpr int CELL_PX = 4;
+inline constexpr int CELL_PX = 6;
 
 // One ant thread. Each thread waits on its own private auto-reset event and
 // updates ant location once per tick. The ant-thread pool can be grown or shrunk at
