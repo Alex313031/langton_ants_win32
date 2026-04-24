@@ -30,9 +30,9 @@ HBITMAP g_hbmMem = nullptr;
 // (g_hdcMem / g_hbmMem) at the same time.
 CRITICAL_SECTION g_paintCS;
 
-// Current background color. Defaults to black, changed via the Background
+// Current background color. Defaults to blue, changed via the Background
 // Color menu. Used when filling the back buffer on resize and on WM_PAINT.
-COLORREF g_bkg_color = RGB_BLACK;
+COLORREF g_bkg_color = RGB_BLUE;
 
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = true;
@@ -61,8 +61,13 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.hInstance     = hInstance;
   wndclass.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
   wndclass.hCursor       = LoadCursorW(nullptr, IDC_ARROW) ;
-  wndclass.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
-  wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDC_MAIN);
+  // No stock brush matches our default bg (there's only black / white /
+  // grey / null), and we handle erase + paint ourselves — WM_ERASEBKGND
+  // returns TRUE and WM_PAINT fills with g_bkg_color. nullptr here skips
+  // the OS's pre-fill entirely so there's no flash of a wrong-colored
+  // window before our first WM_PAINT.
+  wndclass.hbrBackground = nullptr;
+  wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDR_MAIN);
   wndclass.lpszClassName = szClassName;
   wndclass.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
 
@@ -116,7 +121,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 1;
   }
 
-  HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDC_MAIN));
+  HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -259,10 +264,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_NOTIFY: {
       // Toolbar dropdown buttons (TBSTYLE_DROPDOWN + TBSTYLE_EX_DRAWDDARROWS)
       // send TBN_DROPDOWN when the user clicks the arrow. We handle it for
-      // IDM_ANTS by popping up a small color menu anchored under the button.
-      // lParam points to an NMTOOLBAR whose rcButton is in toolbar-client
-      // coords — ClientToScreen on the toolbar's HWND (hdr.hwndFrom) gives
-      // the screen-coord anchor TrackPopupMenu wants.
+      // IDM_ANTS and IDM_SPEED by popping up the corresponding Settings
+      // submenu anchored under the button. lParam points to an NMTOOLBAR
+      // whose rcButton is in toolbar-client coords — ClientToScreen on the
+      // toolbar's HWND (hdr.hwndFrom) gives the screen-coord anchor
+      // TrackPopupMenu wants.
       LPNMHDR pnmh = reinterpret_cast<LPNMHDR>(lParam);
       // Toolbar tooltip requests are cheap and noisy, so let utils.cc answer
       // them first and only fall through to other toolbar notifications when
@@ -274,15 +280,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         POINT pt = { pnmtb->rcButton.left, pnmtb->rcButton.bottom };
         ClientToScreen(pnmh->hwndFrom, &pt);
 
+        // Reusing the live HMENU from the main menu bar means radio check
+        // marks stay in perfect sync with the existing IDM_CONC_* /
+        // IDM_SLOW..IDM_HYPER handlers — no duplicate items, no manual
+        // state sync needed.
         if (pnmtb->iItem == IDM_ANTS) {
-          // Reuse the Settings → Num Ants submenu directly. Because it's
-          // the same HMENU object the main menu bar uses, its radio check
-          // mark (which ant count is active) stays in perfect sync with
-          // the existing IDM_CONC_* handlers — no duplicate items, no
-          // manual state sync needed.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hAnts   = GetSubMenu(hSettings, 3);
+          HMENU hAnts     = GetSubMenu(hSettings, 3);
           TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN,
+                         pt.x, pt.y, 0, hWnd, nullptr);
+          return TBDDRET_DEFAULT;
+        }
+        if (pnmtb->iItem == IDM_SPEED) {
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSpeed    = GetSubMenu(hSettings, 5);
+          TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN,
                          pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
@@ -307,6 +319,22 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SAVE_AS:
           SaveClientBitmap(hWnd);
           break;
+        case IDM_ANTS: {
+          // Button-body click on the Num Ants split button. Show the same
+          // dropdown the arrow does so users don't have to hit the arrow's
+          // narrow hit box.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hAnts     = GetSubMenu(hSettings, 3);
+          PopupUnderToolbarButton(hWnd, IDM_ANTS, hAnts);
+          break;
+        }
+        case IDM_SPEED: {
+          // Button-body click on the Speed split button — mirrors IDM_ANTS.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSpeed    = GetSubMenu(hSettings, 5);
+          PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
+          break;
+        }
         case IDM_SOUND: {
           if (ToggleSound()) {
             // Only update check state if toggling sound on/off succeeded.
@@ -341,6 +369,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             TogglePaintAnts(hWnd); // toggles g_paused=true and KillTimer
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
+            // Mirror the paused state onto the toolbar's Pause/Resume
+            // button so icon + label match the menu check mark.
+            SetPauseButton(g_paused);
           }
           // Pulse every active ant thread's tick event once. The timer is
           // off (paused), so this is the only source of ticks — each thread

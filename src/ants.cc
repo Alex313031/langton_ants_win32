@@ -34,7 +34,9 @@ static int           s_activeCount = 0;  // only touched from the main thread
 // mid-simulation. (Existing trails are left alone — see the comment on
 // RecolorBackground.)
 static COLORREF CurrentPathColor() {
-  if (g_bkg_color == RGB_WHITE || g_bkg_color == RGB_GREEN) return RGB_BLACK;
+  if (g_bkg_color == RGB_WHITE || g_bkg_color == RGB_GREEN) {
+    return RGB_BLACK;
+  }
   return RGB_WHITE;
 }
 

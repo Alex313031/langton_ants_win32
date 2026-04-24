@@ -17,9 +17,10 @@
 #define IDB_SOUND_BMP               108 /* "Speaker" icon for toolbar strip, same as Win2000 speaker icon*/
 #define IDB_MUTE_BMP                109 /* "Mute" icon for toolbar strip, overwrites Speaker icon when needed */
 #define IDB_SAVE_BMP                110 /* "Save" icon for toolbar strip, floppy disk icon */
+#define IDB_TIME_BMP                111 /* "Speed" icon for toolbar strip, timer icon */
 
 /* Main application resource, also used to attach menu */
-#define IDC_MAIN                    120
+#define IDR_MAIN                    120
 
 /* Dialogs */
 #define IDD_ABOUTDLG                130
@@ -72,8 +73,11 @@
 // instead of using timer
 #define IDM_SINGLE                  232
 
-// Toolbar button menu identifier for "Num Ants" button with submenu.
+// Toolbar button identifier for "Num Ants" button with submenu.
 #define IDM_ANTS                    240
+
+// Toolbar button identifier for "Speed" button with submenu.
+#define IDM_SPEED                   241
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                250

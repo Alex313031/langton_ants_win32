@@ -40,6 +40,7 @@ IDB_PLAY_BMP   BITMAP "res/play.bmp"
 IDB_EXIT_BMP   BITMAP "res/exit.bmp"
 IDB_SOUND_BMP  BITMAP "res/sound.bmp"
 IDB_MUTE_BMP   BITMAP "res/nosound.bmp"
+IDB_TIME_BMP   BITMAP "res/timer.bmp"
 
 // Embedded background music as a user-defined "WAVE" resource. The type
 // keyword `WAVE` is a convention (not a system RT_ id) — FindResourceW
@@ -75,7 +76,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
 #endif
 
 // Main Application Menu
-IDC_MAIN MENU
+IDR_MAIN MENU
 BEGIN
     POPUP "&File"
     BEGIN
@@ -86,7 +87,7 @@ BEGIN
     POPUP "&Settings"
     BEGIN
         MENUITEM "&Pause Ants",   IDM_PAUSED
-        MENUITEM "&Sound?",  IDM_SOUND
+        MENUITEM "&Sound?",       IDM_SOUND
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN
@@ -102,8 +103,8 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
-            MENUITEM "&Slow   (1/4  sec.)", IDM_SLOW
-            MENUITEM "&Medium (1/8  sec.)", IDM_MEDIUM
+            MENUITEM "&Slow   (1/4 sec.)", IDM_SLOW
+            MENUITEM "&Medium (1/8 sec.)", IDM_MEDIUM
             MENUITEM "&Fast   (1/16 sec.)", IDM_FAST, CHECKED
             MENUITEM "&Hyper  (1/32 sec.)", IDM_HYPER
         END
@@ -112,11 +113,11 @@ BEGIN
         POPUP "&Background Color"
         BEGIN
             MENUITEM "&White", IDM_WHITE_BKG
-            MENUITEM "&Black", IDM_BLACK_BKG, CHECKED
+            MENUITEM "&Black", IDM_BLACK_BKG
             MENUITEM "&Grey",  IDM_GREY_BKG
             MENUITEM "&Red",   IDM_RED_BKG
             MENUITEM "&Green", IDM_GREEN_BKG
-            MENUITEM "&Blue",  IDM_BLUE_BKG
+            MENUITEM "&Blue",  IDM_BLUE_BKG, CHECKED
         END
     END
     POPUP "&Dev"
@@ -134,7 +135,7 @@ BEGIN
 END
 
 // Keyboard Accelerators
-IDC_MAIN ACCELERATORS
+IDR_MAIN ACCELERATORS
 BEGIN
     "?",       IDM_ABOUT, ASCII,   ALT          // "?" key About
     VK_OEM_2,  IDM_ABOUT, VIRTKEY, ALT          // "/" key About
@@ -196,7 +197,7 @@ BEGIN
         BEGIN
             VALUE "Comments", "https://github.com/Alex313031/langtons_ants_win32\0"
             VALUE "CompanyName", "Alex313031\0"
-            VALUE "FileDescription", "Win32 Langton's Ants Implementation\0"
+            VALUE "FileDescription", "Win32 Langton's Ants Demonstration\0"
             VALUE "FileVersion", VERSION_STRING
             VALUE "InternalName", "langton_ants\0"
             VALUE "LegalCopyright", LEGAL_COPYRIGHT

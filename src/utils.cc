@@ -27,6 +27,7 @@ static int s_idxPlay   = 0;
 static int s_idxSound  = 0;
 static int s_idxMute   = 0;
 static int s_idxAnts   = 0;
+static int s_idxSpeed  = 0;
 
 // Reads the CHECKED state of every menu group at startup and sets the
 // corresponding globals. This makes all defaults entirely RC-driven: changing
@@ -643,6 +644,9 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbab.nID = IDB_ANTS_BMP;
   s_idxAnts = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID = IDB_TIME_BMP;
+  s_idxSpeed = static_cast<int>(
+      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_SOUND_BMP;
   s_idxSound = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
@@ -661,44 +665,57 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
   //   dwData    — app-defined extra data we don't need
   //   iString   — tooltip/label text pointer (cast through INT_PTR)
-  TBBUTTON tbButtons[8] = {};
+  TBBUTTON tbButtons[12] = {};
 
-  tbButtons[0].iBitmap   = idxSave;
-  tbButtons[0].idCommand = IDM_SAVE_AS;
-  tbButtons[0].fsState   = TBSTATE_ENABLED;
-  tbButtons[0].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[0].iString   = reinterpret_cast<INT_PTR>(L"Save As");
+  tbButtons[0].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[1].fsStyle   = TBSTYLE_SEP;
+  tbButtons[1].iBitmap   = idxSave;
+  tbButtons[1].idCommand = IDM_SAVE_AS;
+  tbButtons[1].fsState   = TBSTATE_ENABLED;
+  tbButtons[1].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[1].iString   = reinterpret_cast<INT_PTR>(L"Save As");
 
-  // Painting controls clustered between the two separators.
-  tbButtons[2].iBitmap   = s_idxPause;
-  tbButtons[2].idCommand = IDM_PAUSED;
-  tbButtons[2].fsState   = TBSTATE_ENABLED;
-  tbButtons[2].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[2].iString   = reinterpret_cast<INT_PTR>(L"Pause");
+  tbButtons[2].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[3].iBitmap   = s_idxAnts;
-  tbButtons[3].idCommand = IDM_ANTS;
+  tbButtons[3].iBitmap   = s_idxPause;
+  tbButtons[3].idCommand = IDM_PAUSED;
   tbButtons[3].fsState   = TBSTATE_ENABLED;
-  tbButtons[3].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
+  tbButtons[3].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Pause");
 
   tbButtons[4].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[5].iBitmap   = s_idxSound;
-  tbButtons[5].idCommand = IDM_SOUND;
+  // Num Ants and Speed are deliberately adjacent with no separator — they
+  // form a single "simulation knobs" pair.
+  tbButtons[5].iBitmap   = s_idxAnts;
+  tbButtons[5].idCommand = IDM_ANTS;
   tbButtons[5].fsState   = TBSTATE_ENABLED;
-  tbButtons[5].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+  tbButtons[5].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
 
-  tbButtons[6].fsStyle   = TBSTYLE_SEP;
+  tbButtons[6].iBitmap   = s_idxSpeed;
+  tbButtons[6].idCommand = IDM_SPEED;
+  tbButtons[6].fsState   = TBSTATE_ENABLED;
+  tbButtons[6].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Speed");
 
-  tbButtons[7].iBitmap   = idxExit;
-  tbButtons[7].idCommand = IDM_EXIT;
-  tbButtons[7].fsState   = TBSTATE_ENABLED;
-  tbButtons[7].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+  tbButtons[7].fsStyle   = TBSTYLE_SEP;
+
+  tbButtons[8].iBitmap   = s_idxSound;
+  tbButtons[8].idCommand = IDM_SOUND;
+  tbButtons[8].fsState   = TBSTATE_ENABLED;
+  tbButtons[8].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+
+  tbButtons[9].fsStyle   = TBSTYLE_SEP;
+
+  tbButtons[10].iBitmap   = idxExit;
+  tbButtons[10].idCommand = IDM_EXIT;
+  tbButtons[10].fsState   = TBSTATE_ENABLED;
+  tbButtons[10].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[10].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+
+  tbButtons[11].fsStyle  = TBSTYLE_SEP;
 
   SendMessageW(hTB, TB_ADDBUTTONS,
               sizeof(tbButtons) / sizeof(tbButtons[0]),
@@ -814,13 +831,16 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
   const wchar_t* text = nullptr;
   switch (idCommand) {
     case IDM_SAVE_AS:
-      text = L"Save current canvas as .bmp";
+      text = L"Save current ant field as .bmp";
       break;
     case IDM_EXIT:
       text = L"Exit App";
       break;
     case IDM_ANTS:
       text = L"Choose how many ants to spawn";
+      break;
+    case IDM_SPEED:
+      text = L"Change crawl speed";
       break;
     case IDM_PAUSED:
       text = g_paused ? L"Resume Ants" : L"Pause Ants";
