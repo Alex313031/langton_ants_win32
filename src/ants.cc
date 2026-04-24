@@ -283,25 +283,56 @@ void ShutdownAnts() {
 // that BitBlt can copy between them without color conversion overhead.
 void RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   if (cx <= 0 || cy <= 0 || g_hdcMem == nullptr) return;
-  // Borrow the window DC only to query its pixel format for CreateCompatibleBitmap.
+  // Fast path: the existing bitmap already matches — keep it, no work,
+  // no state loss. Common on restore-from-minimize without a resize.
+  if (g_hbmMem != nullptr) {
+    BITMAP bm = {};
+    if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bm) &&
+        bm.bmWidth == cx && bm.bmHeight == cy) {
+      return;
+    }
+  }
+  // Slow path: dimensions changed, allocate a fresh bitmap. Borrow the
+  // window DC only to query its pixel format for CreateCompatibleBitmap.
   HDC hdcWin = GetDC(hWnd);
   HBITMAP hbmNew = CreateCompatibleBitmap(hdcWin, cx, cy);
   ReleaseDC(hWnd, hdcWin);
+  if (hbmNew == nullptr) return;
+
   // Hold the lock while swapping the bitmap so the ant thread cannot draw into
   // g_hdcMem while we are replacing what it points at.
   EnterCriticalSection(&g_paintCS);
-  // SelectObject swaps the new bitmap into the memory DC, making g_hdcMem ready
-  // to draw into at the new size. The previously selected bitmap is implicitly
-  // deselected and safe to delete.
+  // Prime hbmNew through a scratch DC: fill with bg, then blit the old
+  // back buffer's contents into the top-left. This preserves ant trails
+  // across the resize — and also covers any minimize-then-restore path
+  // where something fires an intermediate WM_SIZE and triggers this
+  // slow branch. On grow, the extra margin stays bg; on shrink, the
+  // excess rows / columns of the old bitmap get clipped off.
+  HDC hdcScratch = CreateCompatibleDC(g_hdcMem);
+  HBITMAP hbmScratchPrev = static_cast<HBITMAP>(SelectObject(hdcScratch, hbmNew));
+  RECT rc = { 0, 0, cx, cy };
+  HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+  FillRect(hdcScratch, &rc, hBrush);
+  DeleteObject(hBrush);
+  if (g_hbmMem != nullptr) {
+    BITMAP bmOld = {};
+    if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bmOld)) {
+      const int copyW = (bmOld.bmWidth  < cx) ? bmOld.bmWidth  : cx;
+      const int copyH = (bmOld.bmHeight < cy) ? bmOld.bmHeight : cy;
+      BitBlt(hdcScratch, 0, 0, copyW, copyH, g_hdcMem, 0, 0, SRCCOPY);
+    }
+  }
+  // Un-select hbmNew from the scratch DC so we can re-select it into g_hdcMem
+  // (a bitmap can only be selected into one DC at a time).
+  SelectObject(hdcScratch, hbmScratchPrev);
+  DeleteDC(hdcScratch);
+
+  // Promote hbmNew to be the live back buffer. SelectObject implicitly
+  // deselects the previously-selected bitmap, which then becomes safe
+  // to delete.
   SelectObject(g_hdcMem, hbmNew);
   if (g_hbmMem != nullptr) DeleteObject(g_hbmMem);
   g_hbmMem = hbmNew;
-  // Fill the fresh bitmap with the current background color so newly exposed
-  // areas on resize match the rest of the canvas.
-  RECT rc = { 0, 0, cx, cy };
-  HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-  FillRect(g_hdcMem, &rc, hBrush);
-  DeleteObject(hBrush);
   LeaveCriticalSection(&g_paintCS);
 }
 

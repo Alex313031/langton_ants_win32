@@ -20,6 +20,12 @@ static bool s_resizing = false;
 static POINT s_resizeOrigin = {};
 static SIZE s_resizeStartSize = {};
 
+// Tracks whether the last WM_SIZE minimized the window. Set by WM_SIZE on
+// SIZE_MINIMIZED, cleared by the next non-minimize WM_SIZE. Used to decide
+// whether the just-arrived size event is "we're coming back from a
+// minimize" (restart the tick source) vs. a normal resize (no-op).
+static bool s_was_minimized = false;
+
 HDC g_hdcMem     = nullptr;
 HBITMAP g_hbmMem = nullptr;
 
@@ -268,20 +274,43 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     }
     case WM_SIZE: {
+      if (wParam == SIZE_MINIMIZED) {
+        // Minimize freezes the simulation: we kill the tick source so the
+        // ant threads park on their wait events with zero CPU use. We
+        // deliberately don't touch cxClient / cyClient or the back buffer —
+        // the bitmap keeps holding the canvas, and each ant's thread-local
+        // cellX / cellY / dir / onBg state survives untouched — so when
+        // restore fires we come back exactly where we left off, trails
+        // and all.
+        s_was_minimized = true;
+        KillTimer(hWnd, TIMER_ANTS);
+        break;
+      }
       // Let the toolbar re-fit the new parent width and re-measure its height.
       // All toolbar state lives in utils.cc; this one call updates
       // g_toolbarHeight as needed.
       LayoutToolbar(hWnd);
       // cxClient / cyClient represent the ants canvas area, not the parent's client
       // area — the toolbar isn't drawable space. Clamp to zero when the
-      // window is smaller than the toolbar (minimized / extreme resize).
+      // window is smaller than the toolbar (extreme resize).
       cxClient = LOWORD(lParam);
       cyClient = HIWORD(lParam) - g_toolbarHeight;
       if (cyClient < 0) cyClient = 0;
       // The ants canvas changed size, so recreate the back buffer to match.
       // If it grew, the old bitmap would be too small and BitBlt would read
       // outside its bounds; if it shrank, the old one just wastes memory.
+      // When restoring from minimize the dimensions match the existing
+      // bitmap and RecreateBackBuffer's fast-path keeps the trails alive.
       RecreateBackBuffer(hWnd, cxClient, cyClient);
+      if (s_was_minimized) {
+        s_was_minimized = false;
+        // Restored from minimize — bring the tick source back unless the
+        // user had explicitly paused before minimizing (g_paused still
+        // reflects that choice, so we honor it).
+        if (!g_paused) {
+          SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
+        }
+      }
       break;
     }
     case WM_NOTIFY: {
