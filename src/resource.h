@@ -37,9 +37,10 @@
 // Simulation control
 #define IDM_PAUSED                  208 /* Pause ant simulation */
 
-// Color choices
+// Display mode
 #define IDM_MONOCHROME              209 /* Only uses black/white background, with opposite colored ants */
-// Background color choices, ants are always black or white.
+
+// Background color choices. Ant paths are always black or white; the ant itself is magenta.
 #define IDM_WHITE_BKG               210
 #define IDM_BLACK_BKG               211
 #define IDM_GREY_BKG                212

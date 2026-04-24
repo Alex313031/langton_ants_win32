@@ -11,7 +11,7 @@ bool g_monochrome = false; // Whether monochrome colors only is enabled
 
 volatile UINT g_num_ants = 1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
 
-unsigned long g_delay = 500UL; // Default to same as .rc file (IDM_FAST)
+unsigned long g_delay = kHyperSpeed; // Default until InitMenuDefaults reads the RC.
 
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
@@ -80,8 +80,8 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
     // Two exit paths: global shutdown OR this individual slot was asked to die
     // (EnsureThreadCount shrinking the pool).
     if (!g_running || slot->exitRequested) break;
-    if (cxClient == 0 && cyClient == 0) {
-      continue; // Window is minimized; wait for restore
+    if (cxClient == 0 || cyClient == 0) {
+      continue; // Window is minimized or has no drawable canvas; wait.
     }
 
     // Serialize every GDI operation on the back buffer — multiple ant threads

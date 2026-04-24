@@ -235,7 +235,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       EnterCriticalSection(&g_paintCS);
       if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
         // Blit the whole back buffer to the window at (0, g_toolbarHeight).
-        // Back buffer coords are ant-local (0..cxClient-1, 0..cyClient-1);
+        // Back buffer coords are ants-canvas-local (0..cxClient-1, 0..cyClient-1);
         // shifting by the toolbar height places the canvas below the toolbar.
         BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient,
                g_hdcMem, 0, 0, SRCCOPY);
@@ -405,7 +405,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CONC_8: {
           // Consecutive IDs let us derive the count directly from the command.
           SetNumAnts((command - IDM_CONC_1) + 1);
-          // Num Ants submenu
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hConc     = GetSubMenu(hSettings, 3);
           CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_8, command, MF_BYCOMMAND);
@@ -480,13 +479,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           HMENU hDelay    = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_HYPER, command, MF_BYCOMMAND);
           switch (command) {
-            case IDM_SLOW:   g_delay = 250UL; break;
-            case IDM_MEDIUM: g_delay = 125UL; break;
-            case IDM_FAST:   g_delay = 62UL; break;
-            case IDM_HYPER:  g_delay = 31UL; break;
+            case IDM_SLOW:   g_delay = kSlowSpeed;  break;
+            case IDM_MEDIUM: g_delay = kMedSpeed;   break;
+            case IDM_FAST:   g_delay = kHighSpeed;  break;
+            case IDM_HYPER:  g_delay = kHyperSpeed; break;
             default:
               LOG(ERROR) << "Unhandled speed type";
-              g_delay = kDefaultSpeed;
+              g_delay = g_default_speed;
               break;
           }
           // Replace the timer with the new interval. SetTimer on an existing ID

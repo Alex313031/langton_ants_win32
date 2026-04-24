@@ -17,7 +17,7 @@ static WNDPROC s_origToolbarProc = nullptr;
 // ants.cc / main.cc can offset the back-buffer blit and mouse coords by it.
 int g_toolbarHeight = 0;
 
-unsigned long kDefaultSpeed = 31UL;
+unsigned long g_default_speed = kHyperSpeed;
 
 // Bitmap indices captured from TB_ADDBITMAP for the dynamic-icon buttons.
 // TB_ADDBITMAP returns the starting index of images it added to the toolbar's
@@ -68,10 +68,8 @@ void InitMenuDefaults(HWND hWnd) {
   for (const auto& d : delays) {
     if (GetMenuState(hDelay, d.id, MF_BYCOMMAND) & MF_CHECKED) {
       g_delay = d.ms;
-      kDefaultSpeed = d.ms;
+      g_default_speed = d.ms;
       break;
-    } else {
-      kDefaultSpeed = 31UL;
     }
   }
 
