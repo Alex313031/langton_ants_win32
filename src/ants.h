@@ -21,6 +21,13 @@ extern HBITMAP g_hbmMem;
 // The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_8 matching this bound.
 #define kMaxAntThreads 8
 
+// Size of one logical ant "pixel" in real hardware pixels. An ant occupies
+// a CELL_PX × CELL_PX square and every path mark quantizes to the same
+// grid, so all coordinates in the automaton are cell-indices and only this
+// constant converts back to the back buffer's pixel space. 4 keeps trails
+// clearly visible on typical displays without over-coarsening the canvas.
+inline constexpr int CELL_PX = 4;
+
 // One ant thread. Each thread waits on its own private auto-reset event and
 // updates ant location once per tick. The ant-thread pool can be grown or shrunk at
 // runtime (see EnsureThreadCount) so we never have more threads alive than

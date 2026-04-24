@@ -30,10 +30,10 @@ extern volatile bool g_playsound;
 #define RGB_MAGENTA RGB(255, 0, 255)
 
 // Time constants
-inline constexpr unsigned long kSlowSpeed  = 1000UL;
-inline constexpr unsigned long kMedSpeed   = 500UL;
-inline constexpr unsigned long kHighSpeed  = 250UL;
-inline constexpr unsigned long kHyperSpeed = 125UL;
+inline constexpr unsigned long kSlowSpeed  = 250UL;
+inline constexpr unsigned long kMedSpeed   = 125UL;
+inline constexpr unsigned long kHighSpeed  = 62UL;
+inline constexpr unsigned long kHyperSpeed = 31UL;
 
 inline constexpr INT CW_WIDTH  = 640;
 inline constexpr INT CW_HEIGHT = 640;

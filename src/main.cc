@@ -61,7 +61,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.hInstance     = hInstance;
   wndclass.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
   wndclass.hCursor       = LoadCursorW(nullptr, IDC_ARROW) ;
-  wndclass.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH));
+  wndclass.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
   wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDC_MAIN);
   wndclass.lpszClassName = szClassName;
   wndclass.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
@@ -280,7 +280,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // mark (which ant count is active) stays in perfect sync with
           // the existing IDM_CONC_* handlers — no duplicate items, no
           // manual state sync needed.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hAnts   = GetSubMenu(hSettings, 3);
           TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN,
                          pt.x, pt.y, 0, hWnd, nullptr);
@@ -310,7 +310,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SOUND: {
           if (ToggleSound()) {
             // Only update check state if toggling sound on/off succeeded.
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_SOUND,
                           MF_BYCOMMAND | (g_playsound ? MF_CHECKED : MF_UNCHECKED));
             // Mirror the state on the toolbar: swap icon + label.
@@ -321,7 +321,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_PAUSED: {
           TogglePaintAnts(hWnd);
           // Reflect the new paused state in the menu check mark.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           CheckMenuItem(hSettings, IDM_PAUSED,
                         MF_BYCOMMAND | (g_paused ? MF_CHECKED : MF_UNCHECKED));
           // Mirror the state on the toolbar: swap icon + label.
@@ -339,7 +339,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // resumes with no extra logic needed here.
           if (!g_paused) {
             TogglePaintAnts(hWnd); // toggles g_paused=true and KillTimer
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
           }
           // Pulse every active ant thread's tick event once. The timer is
@@ -375,29 +375,31 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Consecutive IDs let us derive the count directly from the command.
           SetNumAnts((command - IDM_CONC_1) + 1);
           // Num Ants submenu
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hConc     = GetSubMenu(hSettings, 3);
           CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_8, command, MF_BYCOMMAND);
           break;
         }
         case IDM_MONOCHROME: {
           g_monochrome = !g_monochrome;
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           // Toggle the check mark on the menu item to show current state.
           CheckMenuItem(hSettings, IDM_MONOCHROME,
                         MF_BYCOMMAND | (g_monochrome ? MF_CHECKED : MF_UNCHECKED));
-          // Grey out or restore the color background options — only white and
-          // black are valid background choices in monochrome mode.
+          // Grey out or restore the chromatic bg options. White, black,
+          // and grey all count as monochrome, so only the R/G/B entries
+          // get disabled.
           HMENU hBkgMenu = GetSubMenu(hSettings, 8);
           const UINT colorState = g_monochrome ? MF_GRAYED : MF_ENABLED;
           EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | colorState);
-          // If switching into monochrome and the current background is a color
-          // (not white or black), reset it to white.
-          if (g_monochrome && g_bkg_color != RGB_WHITE && g_bkg_color != RGB_BLACK) {
-            g_bkg_color = RGB_WHITE;
-            CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_WHITE_BKG, MF_BYCOMMAND);
+          // Entering monochrome snaps the bg to grey (ant color then
+          // becomes white automatically via CurrentPathColor). The user
+          // can still switch to white or black manually after the fact.
+          if (g_monochrome && g_bkg_color != RGB_GREY) {
+            g_bkg_color = RGB_GREY;
+            CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
           }
           // Always clear the back buffer on toggle
           EnterCriticalSection(&g_paintCS);
@@ -417,7 +419,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_RED_BKG:
         case IDM_GREEN_BKG:
         case IDM_BLUE_BKG: {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 8);
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
@@ -443,15 +445,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_MEDIUM:
         case IDM_FAST:
         case IDM_HYPER: {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hDelay    = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_HYPER, command, MF_BYCOMMAND);
           switch (command) {
-            case IDM_SLOW:   g_delay = 1000UL; break;
-            case IDM_MEDIUM: g_delay = 500UL; break;
-            case IDM_FAST:   g_delay = 250UL; break;
-            case IDM_HYPER:  g_delay = 125UL; break;
-            default:         g_delay = 250UL; break;
+            case IDM_SLOW:   g_delay = 250UL; break;
+            case IDM_MEDIUM: g_delay = 125UL; break;
+            case IDM_FAST:   g_delay = 62UL; break;
+            case IDM_HYPER:  g_delay = 31UL; break;
+            default:         g_delay = 62UL; break;
           }
           // Replace the timer with the new interval. SetTimer on an existing ID
           // replaces it in place — the next tick will be at the new rate.
@@ -489,7 +491,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         x = pt.x;
         y = pt.y;
       }
-      HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+      HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
       TrackPopupMenu(hSettings, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
                      x, y, 0, hWnd, nullptr);
       break;
@@ -589,7 +591,7 @@ bool InitApp(HWND hWnd) {
   // ever comes out. XP and later relaxed this, so the direct call appears to
   // work there — but posting is correct on every version. WM_APP_AUTOPLAY is
   // picked up by the normal dispatch path once GetMessage starts running.
-  HMENU hSettings = GetSubMenu(GetMenu(hWnd), 2);
+  HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
   if (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) {
     PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
   }

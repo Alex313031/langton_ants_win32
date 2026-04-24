@@ -86,7 +86,7 @@ BEGIN
     POPUP "&Settings"
     BEGIN
         MENUITEM "&Pause Ants",   IDM_PAUSED
-        MENUITEM "&Play Music?",  IDM_SOUND, CHECKED
+        MENUITEM "&Sound?",  IDM_SOUND
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN
@@ -102,10 +102,10 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
-            MENUITEM "&Slow   (1.0 sec.)", IDM_SLOW
-            MENUITEM "&Medium (1/2 sec.)", IDM_MEDIUM
-            MENUITEM "&Fast   (1/4 sec.)", IDM_FAST, CHECKED
-            MENUITEM "&Hyper  (1/8 sec.)", IDM_HYPER
+            MENUITEM "&Slow   (1/4  sec.)", IDM_SLOW
+            MENUITEM "&Medium (1/8  sec.)", IDM_MEDIUM
+            MENUITEM "&Fast   (1/16 sec.)", IDM_FAST, CHECKED
+            MENUITEM "&Hyper  (1/32 sec.)", IDM_HYPER
         END
         MENUITEM SEPARATOR
         MENUITEM "&Use MonoChrome", IDM_MONOCHROME

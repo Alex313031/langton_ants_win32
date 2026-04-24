@@ -28,27 +28,39 @@ struct AntThreadSlot {
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int           s_activeCount = 0;  // only touched from the main thread
 
+// Path/ant color chosen for contrast against the current background: white
+// unless the background is white or green, in which case black. Re-read on
+// every step so the ant adapts immediately if the user changes the bg
+// mid-simulation. (Existing trails are left alone — see the comment on
+// RecolorBackground.)
+static COLORREF CurrentPathColor() {
+  if (g_bkg_color == RGB_WHITE || g_bkg_color == RGB_GREEN) return RGB_BLACK;
+  return RGB_WHITE;
+}
+
 DWORD WINAPI AntThread(LPVOID pvoid) {
   AntThreadSlot* slot = static_cast<AntThreadSlot*>(pvoid);
   if (mainHwnd == nullptr || slot == nullptr) {
     return 0x00000001;
   }
-  // Every thread owns its own drawing scratch state and RNG / distributions.
-  // Nothing here is shared, so none of it needs synchronization; the shared
-  // state (g_hdcMem, the back buffer bitmap) is protected by g_paintCS below.
-  HBRUSH hBrush      = nullptr;
-  // BLACK_PEN is a stock GDI object (always available, never needs DeleteObject).
-  // We save it here so we can restore it into the DC after each ant, which is
-  // required before we can safely delete our custom pen.
-  const HPEN hOldPen = reinterpret_cast<HPEN>(GetStockObject(BLACK_PEN));
-  HDC hdc            = nullptr;
-  // For randomizing ant initial position
-  std::random_device rng;
-  // Background can be any color, but ant path is either black or white.
-  static const COLORREF antPalette[] = { RGB_BLACK,  RGB_WHITE };
-
-  int xLeft = 0, xRight = 0, yTop = 0, yBottom = 0;
-  int iRed  = 0, iGreen = 0, iBlue = 0;
+  // Per-ant state, thread-local so no synchronization is needed for it. The
+  // shared state (g_hdcMem / the back buffer bitmap) is protected by
+  // g_paintCS inside the tick loop.
+  //   cellX / cellY — current cell in the CELL_PX grid, negative means
+  //                   "needs placement" (first tick, or canvas shrank under
+  //                   us and our old cell is out of range).
+  //   dir           — 0=N, 1=E, 2=S, 3=W. Right turn = +1, left = +3,
+  //                   reverse = +2, all mod 4.
+  // rand() on Win32 uses per-thread state, so srand'ing here seeds only
+  // this thread's sequence. Mixing GetTickCount() with the thread ID keeps
+  // simultaneous starts distinct — otherwise the eight ants would spawn at
+  // the same cell facing the same way.
+  srand(static_cast<unsigned>(GetTickCount() ^ GetCurrentThreadId()));
+  int cellX = -1, cellY = -1;
+  int dir   = 0;
+  // Direction → (dx, dy) in cell units, matching the encoding above.
+  static const int kDx[4] = {  0, 1, 0, -1 };
+  static const int kDy[4] = { -1, 0, 1,  0 };
 
   while (true) {
     // Block until SignalAntsTick signals this slot's private event. Auto-reset,
@@ -70,7 +82,65 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
     // main thread also grabs it in WM_PAINT and RecreateBackBuffer.
     EnterCriticalSection(&g_paintCS);
     if (g_hdcMem != nullptr) {
-    // TODO: Ant stuff here
+      // Quantize the canvas into a CELL_PX × CELL_PX grid. Integer division
+      // truncates any remainder column / row so ants never straddle the
+      // right / bottom edge. We need at least a 2×2 grid to bounce within;
+      // anything smaller, skip the tick.
+      const int gridW = cxClient / CELL_PX;
+      const int gridH = cyClient / CELL_PX;
+      if (gridW >= 2 && gridH >= 2) {
+        // First-tick placement, or recovery after a resize that shrank the
+        // grid below our current cell. Uniform across the grid with a
+        // random starting heading.
+        if (cellX < 0 || cellY < 0 || cellX >= gridW || cellY >= gridH) {
+          cellX = rand() % gridW;
+          cellY = rand() % gridH;
+          dir   = rand() % 4;
+        }
+
+        const int px = cellX * CELL_PX;
+        const int py = cellY * CELL_PX;
+        // Every cell is painted as a solid CELL_PX × CELL_PX block, so
+        // sampling any one of its pixels tells us the whole cell's logical
+        // color. Top-left is convenient.
+        const COLORREF sampled = GetPixel(g_hdcMem, px, py);
+        // Binary classification: anything matching the current bg counts
+        // as "unvisited", anything else is "path". That way stale trails
+        // left over from before a bg change still read as path and fold
+        // back into the automaton's state correctly.
+        const bool onBg = (sampled == g_bkg_color);
+        // Classic Langton's: on bg cell turn right, on path cell turn left,
+        // flip the cell's color, then step forward one cell.
+        dir = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
+        const COLORREF paintColor = onBg ? CurrentPathColor() : g_bkg_color;
+        RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+        HBRUSH hBrush = CreateSolidBrush(paintColor);
+        FillRect(g_hdcMem, &rc, hBrush);
+        DeleteObject(hBrush);
+
+        // Try to step forward. If that would leave the grid, reverse 180°
+        // and step the other way — "bouncing off the wall". We don't undo
+        // the flip we just did; only the direction changes.
+        int nx = cellX + kDx[dir];
+        int ny = cellY + kDy[dir];
+        if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) {
+          dir = (dir + 2) & 3;
+          nx = cellX + kDx[dir];
+          ny = cellY + kDy[dir];
+        }
+        cellX = nx;
+        cellY = ny;
+
+        // Invalidate just the cell we painted so WM_PAINT blits a tight
+        // region instead of the whole canvas. InvalidateRect is documented
+        // as safe to call from any thread; it just posts WM_PAINT to the
+        // window's owning (main) thread. Coords need shifting by
+        // g_toolbarHeight to go from back-buffer space into window-client
+        // space.
+        RECT inval = { px, py + g_toolbarHeight,
+                       px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+        InvalidateRect(mainHwnd, &inval, FALSE);
+      }
     }
     LeaveCriticalSection(&g_paintCS);
     // GdiFlush ensures all batched GDI operations for this thread are submitted

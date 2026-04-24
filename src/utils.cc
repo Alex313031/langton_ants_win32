@@ -34,7 +34,7 @@ static int s_idxAnts   = 0;
 // alter a default setting.
 void InitMenuDefaults(HWND hWnd) {
   HMENU hMenu     = GetMenu(hWnd);
-  HMENU hSettings = GetSubMenu(hMenu, 2);
+  HMENU hSettings = GetSubMenu(hMenu, 1);
   HMENU hConc     = GetSubMenu(hSettings, 3); // Num Ants submenu
   HMENU hDelay    = GetSubMenu(hSettings, 5); // Speed menu
   HMENU hBkgMenu  = GetSubMenu(hSettings, 8); // Background color menu
@@ -78,12 +78,19 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Monochrome toggle — grey out color bg items in the RC
+  // Monochrome toggle — grey out chromatic bg items and override the RC's
+  // bg CHECKED to grey (monochrome defaults to grey bg + white ants
+  // regardless of what the RC otherwise selected; white and black remain
+  // selectable afterward).
   if (GetMenuState(hSettings, IDM_MONOCHROME, MF_BYCOMMAND) & MF_CHECKED) {
     g_monochrome = true;
     EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | MF_GRAYED);
+    if (g_bkg_color != RGB_GREY) {
+      g_bkg_color = RGB_GREY;
+      CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
+    }
   }
 }
 
@@ -683,7 +690,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[5].idCommand = IDM_SOUND;
   tbButtons[5].fsState   = TBSTATE_ENABLED;
   tbButtons[5].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Play Music");
+  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
   tbButtons[6].fsStyle   = TBSTYLE_SEP;
 
@@ -768,7 +775,7 @@ void SetSoundButton(bool playing) {
   bi.cbSize  = sizeof(bi);
   bi.dwMask  = TBIF_IMAGE | TBIF_TEXT;
   bi.iImage  = playing ? s_idxMute : s_idxSound;
-  bi.pszText = const_cast<LPWSTR>(playing ? L"Mute" : L"Music");
+  bi.pszText = const_cast<LPWSTR>(playing ? L"Mute" : L"Sound");
   SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_SOUND,
               reinterpret_cast<LPARAM>(&bi));
 }
@@ -819,7 +826,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = g_paused ? L"Resume Ants" : L"Pause Ants";
       break;
     case IDM_SOUND:
-      text = g_playsound ? L"Mute Music" : L"Play Music";
+      text = g_playsound ? L"Mute Background Sounds" : L"Play Background Sounds";
       break;
     default: return false; // unknown button — let the default handling run
   }
