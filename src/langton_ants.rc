@@ -153,6 +153,7 @@ BEGIN
     0x50,      IDM_PAUSED, VIRTKEY, CONTROL     // Ctrl+P Paused
     0x52,      IDM_REPAINT, VIRTKEY, NOINVERT   // R key Repaint
     0x52,      IDM_REPAINT, VIRTKEY, CONTROL    // Ctrl+R Repaint
+    0x53,      IDM_SAVE_AS, VIRTKEY, CONTROL    // Ctrl+S
     VK_SPACE,  IDM_SINGLE, VIRTKEY, NOINVERT    // Spacebar Single-step
 END
 
