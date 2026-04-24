@@ -60,6 +60,11 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
   srand(static_cast<unsigned>(GetTickCount() ^ GetCurrentThreadId()));
   int cellX = -1, cellY = -1;
   int dir   = 0;
+  // onBg tracks whether the cell the ant is sitting on was an unvisited
+  // background cell or a path cell *before* we painted it magenta. Stored
+  // semantically (bool) not as a raw COLORREF so it still interprets
+  // correctly if g_bkg_color changes mid-flight.
+  bool onBg = true;
   // Direction → (dx, dy) in cell units, matching the encoding above.
   static const int kDx[4] = {  0, 1, 0, -1 };
   static const int kDy[4] = { -1, 0, 1,  0 };
@@ -91,57 +96,87 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
       const int gridW = cxClient / CELL_PX;
       const int gridH = cyClient / CELL_PX;
       if (gridW >= 2 && gridH >= 2) {
-        // First-tick placement, or recovery after a resize that shrank the
-        // grid below our current cell. Uniform across the grid with a
-        // random starting heading.
-        if (cellX < 0 || cellY < 0 || cellX >= gridW || cellY >= gridH) {
+        const bool needsPlacement = (cellX < 0 || cellY < 0 ||
+                                     cellX >= gridW || cellY >= gridH);
+        if (needsPlacement) {
+          // First-tick placement, or recovery after a resize that shrank
+          // the grid below our old cell. Sample the cell to decide onBg
+          // (could be bg or a stale trail), then overpaint with magenta
+          // to mark the ant. No Langton step this tick — next tick starts
+          // stepping normally.
           cellX = rand() % gridW;
           cellY = rand() % gridH;
           dir   = rand() % 4;
+          const int px = cellX * CELL_PX;
+          const int py = cellY * CELL_PX;
+          const COLORREF sampled = GetPixel(g_hdcMem, px, py);
+          onBg = (sampled == g_bkg_color);
+          RECT antRc = { px, py, px + CELL_PX, py + CELL_PX };
+          HBRUSH hAnt = CreateSolidBrush(RGB_MAGENTA);
+          FillRect(g_hdcMem, &antRc, hAnt);
+          DeleteObject(hAnt);
+          RECT inval = { px, py + g_toolbarHeight,
+                         px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+          InvalidateRect(mainHwnd, &inval, FALSE);
+        } else {
+          // Classic Langton's step. We can't GetPixel the cell under the
+          // ant — it's magenta — so we use the cached onBg from when the
+          // ant arrived. On bg cell turn right, on path cell turn left,
+          // flip the cell's color, then step forward one cell.
+          dir = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
+          const COLORREF trailColor = onBg ? CurrentPathColor() : g_bkg_color;
+          const int px = cellX * CELL_PX;
+          const int py = cellY * CELL_PX;
+          // Overpaint the vacating cell with the flipped trail color.
+          // This both performs the Langton flip and removes the magenta
+          // overlay, leaving a clean mark the next ant will classify
+          // correctly via GetPixel.
+          RECT trailRc = { px, py, px + CELL_PX, py + CELL_PX };
+          HBRUSH hTrail = CreateSolidBrush(trailColor);
+          FillRect(g_hdcMem, &trailRc, hTrail);
+          DeleteObject(hTrail);
+
+          // Try to step forward. If that would leave the grid, reverse
+          // 180° and step the other way — "bounce off the wall". The
+          // trail we just painted stays as-is; only dir changes.
+          int nx = cellX + kDx[dir];
+          int ny = cellY + kDy[dir];
+          if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) {
+            dir = (dir + 2) & 3;
+            nx = cellX + kDx[dir];
+            ny = cellY + kDy[dir];
+          }
+          cellX = nx;
+          cellY = ny;
+
+          // Sample the new cell to learn bg vs. path for the next tick's
+          // turn decision. Anything matching the current bg counts as
+          // "unvisited"; anything else (including stale trails from
+          // before a bg change) counts as path.
+          const int npx = cellX * CELL_PX;
+          const int npy = cellY * CELL_PX;
+          const COLORREF sampled = GetPixel(g_hdcMem, npx, npy);
+          onBg = (sampled == g_bkg_color);
+
+          // Paint the ant on the new cell.
+          RECT antRc = { npx, npy, npx + CELL_PX, npy + CELL_PX };
+          HBRUSH hAnt = CreateSolidBrush(RGB_MAGENTA);
+          FillRect(g_hdcMem, &antRc, hAnt);
+          DeleteObject(hAnt);
+
+          // Invalidate both the trail cell and the new ant cell so
+          // WM_PAINT blits both tight rects on the next paint pass.
+          // InvalidateRect is documented as safe to call from any thread;
+          // it just posts WM_PAINT to the window's owning (main) thread.
+          // Coords shift by g_toolbarHeight to go from back-buffer space
+          // into window-client space.
+          RECT invalOld = { px, py + g_toolbarHeight,
+                            px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+          RECT invalNew = { npx, npy + g_toolbarHeight,
+                            npx + CELL_PX, npy + CELL_PX + g_toolbarHeight };
+          InvalidateRect(mainHwnd, &invalOld, FALSE);
+          InvalidateRect(mainHwnd, &invalNew, FALSE);
         }
-
-        const int px = cellX * CELL_PX;
-        const int py = cellY * CELL_PX;
-        // Every cell is painted as a solid CELL_PX × CELL_PX block, so
-        // sampling any one of its pixels tells us the whole cell's logical
-        // color. Top-left is convenient.
-        const COLORREF sampled = GetPixel(g_hdcMem, px, py);
-        // Binary classification: anything matching the current bg counts
-        // as "unvisited", anything else is "path". That way stale trails
-        // left over from before a bg change still read as path and fold
-        // back into the automaton's state correctly.
-        const bool onBg = (sampled == g_bkg_color);
-        // Classic Langton's: on bg cell turn right, on path cell turn left,
-        // flip the cell's color, then step forward one cell.
-        dir = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
-        const COLORREF paintColor = onBg ? CurrentPathColor() : g_bkg_color;
-        RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
-        HBRUSH hBrush = CreateSolidBrush(paintColor);
-        FillRect(g_hdcMem, &rc, hBrush);
-        DeleteObject(hBrush);
-
-        // Try to step forward. If that would leave the grid, reverse 180°
-        // and step the other way — "bouncing off the wall". We don't undo
-        // the flip we just did; only the direction changes.
-        int nx = cellX + kDx[dir];
-        int ny = cellY + kDy[dir];
-        if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) {
-          dir = (dir + 2) & 3;
-          nx = cellX + kDx[dir];
-          ny = cellY + kDy[dir];
-        }
-        cellX = nx;
-        cellY = ny;
-
-        // Invalidate just the cell we painted so WM_PAINT blits a tight
-        // region instead of the whole canvas. InvalidateRect is documented
-        // as safe to call from any thread; it just posts WM_PAINT to the
-        // window's owning (main) thread. Coords need shifting by
-        // g_toolbarHeight to go from back-buffer space into window-client
-        // space.
-        RECT inval = { px, py + g_toolbarHeight,
-                       px + CELL_PX, py + CELL_PX + g_toolbarHeight };
-        InvalidateRect(mainHwnd, &inval, FALSE);
       }
     }
     LeaveCriticalSection(&g_paintCS);

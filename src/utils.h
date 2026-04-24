@@ -35,6 +35,8 @@ inline constexpr unsigned long kMedSpeed   = 125UL;
 inline constexpr unsigned long kHighSpeed  = 62UL;
 inline constexpr unsigned long kHyperSpeed = 31UL;
 
+extern unsigned long kDefaultSpeed;
+
 inline constexpr INT CW_WIDTH  = 640;
 inline constexpr INT CW_HEIGHT = 640;
 

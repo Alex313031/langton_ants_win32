@@ -92,8 +92,8 @@ BEGIN
         POPUP "&Num Ants"
         BEGIN
             MENUITEM "1 Threads", IDM_CONC_1
-            MENUITEM "2 Threads", IDM_CONC_2, CHECKED
-            MENUITEM "3 Threads", IDM_CONC_3
+            MENUITEM "2 Threads", IDM_CONC_2
+            MENUITEM "3 Threads", IDM_CONC_3, CHECKED
             MENUITEM "4 Threads", IDM_CONC_4
             MENUITEM "5 Threads", IDM_CONC_5
             MENUITEM "6 Threads", IDM_CONC_6
@@ -105,8 +105,8 @@ BEGIN
         BEGIN
             MENUITEM "&Slow   (1/4 sec.)", IDM_SLOW
             MENUITEM "&Medium (1/8 sec.)", IDM_MEDIUM
-            MENUITEM "&Fast   (1/16 sec.)", IDM_FAST, CHECKED
-            MENUITEM "&Hyper  (1/32 sec.)", IDM_HYPER
+            MENUITEM "&Fast   (1/16 sec.)", IDM_FAST
+            MENUITEM "&Hyper  (1/32 sec.)", IDM_HYPER, CHECKED
         END
         MENUITEM SEPARATOR
         MENUITEM "&Use MonoChrome", IDM_MONOCHROME

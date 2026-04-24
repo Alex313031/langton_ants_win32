@@ -484,7 +484,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             case IDM_MEDIUM: g_delay = 125UL; break;
             case IDM_FAST:   g_delay = 62UL; break;
             case IDM_HYPER:  g_delay = 31UL; break;
-            default:         g_delay = 62UL; break;
+            default:
+              LOG(ERROR) << "Unhandled speed type";
+              g_delay = kDefaultSpeed;
+              break;
           }
           // Replace the timer with the new interval. SetTimer on an existing ID
           // replaces it in place — the next tick will be at the new rate.
