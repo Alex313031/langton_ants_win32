@@ -1,0 +1,36 @@
+# Copyright 2026 Alex313031
+
+executable("langton_ants") {
+  configs += [
+    ":langton_ants_config",
+    "src/logging:antlogger_config",
+  ]
+  precompiled_header = "src/framework.h"
+  precompiled_source = "src/pch.cc"
+  sources = [
+    "src/ants.cc",
+    "src/ants.h",
+    "src/langton_ants.rc",
+    "src/framework.h",
+    "src/globals.h",
+    "src/main.cc",
+    "src/main.h",
+    "src/resource.h",
+    "src/utils.cc",
+    "src/utils.h",
+    "src/version.h",
+  ]
+  deps = [
+    "src/logging:antlogger",
+  ]
+}
+
+config("langton_ants_config") {
+  defines = []
+  cflags = []
+  include_dirs = [ "./src", ]
+  cflags += [
+    "-Wunused-function",
+  ]
+  libs = [ "winmm", ]
+}
