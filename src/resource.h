@@ -91,6 +91,12 @@
 // to res/ants.wav; FindResourceW(L"WAVE") picks it up at runtime.
 #define IDR_BGM_WAVE                500
 
+// Embedded "fahh" sound effect played by IDM_TESTTRAP right before the
+// debug trap fires. Loaded via PlaySoundW(SND_RESOURCE) directly from
+// the exe — no temp-file dance needed since PlaySound can read a WAVE
+// resource out of memory.
+#define IDR_FAHH_WAVE               501
+
 // Custom posted-message IDs (WM_APP range, guaranteed to not clash with any
 // system / common-control message). Used to defer work that mustn't run
 // inside WM_CREATE — see WM_APP_AUTOPLAY usage in main.cc.

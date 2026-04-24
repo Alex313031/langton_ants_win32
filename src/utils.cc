@@ -223,8 +223,6 @@ inline static void __KillInt3Asm() {
 }
 
 void TestTrap() {
-  StopPlayWav();
-  PlayWavFile(L"fahh.wav", false);
   __KillInt3Asm();
   return;
 }

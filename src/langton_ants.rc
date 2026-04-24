@@ -50,6 +50,11 @@ IDB_TIME_BMP   BITMAP "res/timer.bmp"
 // next to the exe instead.
 IDR_BGM_WAVE   WAVE   "res/ants.wav"
 
+// "Fahh" sound effect for Dev → Test Trap. Standard PCM WAV; played via
+// PlaySoundW with SND_RESOURCE, which reads the bytes directly from the
+// loaded PE image without needing a temp file.
+IDR_FAHH_WAVE  WAVE   "res/fahh.wav"
+
 #ifdef APSTUDIO_INVOKED
 
 1 TEXTINCLUDE
@@ -87,7 +92,7 @@ BEGIN
     POPUP "&Settings"
     BEGIN
         MENUITEM "&Pause Ants",   IDM_PAUSED
-        MENUITEM "&Sound?",       IDM_SOUND
+        MENUITEM "&Sound?",       IDM_SOUND, CHECKED
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN

@@ -520,6 +520,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_TESTTRAP:
+          StopPlayWav(); // Stop any playing audio
+          // Play the "fahh" sound-effect synchronously so the whole clip
+          // gets through before TestTrap fires. SND_ASYNC would let the
+          // int3 kill the PlaySound worker mid-playback; SND_SYNC blocks
+          // the UI for the clip's duration (~1s) which is fine for a dev
+          // menu item that's about to crash the app anyway. SND_NODEFAULT
+          // suppresses the system "ding" fallback if the resource is
+          // missing.
+          PlaySoundW(MAKEINTRESOURCEW(IDR_FAHH_WAVE), g_hInstance,
+                     SND_RESOURCE | SND_SYNC | SND_NODEFAULT);
           TestTrap();
           break;
         default:
