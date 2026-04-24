@@ -166,16 +166,23 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         SignalAntsTick();
       }
       break;
-    case WM_APP_AUTOPLAY:
+    case WM_APP_AUTOPLAY: {
       // Deferred startup auto-play. InitApp (called from WM_CREATE) posts
       // this message instead of calling PlayWavFile directly so the actual
       // play call runs in the normal WindowProc dispatch context rather
       // than inside WM_CREATE, which is correct cross-version hygiene.
-      // SetSoundButton flips the toolbar button from "Music" (idle) to
-      // "Mute" (playing) once playback is underway.
-      PlayWavFile(sound_file, kUseEmbeddedBgm);
+      // SetSoundButton flips the toolbar button from "Music On" (idle) to
+      // "Mute" (playing) once playback is underway. If the play call fails
+      // (missing WAV, driver error, etc.), clear the IDM_SOUND menu check
+      // so the menu state matches the fact that nothing is actually playing.
+      const bool playing = PlayWavFile(sound_file, kUseEmbeddedBgm);
+      if (!playing) {
+        HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+        CheckMenuItem(hSettings, IDM_SOUND, MF_BYCOMMAND | MF_UNCHECKED);
+      }
       SetSoundButton(g_playsound);
       break;
+    }
     case MM_MCINOTIFY:
       // Loop-back handler for the MCI-driven background music. When the
       // waveform driver finishes a `play ... notify` command successfully,
@@ -574,7 +581,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // Tear down every ant thread, signal their tick events, and close
       // their handles in one shot.
       ShutdownAnts();
-      StopPlayWav(); // In case window was destroyed not from WM_CLOSE
+      // Tear down MCI here too — most shutdowns go through ShutDownApp
+      // (which calls StopPlayWav), but if the window is destroyed by any
+      // other path (external DestroyWindow, session end, etc.) we still
+      // need to close the waveform device and delete the temp BGM file.
+      // StopPlayWav is a no-op if the device was never opened.
+      StopPlayWav();
       // Clean up the back buffer. Order matters: DeleteDC first deselects
       // g_hbmMem from the memory DC, after which DeleteObject can safely free
       // the bitmap. Deleting a bitmap that is still selected into a DC is
