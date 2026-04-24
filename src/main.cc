@@ -35,7 +35,7 @@ CRITICAL_SECTION g_paintCS;
 COLORREF g_bkg_color = RGB_BLUE;
 
 // Whether to open conhost window for debugging.
-static constexpr bool debug_console = true;
+static constexpr bool debug_console = is_debug;
 
 int APIENTRY wWinMain(HINSTANCE hInstance,
                       HINSTANCE hPrevInstance,
@@ -109,8 +109,21 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // OS handles its theming (themed on XP+, classic on Win2000).
   static constexpr DWORD style =
       WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
+  // Center on the primary monitor's work area (the screen minus the
+  // taskbar). SPI_GETWORKAREA is available back to Win2000 and handles
+  // the case where the taskbar is docked at the top/left/right. If the
+  // query fails for any reason, fall back to CW_USEDEFAULT so the OS
+  // places the window wherever it likes rather than at (0,0) with a
+  // half-off-screen origin.
+  int xPos = CW_USEDEFAULT;
+  int yPos = CW_USEDEFAULT;
+  RECT workArea = {};
+  if (SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0)) {
+    xPos = workArea.left + ((workArea.right  - workArea.left) - CW_WIDTH)  / 2;
+    yPos = workArea.top  + ((workArea.bottom - workArea.top)  - CW_HEIGHT) / 2;
+  }
   mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style,
-                         CW_USEDEFAULT, CW_USEDEFAULT,
+                         xPos, yPos,
                          CW_WIDTH, CW_HEIGHT, nullptr, nullptr, hInstance, nullptr);
 
   if (mainHwnd == nullptr) {
