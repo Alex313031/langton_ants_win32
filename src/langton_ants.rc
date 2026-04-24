@@ -108,10 +108,10 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
-            MENUITEM "&Slow   (1/4 sec.)", IDM_SLOW
-            MENUITEM "&Medium (1/8 sec.)", IDM_MEDIUM
-            MENUITEM "&Fast   (1/16 sec.)", IDM_FAST
-            MENUITEM "&Hyper  (1/32 sec.)", IDM_HYPER, CHECKED
+            MENUITEM "&Slow   (250 ms.)", IDM_SLOW
+            MENUITEM "&Medium (125 ms.)", IDM_MEDIUM
+            MENUITEM "&Fast   (33 ms.)",  IDM_FAST, CHECKED
+            MENUITEM "&Hyper  (10 ms.)",  IDM_HYPER
         END
         MENUITEM SEPARATOR
         MENUITEM "&Use MonoChrome", IDM_MONOCHROME
