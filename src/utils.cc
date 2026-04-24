@@ -450,11 +450,34 @@ bool StopPlayWav() {
   return true;
 }
 
+// Set true by AntPauseBgm when it actually paused the BGM. Cleared by
+// AntResumeBgm after resuming, or by ToggleSound on any explicit user
+// toggle — so an explicit mute/unmute during an ant pause "wins" over
+// the auto-resume that would otherwise fire when ants un-pause.
+static bool s_bgm_paused_by_ants = false;
+
 bool ToggleSound() {
+  // User is taking explicit control of sound; forget that we had auto-
+  // paused it so we don't later contradict their choice on ant resume.
+  s_bgm_paused_by_ants = false;
   if (g_playsound) {
     return PauseWavFile();
   } else {
     return PlayWavFile(sound_file, kUseEmbeddedBgm);
+  }
+}
+
+void AntPauseBgm() {
+  if (g_playsound) {
+    PauseWavFile();
+    s_bgm_paused_by_ants = true;
+  }
+}
+
+void AntResumeBgm() {
+  if (s_bgm_paused_by_ants) {
+    s_bgm_paused_by_ants = false;
+    PlayWavFile(sound_file, kUseEmbeddedBgm);
   }
 }
 

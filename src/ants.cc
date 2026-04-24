@@ -437,10 +437,15 @@ void TogglePaintAnts(HWND hWnd) {
   // Pause = kill the timer so no more ticks fire. Every active thread sits
   // parked on its tick event, zero CPU. Resume = re-arm the timer and also
   // give one immediate pulse so the window doesn't wait up to g_delay ms
-  // before redrawing.
+  // before redrawing. The BGM follows the simulation in lockstep via
+  // AntPauseBgm / AntResumeBgm — single-step lands here too (it enters
+  // the paused branch once, then further single-steps no-op this
+  // toggle), so the BGM stays paused until the user un-pauses.
   if (g_paused) {
     KillTimer(hWnd, TIMER_ANTS);
+    AntPauseBgm();
   } else {
+    AntResumeBgm();
     SignalAntsTick();
     SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
   }

@@ -82,6 +82,18 @@ bool StopPlayWav();
 // Starts and stops playing sound at will.
 bool ToggleSound();
 
+// Called by the ants-pause path (TogglePaintAnts) to auto-pause the BGM
+// in lockstep with the simulation. If the BGM is currently playing, this
+// issues an MCI pause and remembers internally that *we* were the ones
+// who paused it. If the BGM is muted / never started, does nothing.
+void AntPauseBgm();
+
+// Called by the ants-resume path. Resumes the BGM only if AntPauseBgm
+// was the thing that paused it and the user hasn't since toggled sound
+// explicitly (ToggleSound clears the internal flag so their choice
+// wins over our auto-resume).
+void AntResumeBgm();
+
 // Helper functions for MessageBoxW
 bool InfoBox(HWND hWnd, const std::wstring& title, const std::wstring& message);
 
