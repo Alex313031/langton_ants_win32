@@ -136,15 +136,27 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
           FillRect(g_hdcMem, &trailRc, hTrail);
           DeleteObject(hTrail);
 
-          // Try to step forward. If that would leave the grid, reverse
-          // 180° and step the other way — "bounce off the wall". The
-          // trail we just painted stays as-is; only dir changes.
+          // Try to step forward. A target cell is "blocked" if it's out of
+          // bounds (wall) or currently occupied by another ant (magenta).
+          // On block, reverse direction 180° and try the other way — the
+          // same "bounce" rule covers both walls and ant-vs-ant collisions.
+          // If the reversed cell is also blocked, stay put for this tick;
+          // the subsequent sample-at-new-cell step still works because it
+          // reads the trail color we just painted on the vacating cell.
+          auto isBlocked = [&](int x, int y) -> bool {
+            if (x < 0 || x >= gridW || y < 0 || y >= gridH) return true;
+            return GetPixel(g_hdcMem, x * CELL_PX, y * CELL_PX) == RGB_MAGENTA;
+          };
           int nx = cellX + kDx[dir];
           int ny = cellY + kDy[dir];
-          if (nx < 0 || nx >= gridW || ny < 0 || ny >= gridH) {
+          if (isBlocked(nx, ny)) {
             dir = (dir + 2) & 3;
             nx = cellX + kDx[dir];
             ny = cellY + kDy[dir];
+            if (isBlocked(nx, ny)) {
+              nx = cellX;
+              ny = cellY;
+            }
           }
           cellX = nx;
           cellY = ny;

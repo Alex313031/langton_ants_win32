@@ -91,7 +91,7 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN
-            MENUITEM "1 Threads", IDM_CONC_1
+            MENUITEM "1 Thread",  IDM_CONC_1
             MENUITEM "2 Threads", IDM_CONC_2
             MENUITEM "3 Threads", IDM_CONC_3, CHECKED
             MENUITEM "4 Threads", IDM_CONC_4

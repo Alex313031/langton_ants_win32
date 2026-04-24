@@ -60,7 +60,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.cbWndExtra    = 0;
   wndclass.hInstance     = hInstance;
   wndclass.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
-  wndclass.hCursor       = LoadCursorW(nullptr, IDC_ARROW) ;
+  wndclass.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
   // No stock brush matches our default bg (there's only black / white /
   // grey / null), and we handle erase + paint ourselves — WM_ERASEBKGND
   // returns TRUE and WM_PAINT fills with g_bkg_color. nullptr here skips
@@ -130,8 +130,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
       DispatchMessageW(&msg);
     }
   }
+  if (hAccel != nullptr) {
+    DestroyAcceleratorTable(hAccel);
+  }
   DeleteCriticalSection(&g_paintCS);
-  return msg.wParam;
+  return static_cast<int>(msg.wParam);
 }
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -309,7 +312,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         case IDM_ABOUT:
           if (!g_playsound) {
-            PlaySoundW(L"SystemNotification", nullptr, SND_ASYNC);
+            PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
           }
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;
@@ -571,6 +574,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // Tear down every ant thread, signal their tick events, and close
       // their handles in one shot.
       ShutdownAnts();
+      StopPlayWav(); // In case window was destroyed not from WM_CLOSE
       // Clean up the back buffer. Order matters: DeleteDC first deselects
       // g_hbmMem from the memory DC, after which DeleteObject can safely free
       // the bitmap. Deleting a bitmap that is still selected into a DC is
