@@ -53,35 +53,36 @@
 #define IDM_MEDIUM                  217
 #define IDM_FAST                    218
 #define IDM_HYPER                   219
+#define IDM_REALTIME                220
 
 // Sound settings
-#define IDM_SOUND                   220
+#define IDM_SOUND                   221
 
 // Ant drawing threads
-#define IDM_CONC_1                  221
-#define IDM_CONC_2                  222
-#define IDM_CONC_3                  223
-#define IDM_CONC_4                  224
-#define IDM_CONC_5                  225
-#define IDM_CONC_6                  226
-#define IDM_CONC_7                  227
-#define IDM_CONC_8                  228
+#define IDM_CONC_1                  222
+#define IDM_CONC_2                  223
+#define IDM_CONC_3                  224
+#define IDM_CONC_4                  225
+#define IDM_CONC_5                  226
+#define IDM_CONC_6                  227
+#define IDM_CONC_7                  228
+#define IDM_CONC_8                  229
 
 // Forces painting a new canvas, with whatever settings it currently has
-#define IDM_REPAINT                 231
+#define IDM_REPAINT                 230
 
 // "Single step" through ant painting, allows you to run it manually one iteration at a time
 // instead of using timer
-#define IDM_SINGLE                  232
+#define IDM_SINGLE                  231
 
 // Toolbar button identifier for "Num Ants" button with submenu.
-#define IDM_ANTS                    240
+#define IDM_ANTS                    232
 
 // Toolbar button identifier for "Speed" button with submenu.
-#define IDM_SPEED                   241
+#define IDM_SPEED                   233
 
 // Dev menu item, test debug trap
-#define IDM_TESTTRAP                250
+#define IDM_TESTTRAP                240
 
 // Timer ID for painting
 #define TIMER_ANTS                  400

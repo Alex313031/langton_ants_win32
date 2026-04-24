@@ -33,7 +33,8 @@ extern volatile bool g_playsound;
 inline constexpr unsigned long kSlowSpeed  = 250UL;
 inline constexpr unsigned long kMedSpeed   = 125UL;
 inline constexpr unsigned long kHighSpeed  = 33UL;
-inline constexpr unsigned long kHyperSpeed = 10UL;
+inline constexpr unsigned long kHyperSpeed = 16UL;
+inline constexpr unsigned long kRealTime   = 1UL;
 
 extern unsigned long g_default_speed;
 

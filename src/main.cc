@@ -497,15 +497,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SLOW:
         case IDM_MEDIUM:
         case IDM_FAST:
-        case IDM_HYPER: {
+        case IDM_HYPER:
+        case IDM_REALTIME: {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hDelay    = GetSubMenu(hSettings, 5);
-          CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_HYPER, command, MF_BYCOMMAND);
+          CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
           switch (command) {
-            case IDM_SLOW:   g_delay = kSlowSpeed;  break;
-            case IDM_MEDIUM: g_delay = kMedSpeed;   break;
-            case IDM_FAST:   g_delay = kHighSpeed;  break;
-            case IDM_HYPER:  g_delay = kHyperSpeed; break;
+            case IDM_SLOW:     g_delay = kSlowSpeed;  break;
+            case IDM_MEDIUM:   g_delay = kMedSpeed;   break;
+            case IDM_FAST:     g_delay = kHighSpeed;  break;
+            case IDM_HYPER:    g_delay = kHyperSpeed; break;
+            case IDM_REALTIME: g_delay = kRealTime;   break;
             default:
               LOG(ERROR) << "Unhandled speed type";
               g_delay = g_default_speed;

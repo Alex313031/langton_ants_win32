@@ -60,10 +60,11 @@ void InitMenuDefaults(HWND hWnd) {
 
   // Draw delay
   const struct { UINT id; unsigned long ms; } delays[] = {
-    { IDM_SLOW,   kSlowSpeed },
-    { IDM_MEDIUM, kMedSpeed },
-    { IDM_FAST,   kHighSpeed },
-    { IDM_HYPER,  kHyperSpeed },
+    { IDM_SLOW,     kSlowSpeed },
+    { IDM_MEDIUM,   kMedSpeed },
+    { IDM_FAST,     kHighSpeed },
+    { IDM_HYPER,    kHyperSpeed },
+    { IDM_REALTIME, kRealTime },
   };
   for (const auto& d : delays) {
     if (GetMenuState(hDelay, d.id, MF_BYCOMMAND) & MF_CHECKED) {
