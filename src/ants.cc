@@ -2,6 +2,7 @@
 
 #include "globals.h"
 #include "resource.h"
+#include "sound.h"
 #include "utils.h"
 
 volatile bool g_running = false; // Global ant threads running state

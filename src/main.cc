@@ -6,6 +6,7 @@
 #include "main.h"
 
 #include "resource.h"
+#include "sound.h"
 #include "utils.h"
 #include "version.h"
 

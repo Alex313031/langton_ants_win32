@@ -1,0 +1,60 @@
+#ifndef LANGTON_ANTS_SOUND_H_
+#define LANGTON_ANTS_SOUND_H_
+
+#include "framework.h"
+
+// Default BGM filename (side-by-side with the .exe). Ignored when
+// kUseEmbeddedBgm is true, but kept for the fallback file-source path.
+inline const std::wstring sound_file = L"ants.wav";
+
+// Compile-time switch for how the background music is sourced. When true,
+// PlayWavFile ignores its wav_file argument and plays the WAV baked into
+// the .exe as the IDR_BGM_WAVE resource (extracted to a temp file so MCI
+// can open it — MCI's string API has no "play from memory" form, and we
+// need MCI specifically to decode MS ADPCM reliably on Win2K). When false,
+// PlayWavFile reads the file by name from the exe directory as before.
+// Flip here and rebuild; callers pass this through to PlayWavFile.
+inline constexpr bool kUseEmbeddedBgm = true;
+
+// True iff the BGM is currently playing (as opposed to muted / paused).
+// Read from main.cc / ants.cc to mirror state on the menu + toolbar and
+// as a guard against late-arriving MM_MCINOTIFY messages.
+extern volatile bool g_playsound;
+
+// Plays a .wav file. On the first call, opens the file and starts playback
+// from position 0. On subsequent calls after a PauseWavFile, issues an MCI
+// `resume` so playback continues from where it was paused (no re-open, no
+// restart).
+//
+// If use_embedded is true, wav_file is ignored and the clip is taken from
+// the IDR_BGM_WAVE resource baked into the exe. On first play the resource
+// is materialized to a temp file (MCI needs a path, not a memory buffer)
+// and StopPlayWav deletes that file on cleanup. If use_embedded is false,
+// wav_file must name a .wav sitting next to the exe.
+bool PlayWavFile(const std::wstring& wav_file, bool use_embedded);
+
+// Pauses the currently-playing sound, preserving playback position. The
+// MCI device stays open; a following PlayWavFile will resume rather than
+// restart. Used by the mute toolbar / menu toggle.
+bool PauseWavFile();
+
+// Fully stops playback and releases the MCI device (stop + close). Used by
+// ShutDownApp for cleanup on exit — not by the mute toggle.
+bool StopPlayWav();
+
+// Starts and stops playing sound at will.
+bool ToggleSound();
+
+// Called by the ants-pause path (TogglePaintAnts) to auto-pause the BGM
+// in lockstep with the simulation. If the BGM is currently playing, this
+// issues an MCI pause and remembers internally that *we* were the ones
+// who paused it. If the BGM is muted / never started, does nothing.
+void AntPauseBgm();
+
+// Called by the ants-resume path. Resumes the BGM only if AntPauseBgm
+// was the thing that paused it and the user hasn't since toggled sound
+// explicitly (ToggleSound clears the internal flag so their choice
+// wins over our auto-resume).
+void AntResumeBgm();
+
+#endif // LANGTON_ANTS_SOUND_H_

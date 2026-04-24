@@ -16,6 +16,8 @@ executable("langton_ants") {
     "src/main.cc",
     "src/main.h",
     "src/resource.h",
+    "src/sound.cc",
+    "src/sound.h",
     "src/utils.cc",
     "src/utils.h",
     "src/version.h",
