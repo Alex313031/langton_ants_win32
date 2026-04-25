@@ -104,6 +104,19 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   }
 
   InitializeCriticalSection(&g_paintCS);
+  // Tighten the system timer resolution from the default ~15.6ms down
+  // to 1ms for the life of the process. SetTimer (driving the ant tick)
+  // and the sound subsystem both benefit — at Hyper / Realtime speeds
+  // the default resolution rounds our requested interval up to the
+  // nearest 15ms, so misses-and-catches-up visibly as stutter. Paired
+  // with timeEndPeriod below.
+  timeBeginPeriod(1);
+  // Spin up the BGM worker thread. The worker owns the MCI device and
+  // its hidden notify window, so all mciSendString calls (including
+  // the 2-second loop re-issue) run off the main thread. Must come
+  // before any PlayWavFile call; PostMessageW(WM_APP_AUTOPLAY) from
+  // InitApp fires only after the message loop starts, well after this.
+  InitBgm();
 
   static constexpr DWORD exStyle =
 #if _WIN32_WINNT > 0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
@@ -154,6 +167,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     DestroyAcceleratorTable(hAccel);
   }
   DeleteCriticalSection(&g_paintCS);
+  // Match the timeBeginPeriod at startup. Not strictly needed (the OS
+  // drops the requested resolution when the process exits) but good
+  // hygiene — especially on older Windows where the effect is system-
+  // wide rather than per-process.
+  timeEndPeriod(1);
   return static_cast<int>(msg.wParam);
 }
 
@@ -203,34 +221,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       SetSoundButton(g_playsound);
       break;
     }
-    case MM_MCINOTIFY:
-      // Loop-back handler for the MCI-driven background music. When the
-      // waveform driver finishes a `play ... notify` command successfully,
-      // it posts MM_MCINOTIFY with wParam == MCI_NOTIFY_SUCCESSFUL. We
-      // re-issue the play command here to achieve continuous looping —
-      // MCIWAVE doesn't accept `repeat` on its play verb the way MCIAVI /
-      // MCICDA do, so this is the idiomatic substitute.
-      //
-      // `from 0` is REQUIRED: after a natural completion MCI leaves the
-      // position cursor at end-of-file, and a bare `play` would try to
-      // resume from EOF (a silent no-op). Explicitly rewinding to 0
-      // restarts the clip cleanly and is correct whether or not the
-      // driver auto-rewinds on underflow.
-      //
-      // wParam values we might see: MCI_NOTIFY_SUCCESSFUL (natural end-of-
-      // clip — we loop), MCI_NOTIFY_SUPERSEDED (another play command took
-      // over — do nothing), MCI_NOTIFY_ABORTED (stop/close happened — do
-      // nothing), MCI_NOTIFY_FAILURE (driver error — do nothing). The
-      // g_playsound guard also protects against a late-arriving SUCCESSFUL
-      // notification that races a user Stop.
-      if (wParam == MCI_NOTIFY_SUCCESSFUL && g_playsound) {
-        // Re-issue with hWnd as the callback so the NEXT completion also
-        // lands here. Dropping the callback param (passing nullptr) would
-        // make MCI silently swallow future MM_MCINOTIFY messages and the
-        // loop would play exactly twice then die.
-        mciSendStringW(L"play langton_ants_bgm from 0 notify", nullptr, 0, hWnd);
-      }
-      break;
     case WM_ERASEBKGND:
       // Returning TRUE tells Windows we have handled background erasing
       // ourselves, suppressing the default white fill. We do our own filling
@@ -433,10 +423,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_REPAINT: {
-          // Clear the back buffer to the current background color and force a
-          // repaint. All user settings stay intact — the ant thread keeps
-          // drawing at the same rate with the same speed/color options,
-          // it just has a fresh canvas to paint onto.
+          // Clear the back buffer to the current background color, then
+          // reseed every ant so their positions, directions, and marker
+          // colors all reroll on the next tick. All user settings (speed,
+          // num ants, monochrome, etc.) stay intact — only the runtime
+          // per-ant state resets.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
             RECT rc = { 0, 0, cxClient, cyClient };
@@ -445,6 +436,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             DeleteObject(hBrush);
           }
           LeaveCriticalSection(&g_paintCS);
+          ReseedAnts();
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
@@ -640,8 +632,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // (which calls StopPlayWav), but if the window is destroyed by any
       // other path (external DestroyWindow, session end, etc.) we still
       // need to close the waveform device and delete the temp BGM file.
-      // StopPlayWav is a no-op if the device was never opened.
+      // StopPlayWav must come BEFORE ShutdownBgm — it's a sync post to
+      // the worker, so the worker has to still be alive to process it.
+      // StopPlayWav is a no-op if the device was never opened;
+      // ShutdownBgm is a no-op if the worker was never started.
       StopPlayWav();
+      ShutdownBgm();
       // Clean up the back buffer. Order matters: DeleteDC first deselects
       // g_hbmMem from the memory DC, after which DeleteObject can safely free
       // the bitmap. Deleting a bitmap that is still selected into a DC is
@@ -668,7 +664,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 }
 
 void ShutDownApp() {
+  // Stop the BGM first (sync post to the worker), THEN tear the worker
+  // down. Both calls are idempotent — WM_DESTROY will call them again
+  // harmlessly on the way out.
   StopPlayWav();
+  ShutdownBgm();
   // WM_DESTROY will call ShutdownAnts() for us — DestroyWindow triggers that
   // path synchronously, so we don't need to touch thread state here.
   DestroyWindow(mainHwnd);

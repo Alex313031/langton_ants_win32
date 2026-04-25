@@ -57,4 +57,19 @@ void AntPauseBgm();
 // wins over our auto-resume).
 void AntResumeBgm();
 
+// Spins up the BGM worker thread. The worker owns the MCI device
+// end-to-end — every mciSendString (open, play, pause, resume, stop,
+// close, and the loop re-issue) runs on this thread, including the
+// MM_MCINOTIFY loop-back that drives looping. Main thread interacts
+// only through the public API above, which posts commands to a small
+// single-slot queue and waits for the worker to finish. Call once at
+// app startup, before any PlayWavFile.
+void InitBgm();
+
+// Signals the BGM worker to exit and joins it, releasing the worker's
+// hidden notify window and synchronization primitives. Call at app
+// shutdown AFTER StopPlayWav so the stop command can still be processed
+// by a live worker before teardown.
+void ShutdownBgm();
+
 #endif // LANGTON_ANTS_SOUND_H_

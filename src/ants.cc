@@ -22,9 +22,10 @@ unsigned long g_delay = kHyperSpeed; // Default until InitMenuDefaults reads the
 // lets us dynamically spawn/terminate individual threads when the user
 // changes the Num Ants setting.
 struct AntThreadSlot {
-  HANDLE        hThread       = nullptr;
-  HANDLE        hTickEvent    = nullptr; // auto-reset; SetEvent = "go draw"
-  volatile bool exitRequested = false;   // set true to make thread exit cleanly
+  HANDLE        hThread          = nullptr;
+  HANDLE        hTickEvent       = nullptr; // auto-reset; SetEvent = "go draw"
+  volatile bool exitRequested    = false;   // set true to make thread exit cleanly
+  volatile bool reseedRequested  = false;   // set true to reroll position / color / dir
 };
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int           s_activeCount = 0;  // only touched from the main thread
@@ -61,10 +62,15 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
   srand(static_cast<unsigned>(GetTickCount() ^ GetCurrentThreadId()));
   int cellX = -1, cellY = -1;
   int dir   = 0;
+  // Per-ant marker color. Picked once at placement (see needsPlacement
+  // branch below) from {magenta, cyan, yellow} so multiple ants on the
+  // canvas are easy to tell apart. Collision detection treats any of
+  // those three as "another ant" — see isBlocked in the step branch.
+  COLORREF antColor = RGB_MAGENTA;
   // onBg tracks whether the cell the ant is sitting on was an unvisited
-  // background cell or a path cell *before* we painted it magenta. Stored
-  // semantically (bool) not as a raw COLORREF so it still interprets
-  // correctly if g_bkg_color changes mid-flight.
+  // background cell or a path cell *before* we painted the ant marker
+  // over it. Stored semantically (bool) not as a raw COLORREF so it
+  // still interprets correctly if g_bkg_color changes mid-flight.
   bool onBg = true;
   // Direction → (dx, dy) in cell units, matching the encoding above.
   static const int kDx[4] = {  0, 1, 0, -1 };
@@ -81,6 +87,14 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
     // Two exit paths: global shutdown OR this individual slot was asked to die
     // (EnsureThreadCount shrinking the pool).
     if (!g_running || slot->exitRequested) break;
+    // Main thread may have requested a reseed (IDM_REPAINT). Clearing
+    // cellX triggers the needsPlacement branch below, which rerolls
+    // position, direction, and marker color from the current rand()
+    // state — so each reseed produces a fresh layout.
+    if (slot->reseedRequested) {
+      slot->reseedRequested = false;
+      cellX = -1;
+    }
     if (cxClient == 0 || cyClient == 0) {
       continue; // Window is minimized or has no drawable canvas; wait.
     }
@@ -102,18 +116,22 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
         if (needsPlacement) {
           // First-tick placement, or recovery after a resize that shrank
           // the grid below our old cell. Sample the cell to decide onBg
-          // (could be bg or a stale trail), then overpaint with magenta
-          // to mark the ant. No Langton step this tick — next tick starts
+          // (could be bg or a stale trail), roll this ant's marker color,
+          // then overpaint. No Langton step this tick — next tick starts
           // stepping normally.
           cellX = rand() % gridW;
           cellY = rand() % gridH;
           dir   = rand() % 4;
+          static const COLORREF kAntColors[3] = {
+            RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+          };
+          antColor = kAntColors[rand() % 3];
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
           const COLORREF sampled = GetPixel(g_hdcMem, px, py);
           onBg = (sampled == g_bkg_color);
           RECT antRc = { px, py, px + CELL_PX, py + CELL_PX };
-          HBRUSH hAnt = CreateSolidBrush(RGB_MAGENTA);
+          HBRUSH hAnt = CreateSolidBrush(antColor);
           FillRect(g_hdcMem, &antRc, hAnt);
           DeleteObject(hAnt);
           RECT inval = { px, py + g_toolbarHeight,
@@ -146,7 +164,12 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
           // reads the trail color we just painted on the vacating cell.
           auto isBlocked = [&](int x, int y) -> bool {
             if (x < 0 || x >= gridW || y < 0 || y >= gridH) return true;
-            return GetPixel(g_hdcMem, x * CELL_PX, y * CELL_PX) == RGB_MAGENTA;
+            // Treat any of the three ant marker colors as "occupied by
+            // another ant" — this ant might be magenta, the neighbor
+            // might be cyan, etc. A trail pixel is always black/white,
+            // so the false-positive surface here is small.
+            const COLORREF c = GetPixel(g_hdcMem, x * CELL_PX, y * CELL_PX);
+            return c == RGB_MAGENTA || c == RGB_CYAN || c == RGB_YELLOW;
           };
           int nx = cellX + kDx[dir];
           int ny = cellY + kDy[dir];
@@ -171,9 +194,10 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
           const COLORREF sampled = GetPixel(g_hdcMem, npx, npy);
           onBg = (sampled == g_bkg_color);
 
-          // Paint the ant on the new cell.
+          // Paint the ant on the new cell using this ant's chosen marker
+          // color (locked in at placement, see needsPlacement branch).
           RECT antRc = { npx, npy, npx + CELL_PX, npy + CELL_PX };
-          HBRUSH hAnt = CreateSolidBrush(RGB_MAGENTA);
+          HBRUSH hAnt = CreateSolidBrush(antColor);
           FillRect(g_hdcMem, &antRc, hAnt);
           DeleteObject(hAnt);
 
@@ -221,6 +245,11 @@ bool EnsureThreadCount(int targetCount) {
       s_slots[i].hTickEvent = nullptr;
       return false;
     }
+    // Prefer scheduling ant threads over the BGM worker / other normal-
+    // priority threads so short CPU blips (audio driver buffer reset on
+    // clip loop, GDI contention, etc.) don't skip a tick and cause a
+    // visible stutter on fast speed settings.
+    SetThreadPriority(s_slots[i].hThread, THREAD_PRIORITY_ABOVE_NORMAL);
     s_activeCount++;
   }
 
@@ -246,6 +275,19 @@ void SignalAntsTick() {
   // each SetEvent wakes exactly one waiter (the thread waiting on that specific
   // event), so all s_activeCount threads wake together per tick.
   for (int i = 0; i < s_activeCount; i++) {
+    if (s_slots[i].hTickEvent != nullptr) {
+      SetEvent(s_slots[i].hTickEvent);
+    }
+  }
+}
+
+void ReseedAnts() {
+  // Flag every active slot so the next tick re-rolls its cellX / cellY /
+  // dir / antColor. Pulse the tick events so the reseed happens even
+  // when paused — otherwise the ants would sit in their old positions
+  // until the user unpaused, which defeats the "Repaint now" intent.
+  for (int i = 0; i < s_activeCount; i++) {
+    s_slots[i].reseedRequested = true;
     if (s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }

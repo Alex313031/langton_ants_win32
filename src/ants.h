@@ -44,6 +44,13 @@ bool EnsureThreadCount(int targetCount);
 // draw pulse is wanted (e.g. IDM_SINGLE, resume-from-pause).
 void SignalAntsTick();
 
+// Requests that every active ant reroll its position, direction, and
+// marker color on its next tick — used by IDM_REPAINT so "Repaint now"
+// both clears the canvas AND restarts the ants from fresh random spots.
+// Also pulses the tick events so the reseed actually runs even when
+// the simulation is currently paused.
+void ReseedAnts();
+
 // Terminates all ant threads and closes their events/the timer. Called from
 // WM_DESTROY; safe to call more than once.
 void ShutdownAnts();
