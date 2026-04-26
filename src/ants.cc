@@ -42,7 +42,7 @@ struct AntThreadSlot {
   // the current g_monochrome and overpaints its current cell so the new
   // color is visible immediately (even when paused). Position / dir /
   // onBg are left alone — used by the Monochrome toggle which is meant
-  // to behave like the background-color menu (just swap colors, don't
+  // to behave like picking a Colors entry (just swap colors, don't
   // touch ant draw state).
   volatile bool colorRefreshRequest = false;
 };

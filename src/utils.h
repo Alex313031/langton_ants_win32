@@ -25,9 +25,18 @@ inline constexpr unsigned long kRealTime   = 1UL;
 
 extern unsigned long g_default_speed;
 
+// Default desired ant canvas size (NOT the outer window size). wWinMain
+// adds the OS chrome and the toolbar's measured height on top of these
+// to compute the actual outer window size, so the user always gets a
+// CW_WIDTH x CW_HEIGHT ant canvas at startup regardless of how tall the
+// menu bar / toolbar end up being.
 inline constexpr INT CW_WIDTH  = 640;
 inline constexpr INT CW_HEIGHT = 640;
 
+// Minimum desired ant canvas size. WM_GETMINMAXINFO converts these to
+// outer-window minimums (chrome + g_toolbarHeight added) so the canvas
+// never gets squeezed below this even when the toolbar wraps onto extra
+// rows at narrow widths.
 inline constexpr INT MINWIDTH  = 256;
 inline constexpr INT MINHEIGHT = 256;
 

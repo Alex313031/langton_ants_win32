@@ -388,10 +388,16 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // Win2000 falls back to classic 3D raised shading.
   //
   // TBSTYLE_TOOLTIPS — show tooltip popups when the cursor hovers.
+  // TBSTYLE_WRAPABLE — when the parent isn't wide enough to fit every
+  // button on one row, the toolbar wraps overflow buttons onto a new
+  // row instead of clipping them. LayoutToolbar's TB_AUTOSIZE call
+  // re-runs the wrap on each WM_SIZE and re-reads the resulting height
+  // into g_toolbarHeight, so the ants canvas stays correctly offset
+  // even after a wrap.
   // CCS_TOP is the default (toolbar docks to top of parent) so we omit it.
   HWND hTB = CreateWindowExW(
       0, TOOLBARCLASSNAME, nullptr,
-      WS_CHILD | TBSTYLE_TOOLTIPS,
+      WS_CHILD | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE,
       0, 0, CW_USEDEFAULT, CW_USEDEFAULT,
       hParent, nullptr, hInst, nullptr);
   if (hTB == nullptr) {
@@ -401,6 +407,13 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // Tell the control which TBBUTTON layout we compiled against so it can
   // adapt if this binary runs against a different Common Controls DLL version.
   SendMessageW(hTB, TB_BUTTONSTRUCTSIZE, sizeof(TBBUTTON), 0);
+
+  // Tighten the per-button padding around the icon. Defaults are roughly
+  // 7 px horizontal and 6 px vertical per button on most Windows
+  // versions, which makes the toolbar visibly taller than the icons need
+  // — shrinking the vertical pad is what brings the toolbar height down.
+  // LOWORD = horizontal pad, HIWORD = vertical pad.
+  //SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(6, 5));
 
   // --- Bitmap loading ------------------------------------------------------
   // Each TB_ADDBITMAP adds images to the toolbar's internal image list and
@@ -455,77 +468,71 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
   //   dwData    — app-defined extra data we don't need
   //   iString   — tooltip/label text pointer (cast through INT_PTR)
-  TBBUTTON tbButtons[15] = {};
+  // Three separators: one between Save As and Pause (divides file ops
+  // from simulation control), one between Stop and Num Ants (divides
+  // transport controls from simulation knobs), and one between Sound
+  // and Exit (sets Exit apart). All other buttons sit flush.
+  TBBUTTON tbButtons[12] = {};
 
-  tbButtons[0].fsStyle   = TBSTYLE_SEP;
+  tbButtons[0].iBitmap   = idxSave;
+  tbButtons[0].idCommand = IDM_SAVE_AS;
+  tbButtons[0].fsState   = TBSTATE_ENABLED;
+  tbButtons[0].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[0].iString   = reinterpret_cast<INT_PTR>(L"Save As");
 
-  tbButtons[1].iBitmap   = idxSave;
-  tbButtons[1].idCommand = IDM_SAVE_AS;
-  tbButtons[1].fsState   = TBSTATE_ENABLED;
-  tbButtons[1].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[1].iString   = reinterpret_cast<INT_PTR>(L"Save As");
+  tbButtons[1].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[2].fsStyle   = TBSTYLE_SEP;
+  tbButtons[2].iBitmap   = s_idxPause;
+  tbButtons[2].idCommand = IDM_PAUSED;
+  tbButtons[2].fsState   = TBSTATE_ENABLED;
+  tbButtons[2].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[2].iString   = reinterpret_cast<INT_PTR>(L"Pause");
 
-  // Pause and Stop are deliberately adjacent with no separator — they
-  // form the "transport controls" pair (pause/resume vs full stop+wipe).
-  tbButtons[3].iBitmap   = s_idxPause;
-  tbButtons[3].idCommand = IDM_PAUSED;
+  tbButtons[3].iBitmap   = s_idxStop;
+  tbButtons[3].idCommand = IDM_STOP;
   tbButtons[3].fsState   = TBSTATE_ENABLED;
   tbButtons[3].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Pause");
+  tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Stop");
 
-  tbButtons[4].iBitmap   = s_idxStop;
-  tbButtons[4].idCommand = IDM_STOP;
-  tbButtons[4].fsState   = TBSTATE_ENABLED;
-  tbButtons[4].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[4].iString   = reinterpret_cast<INT_PTR>(L"Stop");
+  tbButtons[4].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[5].fsStyle   = TBSTYLE_SEP;
+  tbButtons[5].iBitmap   = s_idxAnts;
+  tbButtons[5].idCommand = IDM_ANTS;
+  tbButtons[5].fsState   = TBSTATE_ENABLED;
+  tbButtons[5].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
 
-  // Num Ants, Speed, Customize and Colors are deliberately adjacent with
-  // no separators — they form a single "simulation knobs" group.
-  tbButtons[6].iBitmap   = s_idxAnts;
-  tbButtons[6].idCommand = IDM_ANTS;
+  tbButtons[6].iBitmap   = s_idxSpeed;
+  tbButtons[6].idCommand = IDM_SPEED;
   tbButtons[6].fsState   = TBSTATE_ENABLED;
   tbButtons[6].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
+  tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Speed");
 
-  tbButtons[7].iBitmap   = s_idxSpeed;
-  tbButtons[7].idCommand = IDM_SPEED;
+  tbButtons[7].iBitmap   = s_idxCustom;
+  tbButtons[7].idCommand = IDM_CUSTOM;
   tbButtons[7].fsState   = TBSTATE_ENABLED;
   tbButtons[7].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Speed");
+  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Customize");
 
-  tbButtons[8].iBitmap   = s_idxCustom;
-  tbButtons[8].idCommand = IDM_CUSTOM;
+  tbButtons[8].iBitmap   = s_idxColors;
+  tbButtons[8].idCommand = IDM_COLORS;
   tbButtons[8].fsState   = TBSTATE_ENABLED;
   tbButtons[8].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Customize");
+  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Colors");
 
-  tbButtons[9].iBitmap   = s_idxColors;
-  tbButtons[9].idCommand = IDM_COLORS;
+  tbButtons[9].iBitmap   = s_idxSound;
+  tbButtons[9].idCommand = IDM_SOUND;
   tbButtons[9].fsState   = TBSTATE_ENABLED;
-  tbButtons[9].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Colors");
+  tbButtons[9].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[10].fsStyle   = TBSTYLE_SEP;
+  tbButtons[10].fsStyle  = TBSTYLE_SEP;
 
-  tbButtons[11].iBitmap   = s_idxSound;
-  tbButtons[11].idCommand = IDM_SOUND;
+  tbButtons[11].iBitmap   = idxExit;
+  tbButtons[11].idCommand = IDM_EXIT;
   tbButtons[11].fsState   = TBSTATE_ENABLED;
   tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Sound");
-
-  tbButtons[12].fsStyle   = TBSTYLE_SEP;
-
-  tbButtons[13].iBitmap   = idxExit;
-  tbButtons[13].idCommand = IDM_EXIT;
-  tbButtons[13].fsState   = TBSTATE_ENABLED;
-  tbButtons[13].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[13].iString   = reinterpret_cast<INT_PTR>(L"Exit");
-
-  tbButtons[14].fsStyle  = TBSTYLE_SEP;
+  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Exit");
 
   SendMessageW(hTB, TB_ADDBUTTONS,
               sizeof(tbButtons) / sizeof(tbButtons[0]),

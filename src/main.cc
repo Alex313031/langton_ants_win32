@@ -37,8 +37,9 @@ HBITMAP g_hbmMem = nullptr;
 // (g_hdcMem / g_hbmMem) at the same time.
 CRITICAL_SECTION g_paintCS;
 
-// Current background color. Defaults to black, changed via the Background
-// Color menu. Used when filling the back buffer on resize and on WM_PAINT.
+// Current background color. Defaults to blue (matching the IDM_BLUE_BKG
+// CHECKED entry in the RC), changed via the Colors menu. Used when
+// filling the back buffer on resize and on WM_PAINT.
 COLORREF g_bkg_color = RGB_BLUE;
 
 // Background color the user had selected just before monochrome was turned
@@ -137,26 +138,46 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // OS handles its theming (themed on XP+, classic on Win2000).
   static constexpr DWORD style =
       WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
-  // Center on the primary monitor's work area (the screen minus the
-  // taskbar). SPI_GETWORKAREA is available back to Win2000 and handles
-  // the case where the taskbar is docked at the top/left/right. If the
-  // query fails for any reason, fall back to CW_USEDEFAULT so the OS
-  // places the window wherever it likes rather than at (0,0) with a
-  // half-off-screen origin.
-  int xPos = CW_USEDEFAULT;
-  int yPos = CW_USEDEFAULT;
+  // SPI_GETWORKAREA gives us the screen minus the taskbar. Available
+  // back to Win2000 and correct regardless of which edge the taskbar is
+  // docked on. Used below to center the window after the toolbar height
+  // is known; if the query fails we fall back to letting the OS place
+  // the window itself (CW_USEDEFAULT).
   RECT workArea = {};
-  if (SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0)) {
-    xPos = workArea.left + ((workArea.right  - workArea.left) - CW_WIDTH)  / 2;
-    yPos = workArea.top  + ((workArea.bottom - workArea.top)  - CW_HEIGHT) / 2;
-  }
+  const bool gotWorkArea =
+      SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
+
+  // Create at a placeholder size — the real size depends on the toolbar
+  // height, which won't exist until WM_CREATE runs CreateAppToolbar.
+  // SetWindowPos below resizes + centers before ShowWindow makes the
+  // window visible, so the user never sees the placeholder.
   mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style,
-                         xPos, yPos,
-                         CW_WIDTH, CW_HEIGHT, nullptr, nullptr, hInstance, nullptr);
+                         CW_USEDEFAULT, CW_USEDEFAULT,
+                         CW_USEDEFAULT, CW_USEDEFAULT,
+                         nullptr, nullptr, hInstance, nullptr);
 
   if (mainHwnd == nullptr) {
     return 1;
   }
+
+  // CW_WIDTH / CW_HEIGHT name the desired ant CANVAS size, not the outer
+  // window size. The outer window has to be larger by the OS chrome
+  // (borders + titlebar + menu, computed by AdjustWindowRectEx) plus
+  // the toolbar's measured height (set by CreateAppToolbar inside
+  // WM_CREATE, which has already returned by the time we get here).
+  RECT outer = { 0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight };
+  AdjustWindowRectEx(&outer, style, TRUE, exStyle);
+  const int outerW = outer.right - outer.left;
+  const int outerH = outer.bottom - outer.top;
+  int xPos = CW_USEDEFAULT;
+  int yPos = CW_USEDEFAULT;
+  if (gotWorkArea) {
+    xPos = workArea.left + ((workArea.right  - workArea.left) - outerW) / 2;
+    yPos = workArea.top  + ((workArea.bottom - workArea.top) - outerH) / 2;
+  }
+  SetWindowPos(mainHwnd, nullptr, xPos, yPos, outerW, outerH,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+
   ShowWindow(mainHwnd, iCmdShow);
   if (!UpdateWindow(mainHwnd)) {
     return 1;
@@ -235,12 +256,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // in WM_PAINT so the two operations don't race or double-paint.
       return TRUE;
     case WM_GETMINMAXINFO: {
-      // Set the minimum size for the window
       LPMINMAXINFO pMinMaxInfo = reinterpret_cast<LPMINMAXINFO>(lParam);
+      // MINWIDTH / MINHEIGHT are the minimum desired ant CANVAS size.
+      // The outer-window minimum has to be larger by the OS chrome
+      // (AdjustWindowRectEx) plus the toolbar's current height, so the
+      // canvas can't be squeezed below MINWIDTH x MINHEIGHT — and as
+      // the toolbar wraps onto extra rows at narrow widths, the min
+      // grows accordingly because g_toolbarHeight grew on the last
+      // WM_SIZE → LayoutToolbar pass.
+      RECT canvasMin = { 0, 0, MINWIDTH, MINHEIGHT };
+      AdjustWindowRectEx(&canvasMin,
+                         static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)),
+                         TRUE,
+                         static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)));
+      pMinMaxInfo->ptMinTrackSize.x = canvasMin.right - canvasMin.left;
+      pMinMaxInfo->ptMinTrackSize.y =
+          (canvasMin.bottom - canvasMin.top) + g_toolbarHeight;
       const int MAXWIDTH  = GetSystemMetrics(SM_CXMAXIMIZED);
       const int MAXHEIGHT = GetSystemMetrics(SM_CYMAXIMIZED);
-      pMinMaxInfo->ptMinTrackSize.x = MINWIDTH;
-      pMinMaxInfo->ptMinTrackSize.y = MINHEIGHT;
       pMinMaxInfo->ptMaxTrackSize.x = MAXWIDTH;
       pMinMaxInfo->ptMaxTrackSize.y = MAXHEIGHT;
       break;
