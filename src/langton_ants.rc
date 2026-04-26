@@ -141,14 +141,14 @@ BEGIN
         END
         POPUP "&Colors"
         BEGIN
+            MENUITEM "&Use MonoChrome", IDM_MONOCHROME
+            MENUITEM SEPARATOR
             MENUITEM "&White", IDM_WHITE_BKG
-            MENUITEM "&Black", IDM_BLACK_BKG, CHECKED
+            MENUITEM "&Black", IDM_BLACK_BKG
             MENUITEM "&Grey",  IDM_GREY_BKG
             MENUITEM "&Red",   IDM_RED_BKG
             MENUITEM "&Green", IDM_GREEN_BKG
-            MENUITEM "&Blue",  IDM_BLUE_BKG
-            MENUITEM SEPARATOR
-            MENUITEM "&Use MonoChrome", IDM_MONOCHROME
+            MENUITEM "&Blue",  IDM_BLUE_BKG, CHECKED
         END
         MENUITEM SEPARATOR
         POPUP "&Customize"
@@ -188,6 +188,7 @@ BEGIN
     0x53,      IDM_SAVE_AS, VIRTKEY, CONTROL  // Ctrl+S Save As
     VK_SPACE,  IDM_SINGLE,  VIRTKEY, NOINVERT // Spacebar Single-step
     0x5A,      IDM_UNDO,    VIRTKEY, CONTROL  // Ctrl+Z Undo Ant Placement
+    0x43,      IDM_CUSTOMPLACE, VIRTKEY, NOINVERT // C key, customize
 END
 
 // About Dialog Box

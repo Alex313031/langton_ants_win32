@@ -39,7 +39,7 @@ CRITICAL_SECTION g_paintCS;
 
 // Current background color. Defaults to black, changed via the Background
 // Color menu. Used when filling the back buffer on resize and on WM_PAINT.
-COLORREF g_bkg_color = RGB_BLACK;
+COLORREF g_bkg_color = RGB_BLUE;
 
 // Background color the user had selected just before monochrome was turned
 // on. Captured on the off → on transition of IDM_MONOCHROME and restored
@@ -47,7 +47,7 @@ COLORREF g_bkg_color = RGB_BLACK;
 // and their colorful setup without losing their bg choice. Default
 // matches g_bkg_color's initial value as a safe fallback if monochrome
 // was somehow active before any toggle had a chance to save a real value.
-static COLORREF s_pre_mono_bg = RGB_BLACK;
+static COLORREF s_pre_mono_bg = RGB_BLUE;
 
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = is_debug;
@@ -650,8 +650,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             const COLORREF oldBg = g_bkg_color;
             g_bkg_color = s_pre_mono_bg;
             // Map the saved color back to its menu item ID so the radio
-            // mark in the Colors submenu lands on the right entry.
-            UINT restoredId = IDM_BLACK_BKG;
+            // mark in the Colors submenu lands on the right entry. The
+            // default arm matches the app's current default bg so a
+            // never-should-happen fallback at least lands on something
+            // sensible.
+            UINT restoredId = IDM_BLUE_BKG;
             switch (s_pre_mono_bg) {
               case RGB_WHITE: restoredId = IDM_WHITE_BKG; break;
               case RGB_BLACK: restoredId = IDM_BLACK_BKG; break;
@@ -659,7 +662,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               case RGB_RED:   restoredId = IDM_RED_BKG;   break;
               case RGB_GREEN: restoredId = IDM_GREEN_BKG; break;
               case RGB_BLUE:  restoredId = IDM_BLUE_BKG;  break;
-              default:        restoredId = IDM_BLACK_BKG; break;
+              default:        restoredId = IDM_BLUE_BKG;  break;
             }
             CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG,
                                restoredId, MF_BYCOMMAND);
