@@ -42,6 +42,7 @@ IDB_SOUND_BMP  BITMAP "res/sound.bmp"
 IDB_MUTE_BMP   BITMAP "res/nosound.bmp"
 IDB_TIME_BMP   BITMAP "res/timer.bmp"
 IDB_CUSTOM_BMP BITMAP "res/custom.bmp"
+IDB_STOP_BMP   BITMAP "res/stop.bmp"
 
 // Embedded background music as a user-defined "WAVE" resource. The type
 // keyword `WAVE` is a convention (not a system RT_ id) — FindResourceW
@@ -206,9 +207,9 @@ CAPTION "Choose Custom Seed"
 FONT 8, "MS Shell Dlg 2"
 BEGIN
     LTEXT         "Integer Ant Start Seed:", IDC_STATIC, 7, 7, 116, 10, SS_NOPREFIX
-    EDITTEXT      IDC_CUSTOMSEED, 7, 20, 60, 14, ES_LEFT | WS_BORDER | WS_TABSTOP | WS_HSCROLL
-    PUSHBUTTON    "OK", IDOK, 25, 35, 40, 14, WS_TABSTOP
-    DEFPUSHBUTTON "Cancel", IDCANCEL, 70, 35, 40, 14, WS_TABSTOP
+    EDITTEXT      IDC_CUSTOMSEED, 7, 20, 80, 14, ES_LEFT | WS_BORDER | WS_TABSTOP
+    DEFPUSHBUTTON "OK", IDOK, 25, 35, 40, 14, WS_TABSTOP
+    PUSHBUTTON    "Cancel", IDCANCEL, 70, 35, 40, 14, WS_TABSTOP
 END
 
 // Dialog DESIGNINFO

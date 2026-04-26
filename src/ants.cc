@@ -133,9 +133,12 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       cellX = -1;
     }
     // Place-mode handoff. The main thread painted the marker on the canvas
-    // already and recorded what was under it (placeOnBg), so we just adopt
-    // the position + color and skip stepping this tick — the next tick will
-    // do a normal Langton step from here. Direction is rolled per-ant.
+    // already and recorded what was under it (placeOnBg), so we adopt the
+    // user-clicked position + the marker's color and skip stepping this
+    // tick — the next tick will do a normal Langton step from here. The
+    // direction is rolled from rand() (which may have been seeded by a
+    // custom seed at thread startup), so a custom seed only varies the
+    // direction in place mode; position and color stay user-controlled.
     if (slot->placementRequested) {
       slot->placementRequested = false;
       cellX    = slot->placeCellX;
@@ -331,21 +334,24 @@ void SignalAntsTick() {
   }
 }
 
-void ReseedAnts() {
+void ReseedAnts(bool pulse) {
   // Flag every active slot so the next tick re-rolls its cellX / cellY /
-  // dir / antColor. Pulse the tick events so the reseed happens even
-  // when paused — otherwise the ants would sit in their old positions
-  // until the user unpaused, which defeats the "Repaint now" intent.
+  // dir / antColor. When pulse is true, also SetEvent each tick event so
+  // the reseed runs even while paused — that's the "Repaint now" path.
+  // When pulse is false (IDM_STOP), the threads stay parked on their
+  // tick events and the wiped canvas stays blank until something else
+  // (typically the resume path in TogglePaintAnts) pulses them.
   for (int i = 0; i < s_activeCount; i++) {
     s_slots[i].reseedRequest = true;
     s_slots[i].customSeedRequest = false;
-    if (s_slots[i].hTickEvent != nullptr) {
+    if (pulse && s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
   }
 }
 
 void CustomSeedAnts(const unsigned int custom_seed) {
+  
   // The custom seed is consumed inside AntThread's startup branch (srand),
   // never inside its tick loop, so applying a new seed means tearing down
   // every live ant thread and respawning the same number with the new seed
@@ -357,12 +363,19 @@ void CustomSeedAnts(const unsigned int custom_seed) {
   if (s_activeCount <= 0) return;
   const int desiredCount         = s_activeCount;
   const bool wasRunning          = !g_paused;
+  // Place mode and Custom Seed are not mutually exclusive: when both are
+  // active, the user-clicked positions are kept and the seed only drives
+  // the per-ant direction + color. Captured up front so the wipe-canvas
+  // step below can be followed by a marker re-paint that preserves what
+  // the user has already placed.
+  const bool inPlaceMode         = g_place_mode && g_placed_ants_count > 0;
 
-  // Place mode and Custom Seed are mutually exclusive intents — abandon
-  // any pending placements so they don't smash the seed-rolled layout the
-  // moment the user resumes.
-  if (g_place_mode) {
-    ExitPlaceMode();
+  if (inPlaceMode) {
+    LOG(INFO) << L"Using custom seed " << custom_seed
+              << L" for ant direction";
+  } else {
+    LOG(INFO) << L"Using custom seed " << custom_seed
+              << L" for ant placement, direction, and color.";
   }
 
   // Stop the timer for the duration of the respawn so no stray WM_TIMER
@@ -402,6 +415,23 @@ void CustomSeedAnts(const unsigned int custom_seed) {
     HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
     FillRect(g_hdcMem, &rc, hBrush);
     DeleteObject(hBrush);
+    // Re-paint placement markers on the freshly-wiped canvas so the user's
+    // clicks are still visible while paused. Their pre-seed color stays —
+    // the AntThread placementRequested handler re-rolls antColor from the
+    // seeded rand() once the simulation resumes, so the moving ant may
+    // briefly differ in color until the first Langton step overpaints
+    // the marker with the trail color.
+    if (inPlaceMode && g_hdcMem != nullptr) {
+      for (int i = 0; i < g_placed_ants_count; i++) {
+        const PlacedAnt& a = s_placedAnts[i];
+        const int px = a.cellX * CELL_PX;
+        const int py = a.cellY * CELL_PX;
+        RECT mrc = { px, py, px + CELL_PX, py + CELL_PX };
+        HBRUSH hAnt = CreateSolidBrush(a.color);
+        FillRect(g_hdcMem, &mrc, hAnt);
+        DeleteObject(hAnt);
+      }
+    }
   }
   LeaveCriticalSection(&g_paintCS);
 
@@ -767,13 +797,15 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             SetFocus(GetDlgItem(hDlg, IDC_CUSTOMSEED));
             return TRUE;
           }
-          const unsigned long seed = wcstoul(buf, nullptr, 10);
-          CustomSeedAnts(static_cast<unsigned int>(seed));
+          const unsigned long lseed = wcstoul(buf, nullptr, 10);
+          const UINT seed = static_cast<unsigned int>(lseed);
+          CustomSeedAnts(seed);
           EndDialog(hDlg, IDOK);
           return TRUE;
         }
         case IDC_CUSTOMSEED:
-          LOG(DEBUG) << L"IDC_CUSTOMSEED interacted";
+          break;
+        default:
           break;
       }
     } break;

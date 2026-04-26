@@ -386,12 +386,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_CUSTOM: {
-          // Button-body click on the Custom split button always re-enters
-          // place mode from a clean slate: pause if not paused, wipe the
-          // canvas, and reset the placement list — discarding any ants
-          // dropped during a prior, un-resumed placement session. The
-          // dropdown arrow still pops up the &Custom submenu via
-          // TBN_DROPDOWN above; only the button body triggers this path.
+          // Button-body click on the Custom split button — mirrors IDM_ANTS.
+          // Place-ant mode lives on its own menu item now (IDM_CUSTOMPLACE).
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCustom   = GetSubMenu(hSettings, 9);
+          PopupUnderToolbarButton(hWnd, IDM_CUSTOM, hCustom);
+          break;
+        }
+        case IDM_CUSTOMPLACE: {
+          // Always re-enters place mode from a clean slate: pause if not
+          // paused, wipe the canvas, and reset the placement list —
+          // discarding any ants dropped during a prior, un-resumed
+          // placement session.
           if (!g_paused) {
             TogglePaintAnts(hWnd);
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
@@ -443,6 +449,38 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32,
                                IDM_CONC_1 + (g_num_ants - 1), MF_BYCOMMAND);
           }
+          break;
+        }
+        case IDM_STOP: {
+          // Halt the simulation, wipe the canvas, and reseed the threads so a
+          // subsequent Resume starts from fresh random positions — "ready to
+          // start new ants with new settings". Pause via TogglePaintAnts so
+          // the timer + BGM are quieted in the same code path the user gets
+          // from the Pause button. Place-mode and any pending placements are
+          // discarded too, since a Stop is a clean-slate intent.
+          if (!g_paused) {
+            TogglePaintAnts(hWnd);
+            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
+            SetPauseButton(g_paused);
+          }
+          if (g_place_mode) ExitPlaceMode();
+          EnterCriticalSection(&g_paintCS);
+          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+            RECT rc = { 0, 0, cxClient, cyClient };
+            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+            FillRect(g_hdcMem, &rc, hBrush);
+            DeleteObject(hBrush);
+          }
+          LeaveCriticalSection(&g_paintCS);
+          // pulse=false: just flag the reseed without waking the parked
+          // threads. A pulse here would wake them despite being paused
+          // and immediately re-paint fresh ant markers on the just-wiped
+          // canvas. We want the canvas to stay blank until the user
+          // presses play; the resume path in TogglePaintAnts will pulse
+          // the threads then.
+          ReseedAnts(false);
+          InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
         case IDM_SINGLE: {

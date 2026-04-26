@@ -19,6 +19,7 @@
 #define IDB_SAVE_BMP                110 /* "Save" icon for toolbar strip, floppy disk icon */
 #define IDB_TIME_BMP                111 /* "Speed" icon for toolbar strip, timer icon */
 #define IDB_CUSTOM_BMP              112 /* "Custom" icon for toolbar strip */
+#define IDB_STOP_BMP                113 /* "Stop" icon for toolbar strip */
 
 /* Main application resource, also used to attach menu */
 #define IDR_MAIN                    120
@@ -39,61 +40,62 @@
 
 // Simulation control
 #define IDM_PAUSED                  208 /* Pause ant simulation */
+#define IDM_STOP                    209 /* Stop ant simulation */
 
 // Display mode
-#define IDM_MONOCHROME              209 /* Only uses black/white background, with opposite colored ants */
+#define IDM_MONOCHROME              210 /* Only uses black/white background, with opposite colored ants */
 
 // Background color choices. Ant paths are always black or white; the ant itself is magenta.
-#define IDM_WHITE_BKG               210
-#define IDM_BLACK_BKG               211
-#define IDM_GREY_BKG                212
-#define IDM_RED_BKG                 213
-#define IDM_GREEN_BKG               214
-#define IDM_BLUE_BKG                215
+#define IDM_WHITE_BKG               211
+#define IDM_BLACK_BKG               212
+#define IDM_GREY_BKG                213
+#define IDM_RED_BKG                 214
+#define IDM_GREEN_BKG               215
+#define IDM_BLUE_BKG                216
 
 // Ant iteration speed
-#define IDM_SLOW                    216
-#define IDM_MEDIUM                  217
-#define IDM_FAST                    218
-#define IDM_HYPER                   219
-#define IDM_REALTIME                220
+#define IDM_SLOW                    217
+#define IDM_MEDIUM                  218
+#define IDM_FAST                    219
+#define IDM_HYPER                   220
+#define IDM_REALTIME                221
 
 // Sound settings
-#define IDM_SOUND                   221
+#define IDM_SOUND                   222
 
 // Num. Ant drawing threads menu options
-#define IDM_CONC_1                  222
-#define IDM_CONC_2                  223
-#define IDM_CONC_3                  224
-#define IDM_CONC_4                  225
-#define IDM_CONC_5                  226
-#define IDM_CONC_6                  227
-#define IDM_CONC_7                  228
-#define IDM_CONC_8                  229
-#define IDM_CONC_9                  230
-#define IDM_CONC_10                 231
-#define IDM_CONC_11                 232
-#define IDM_CONC_12                 233
-#define IDM_CONC_13                 234
-#define IDM_CONC_14                 235
-#define IDM_CONC_15                 236
-#define IDM_CONC_16                 237
-#define IDM_CONC_17                 238
-#define IDM_CONC_18                 239
-#define IDM_CONC_19                 240
-#define IDM_CONC_20                 241
-#define IDM_CONC_21                 242
-#define IDM_CONC_22                 243
-#define IDM_CONC_23                 244
-#define IDM_CONC_24                 245
-#define IDM_CONC_25                 246
-#define IDM_CONC_26                 247
-#define IDM_CONC_27                 248
-#define IDM_CONC_28                 249
-#define IDM_CONC_29                 250
-#define IDM_CONC_30                 251
-#define IDM_CONC_31                 252
-#define IDM_CONC_32                 253
+#define IDM_CONC_1                  223
+#define IDM_CONC_2                  224
+#define IDM_CONC_3                  225
+#define IDM_CONC_4                  226
+#define IDM_CONC_5                  227
+#define IDM_CONC_6                  228
+#define IDM_CONC_7                  229
+#define IDM_CONC_8                  230
+#define IDM_CONC_9                  231
+#define IDM_CONC_10                 232
+#define IDM_CONC_11                 233
+#define IDM_CONC_12                 234
+#define IDM_CONC_13                 235
+#define IDM_CONC_14                 236
+#define IDM_CONC_15                 237
+#define IDM_CONC_16                 238
+#define IDM_CONC_17                 239
+#define IDM_CONC_18                 240
+#define IDM_CONC_19                 241
+#define IDM_CONC_20                 242
+#define IDM_CONC_21                 243
+#define IDM_CONC_22                 244
+#define IDM_CONC_23                 245
+#define IDM_CONC_24                 246
+#define IDM_CONC_25                 247
+#define IDM_CONC_26                 248
+#define IDM_CONC_27                 249
+#define IDM_CONC_28                 250
+#define IDM_CONC_29                 251
+#define IDM_CONC_30                 252
+#define IDM_CONC_31                 253
+#define IDM_CONC_32                 254
 
 // Forces painting a new canvas, with whatever settings it currently has
 #define IDM_REPAINT                 260

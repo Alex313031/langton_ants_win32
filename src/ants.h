@@ -55,11 +55,13 @@ bool EnsureThreadCount(int targetCount);
 void SignalAntsTick();
 
 // Requests that every active ant reroll its position, direction, and
-// marker color on its next tick — used by IDM_REPAINT so "Repaint now"
-// both clears the canvas AND restarts the ants from fresh random spots.
-// Also pulses the tick events so the reseed actually runs even when
-// the simulation is currently paused.
-void ReseedAnts();
+// marker color on its next tick. With pulse = true (the default, used by
+// IDM_REPAINT) the tick events are signalled so the reseed runs even
+// while paused — that's what makes "Repaint now" repaint immediately.
+// With pulse = false (IDM_STOP) the flag is set but no event fires, so
+// the threads stay parked and the canvas stays blank until the user
+// resumes from pause.
+void ReseedAnts(bool pulse = true);
 
 // Use a custom seed for the ants
 void CustomSeedAnts(const unsigned int custom_seed);

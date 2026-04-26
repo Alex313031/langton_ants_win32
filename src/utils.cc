@@ -25,6 +25,7 @@ unsigned long g_default_speed = kHighSpeed;
 // to flip the icon on state changes.
 static int s_idxPause  = 0;
 static int s_idxPlay   = 0;
+static int s_idxStop   = 0;
 static int s_idxSound  = 0;
 static int s_idxMute   = 0;
 static int s_idxAnts   = 0;
@@ -415,6 +416,9 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbab.nID = IDB_PLAY_BMP;
   s_idxPlay = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID = IDB_STOP_BMP;
+  s_idxStop = static_cast<int>(
+      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_ANTS_BMP;
   s_idxAnts = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
@@ -442,7 +446,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
   //   dwData    — app-defined extra data we don't need
   //   iString   — tooltip/label text pointer (cast through INT_PTR)
-  TBBUTTON tbButtons[13] = {};
+  TBBUTTON tbButtons[14] = {};
 
   tbButtons[0].fsStyle   = TBSTYLE_SEP;
 
@@ -454,51 +458,59 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
 
   tbButtons[2].fsStyle   = TBSTYLE_SEP;
 
+  // Pause and Stop are deliberately adjacent with no separator — they
+  // form the "transport controls" pair (pause/resume vs full stop+wipe).
   tbButtons[3].iBitmap   = s_idxPause;
   tbButtons[3].idCommand = IDM_PAUSED;
   tbButtons[3].fsState   = TBSTATE_ENABLED;
   tbButtons[3].fsStyle   = TBSTYLE_BUTTON;
   tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Pause");
 
-  tbButtons[4].fsStyle   = TBSTYLE_SEP;
+  tbButtons[4].iBitmap   = s_idxStop;
+  tbButtons[4].idCommand = IDM_STOP;
+  tbButtons[4].fsState   = TBSTATE_ENABLED;
+  tbButtons[4].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[4].iString   = reinterpret_cast<INT_PTR>(L"Stop");
+
+  tbButtons[5].fsStyle   = TBSTYLE_SEP;
 
   // Num Ants, Speed and Custom are deliberately adjacent with no separators
   // — they form a single "simulation knobs" group.
-  tbButtons[5].iBitmap   = s_idxAnts;
-  tbButtons[5].idCommand = IDM_ANTS;
-  tbButtons[5].fsState   = TBSTATE_ENABLED;
-  tbButtons[5].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[5].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
-
-  tbButtons[6].iBitmap   = s_idxSpeed;
-  tbButtons[6].idCommand = IDM_SPEED;
+  tbButtons[6].iBitmap   = s_idxAnts;
+  tbButtons[6].idCommand = IDM_ANTS;
   tbButtons[6].fsState   = TBSTATE_ENABLED;
   tbButtons[6].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Speed");
+  tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Num Ants");
 
-  tbButtons[7].iBitmap   = s_idxCustom;
-  tbButtons[7].idCommand = IDM_CUSTOM;
+  tbButtons[7].iBitmap   = s_idxSpeed;
+  tbButtons[7].idCommand = IDM_SPEED;
   tbButtons[7].fsState   = TBSTATE_ENABLED;
   tbButtons[7].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Custom");
+  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Speed");
 
-  tbButtons[8].fsStyle   = TBSTYLE_SEP;
+  tbButtons[8].iBitmap   = s_idxCustom;
+  tbButtons[8].idCommand = IDM_CUSTOM;
+  tbButtons[8].fsState   = TBSTATE_ENABLED;
+  tbButtons[8].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Custom");
 
-  tbButtons[9].iBitmap   = s_idxSound;
-  tbButtons[9].idCommand = IDM_SOUND;
-  tbButtons[9].fsState   = TBSTATE_ENABLED;
-  tbButtons[9].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+  tbButtons[9].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[10].fsStyle   = TBSTYLE_SEP;
+  tbButtons[10].iBitmap   = s_idxSound;
+  tbButtons[10].idCommand = IDM_SOUND;
+  tbButtons[10].fsState   = TBSTATE_ENABLED;
+  tbButtons[10].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[10].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[11].iBitmap   = idxExit;
-  tbButtons[11].idCommand = IDM_EXIT;
-  tbButtons[11].fsState   = TBSTATE_ENABLED;
-  tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+  tbButtons[11].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[12].fsStyle  = TBSTYLE_SEP;
+  tbButtons[12].iBitmap   = idxExit;
+  tbButtons[12].idCommand = IDM_EXIT;
+  tbButtons[12].fsState   = TBSTATE_ENABLED;
+  tbButtons[12].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[12].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+
+  tbButtons[13].fsStyle  = TBSTYLE_SEP;
 
   SendMessageW(hTB, TB_ADDBUTTONS,
               sizeof(tbButtons) / sizeof(tbButtons[0]),
@@ -630,6 +642,9 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       break;
     case IDM_PAUSED:
       text = g_paused ? L"Resume Ants" : L"Pause Ants";
+      break;
+    case IDM_STOP:
+      text = L"Stop ants and clear the ant field";
       break;
     case IDM_SOUND:
       text = g_playsound ? L"Mute Background Sounds" : L"Play Background Sounds";

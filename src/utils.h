@@ -28,8 +28,8 @@ extern unsigned long g_default_speed;
 inline constexpr INT CW_WIDTH  = 640;
 inline constexpr INT CW_HEIGHT = 640;
 
-inline constexpr INT MINWIDTH  = 192;
-inline constexpr INT MINHEIGHT = 192;
+inline constexpr INT MINWIDTH  = 256;
+inline constexpr INT MINHEIGHT = 256;
 
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives below it.
 

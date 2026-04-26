@@ -70,15 +70,15 @@
 // Adhere to semver > semver.org
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 3
-#define BUILD_VERSION 6
+#define BUILD_VERSION 7
 
 // String constants
 #define VERSION_STRING _VERSION(MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION)
 #define APP_NAME      L"Langton's Ants"   // Name of the App
 #define MAIN_WNDCLASS L"LangtonAntsWin32" // Our main Window Class unique name
 
-#define ABOUT_TITLE   L"About Langton's Ants"
-#define ABOUT_CONTENT L"langton_ants ver. " VERSION_STRING
+#define ABOUT_TITLE     L"About Langton's Ants"
+#define ABOUT_CONTENT   L"langton_ants ver. " VERSION_STRING
 #define ABOUT_COPYRIGHT L"\251 2026 Alex313031" // \251 is the © symbol
 #define LEGAL_COPYRIGHT L"\251 2026 Alex313031"
 
