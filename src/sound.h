@@ -16,9 +16,10 @@ inline const std::wstring sound_file = L"ants.wav";
 // Flip here and rebuild; callers pass this through to PlayWavFile.
 inline constexpr bool kUseEmbeddedBgm = true;
 
-// True iff the BGM is currently playing (as opposed to muted / paused).
-// Read from main.cc / ants.cc to mirror state on the menu + toolbar and
-// as a guard against late-arriving MM_MCINOTIFY messages.
+// User preference: true if the user wants sound enabled. Toggled by the
+// IDM_SOUND menu / toolbar button (via ToggleSound). Audio actually plays
+// only when this is true AND the simulation is running (!g_paused) — see
+// SyncBgm below for the chokepoint that enforces that invariant.
 extern volatile bool g_playsound;
 
 // Plays a .wav file. On the first call, opens the file and starts playback
@@ -42,20 +43,19 @@ bool PauseWavFile();
 // ShutDownApp for cleanup on exit — not by the mute toggle.
 bool StopPlayWav();
 
-// Starts and stops playing sound at will.
+// Toggles the user's sound preference (g_playsound) and re-syncs MCI
+// state to match. Returns true on success (or no-op), false if a play
+// attempt failed under the hood.
 bool ToggleSound();
 
-// Called by the ants-pause path (TogglePaintAnts) to auto-pause the BGM
-// in lockstep with the simulation. If the BGM is currently playing, this
-// issues an MCI pause and remembers internally that *we* were the ones
-// who paused it. If the BGM is muted / never started, does nothing.
-void AntPauseBgm();
-
-// Called by the ants-resume path. Resumes the BGM only if AntPauseBgm
-// was the thing that paused it and the user hasn't since toggled sound
-// explicitly (ToggleSound clears the internal flag so their choice
-// wins over our auto-resume).
-void AntResumeBgm();
+// The single chokepoint that brings actual MCI playback in line with the
+// invariant "audio plays if g_playsound && !g_paused". Idempotent — if
+// the desired state already matches the current MCI state, this is a
+// no-op. Call after any mutation of g_playsound or g_paused (and on
+// startup once the menu defaults are loaded). Returns true on success
+// (including no-op), false if a transition couldn't be applied (MCI
+// open/play failure on the play path).
+bool SyncBgm();
 
 // Spins up the BGM worker thread. The worker owns the MCI device
 // end-to-end — every mciSendString (open, play, pause, resume, stop,

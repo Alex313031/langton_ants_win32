@@ -84,6 +84,11 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
+  // Sound — seed the user's sound preference from the IDM_SOUND menu
+  // check. SyncBgm later (via WM_APP_AUTOPLAY) reads this to decide
+  // whether to start playback at startup.
+  g_playsound = (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) != 0;
+
   // Monochrome toggle — grey out chromatic bg items and override the RC's
   // bg CHECKED to grey (monochrome defaults to grey bg + white ants
   // regardless of what the RC otherwise selected; white and black remain
@@ -492,7 +497,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[8].idCommand = IDM_CUSTOM;
   tbButtons[8].fsState   = TBSTATE_ENABLED;
   tbButtons[8].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Custom");
+  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Customize");
 
   tbButtons[9].fsStyle   = TBSTYLE_SEP;
 
@@ -576,7 +581,20 @@ void SetPauseButton(bool paused) {
   bi.cbSize  = sizeof(bi);
   bi.dwMask  = TBIF_IMAGE | TBIF_TEXT;
   bi.iImage  = paused ? s_idxPlay : s_idxPause;
-  bi.pszText = const_cast<LPWSTR>(paused ? L"Resume" : L"Pause");
+  // Three label states sharing one button:
+  //   not paused           → "Pause"   (running, click to pause)
+  //   paused, mid-run      → "Resume"  (was playing, click to continue)
+  //   paused, fresh/stopped → "Play"   (no animation yet OR after IDM_STOP)
+  // Both paused variants use the play icon since both kick off the timer.
+  const wchar_t* label;
+  if (!paused) {
+    label = L"Pause";
+  } else if (g_stopped) {
+    label = L"Play";
+  } else {
+    label = L"Resume";
+  }
+  bi.pszText = const_cast<LPWSTR>(label);
   SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_PAUSED,
               reinterpret_cast<LPARAM>(&bi));
 }
@@ -641,7 +659,11 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = L"Customize ant placement and starting \"seed\"";
       break;
     case IDM_PAUSED:
-      text = g_paused ? L"Resume Ants" : L"Pause Ants";
+      // Mirror the three-state label SetPauseButton picks: "Play Ants"
+      // (paused + stopped), "Resume Ants" (paused mid-run), or "Pause Ants".
+      if (!g_paused)     text = L"Pause Ants";
+      else if (g_stopped) text = L"Play Ants";
+      else                text = L"Resume Ants";
       break;
     case IDM_STOP:
       text = L"Stop ants and clear the ant field";

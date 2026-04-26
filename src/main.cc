@@ -206,15 +206,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     case WM_APP_AUTOPLAY: {
       // Deferred startup auto-play. InitApp (called from WM_CREATE) posts
-      // this message instead of calling PlayWavFile directly so the actual
-      // play call runs in the normal WindowProc dispatch context rather
-      // than inside WM_CREATE, which is correct cross-version hygiene.
-      // SetSoundButton flips the toolbar button from "Music On" (idle) to
-      // "Mute" (playing) once playback is underway. If the play call fails
-      // (missing WAV, driver error, etc.), clear the IDM_SOUND menu check
-      // so the menu state matches the fact that nothing is actually playing.
-      const bool playing = PlayWavFile(sound_file, kUseEmbeddedBgm);
-      if (!playing) {
+      // this message rather than calling SyncBgm directly so the MCI work
+      // runs in the normal WindowProc dispatch context — defensive against
+      // older Windows quirks with audio APIs invoked inside WM_CREATE.
+      // SyncBgm reads g_playsound (seeded from the IDM_SOUND menu state in
+      // InitMenuDefaults) and starts playback if the user wants sound.
+      // If the open/play fails, drop the user pref to false and uncheck
+      // the menu so the UI doesn't keep promising audio that never plays.
+      if (!SyncBgm()) {
+        g_playsound = false;
         HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
         CheckMenuItem(hSettings, IDM_SOUND, MF_BYCOMMAND | MF_UNCHECKED);
       }
@@ -394,16 +394,26 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_CUSTOMPLACE: {
-          // Always re-enters place mode from a clean slate: pause if not
-          // paused, wipe the canvas, and reset the placement list —
+          // Always re-enters place mode from a clean slate: pause the sim
+          // and set g_stopped = true so the toolbar's pause/play button
+          // says "Play" (rather than "Resume") after the user is done
+          // placing, wipe the canvas, and reset the placement list —
           // discarding any ants dropped during a prior, un-resumed
-          // placement session.
+          // placement session. Audio follows the pause via SyncBgm.
           if (!g_paused) {
             TogglePaintAnts(hWnd);
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
-            SetPauseButton(g_paused);
           }
+          // Refresh the pause/play button label unconditionally — when
+          // entering place mode while already paused, the !g_paused
+          // branch above didn't run and the label would otherwise stay
+          // at "Resume" instead of flipping to "Play".
+          g_stopped = true;
+          SetPauseButton(g_paused);
+          // Audio follows the simulation automatically: TogglePaintAnts
+          // calls SyncBgm, which pauses the BGM whenever ants aren't
+          // running. The next Play resumes it via the same chokepoint.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
             RECT rc = { 0, 0, cxClient, cyClient };
@@ -462,9 +472,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             TogglePaintAnts(hWnd);
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
-            SetPauseButton(g_paused);
           }
           if (g_place_mode) ExitPlaceMode();
+          // Mark the simulation as stopped (fresh state) so the toolbar's
+          // pause/play button switches its label from "Resume" to "Play".
+          // Refresh unconditionally — when the user hits Stop while already
+          // paused, the !g_paused branch above didn't run SetPauseButton
+          // and the label would otherwise stay at the old "Resume".
+          g_stopped = true;
+          SetPauseButton(g_paused);
+          // Audio follows the simulation automatically: TogglePaintAnts
+          // above (when called) pauses BGM via SyncBgm. The user's sound
+          // preference (g_playsound) is preserved across Stop, so a later
+          // Play will resume audio if it was on before.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
             RECT rc = { 0, 0, cxClient, cyClient };
@@ -582,19 +602,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Entering monochrome snaps the bg to grey (ant color then
           // becomes white automatically via CurrentPathColor). The user
           // can still switch to white or black manually after the fact.
+          // Swap bg pixels in place via RecolorBackground rather than
+          // clearing the canvas — same pattern as the background-color
+          // menu, so existing ant trails are preserved.
           if (g_monochrome && g_bkg_color != RGB_GREY) {
+            const COLORREF oldBg = g_bkg_color;
             g_bkg_color = RGB_GREY;
             CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
+            RecolorBackground(oldBg, g_bkg_color);
           }
-          // Always clear the back buffer on toggle
-          EnterCriticalSection(&g_paintCS);
-          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc = { 0, 0, cxClient, cyClient };
-            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-            FillRect(g_hdcMem, &rc, hBrush);
-            DeleteObject(hBrush);
-          }
-          LeaveCriticalSection(&g_paintCS);
+          // Refresh each running ant's cached antColor against the new
+          // g_monochrome — color-only, no position/dir/onBg touched, so
+          // the simulation continues exactly where it was. RefreshAntColors
+          // pulses the tick events so the new colors show up immediately
+          // even while paused.
+          RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
@@ -808,21 +830,13 @@ bool InitApp(HWND hWnd) {
     ErrorBox(hWnd, L"ShowAnts Error", L"ShowAnts failed!");
     return false;
   }
-  // Only start background music if IDM_SOUND is CHECKED in the RC at startup.
-  // Keeps behavior RC-driven: toggling the CHECKED flag in langton_ants.rc is the
-  // only change needed to opt in or out of auto-play.
-  //
-  // We POST a custom message rather than calling PlayWavFile directly. Reason:
-  // on Windows 2000, PlaySound's SND_ASYNC worker thread silently discards the
-  // decode when invoked from inside WM_CREATE (i.e. before the owning thread's
-  // message loop has started pumping). PlaySound returns TRUE but no audio
-  // ever comes out. XP and later relaxed this, so the direct call appears to
-  // work there — but posting is correct on every version. WM_APP_AUTOPLAY is
-  // picked up by the normal dispatch path once GetMessage starts running.
-  HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-  if (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) {
-    PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
-  }
+  // Defer the audio kick-off to WM_APP_AUTOPLAY: posting (rather than
+  // calling SyncBgm directly here) makes sure the MCI work runs in the
+  // normal WindowProc dispatch context once the message loop is pumping.
+  // Always post — the handler's SyncBgm is a no-op when g_playsound is
+  // false, so it's RC-driven via InitMenuDefaults' IDM_SOUND read with
+  // no extra branching here.
+  PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
   return true;
 }
 

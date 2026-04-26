@@ -6,7 +6,14 @@
 
 #include <logging.h>
 
+// User preference, NOT actual playback state. See sound.h.
 volatile bool g_playsound = false;
+
+// Tracks whether MCI is currently playing (vs paused / stopped / unopened).
+// Main-thread only — written exclusively by SyncBgm/ToggleSound after the
+// PostBgmSync call has returned, so the worker never touches it. Used to
+// keep SyncBgm idempotent: if desired matches current, do nothing.
+static bool s_audio_playing = false;
 
 // ==========================================================================
 // BGM is driven by a dedicated worker thread that owns the MCI device
@@ -167,7 +174,6 @@ static bool WorkerOpenPlay(const std::wstring& wav_file, bool use_embedded) {
       DeleteFileW(s_embeddedTempPath.c_str());
       s_embeddedTempPath.clear();
     }
-    g_playsound = false;
     return false;
   }
   s_mciOpened = true;
@@ -186,10 +192,8 @@ static bool WorkerOpenPlay(const std::wstring& wav_file, bool use_embedded) {
       DeleteFileW(s_embeddedTempPath.c_str());
       s_embeddedTempPath.clear();
     }
-    g_playsound = false;
     return false;
   }
-  g_playsound = true;
   return true;
 }
 
@@ -201,32 +205,23 @@ static bool WorkerResume() {
   MCIERROR err = mciSendStringW(L"resume langton_ants_bgm", nullptr, 0, nullptr);
   if (err != 0) {
     LOG(ERROR) << L"MCI resume failed: " << MciErrText(err);
-    g_playsound = false;
     return false;
   }
-  g_playsound = true;
   return true;
 }
 
 static bool WorkerPause() {
-  if (!s_mciOpened) {
-    g_playsound = false;
-    return true;
-  }
+  if (!s_mciOpened) return true;
   // `pause` suspends playback without resetting position — the pending
   // `notify` registration stays alive so MM_MCINOTIFY still fires on the
   // eventual natural completion after a subsequent resume.
   MCIERROR err = mciSendStringW(L"pause langton_ants_bgm", nullptr, 0, nullptr);
   if (err != 0) LOG(ERROR) << L"MCI pause failed: " << MciErrText(err);
-  g_playsound = false;
   return true;
 }
 
 static bool WorkerStop() {
-  if (!s_mciOpened) {
-    g_playsound = false;
-    return true;
-  }
+  if (!s_mciOpened) return true;
   // Full tear-down: stop halts playback, close releases the waveform
   // device so a subsequent open can succeed cleanly.
   MCIERROR err = mciSendStringW(L"stop langton_ants_bgm", nullptr, 0, nullptr);
@@ -234,7 +229,6 @@ static bool WorkerStop() {
   err = mciSendStringW(L"close langton_ants_bgm", nullptr, 0, nullptr);
   if (err != 0) LOG(ERROR) << L"MCI close failed: " << MciErrText(err);
   s_mciOpened = false;
-  g_playsound = false;
   if (!s_embeddedTempPath.empty()) {
     DeleteFileW(s_embeddedTempPath.c_str());
     s_embeddedTempPath.clear();
@@ -248,7 +242,13 @@ static bool WorkerStop() {
 // silent no-op. The `notify` param re-registers s_bgmHwnd so the NEXT
 // completion also lands in our message loop.
 static void WorkerReplay() {
-  if (!s_mciOpened || !g_playsound) return;
+  // Loop only while audio should still be playing right now — i.e., user
+  // wants sound on AND the sim isn't paused. If a Pause came in between
+  // the original play start and the MM_MCINOTIFY for that play, we want
+  // to bail rather than restart. (Reading these volatile bools from the
+  // worker is benign — both are written by the main thread as plain
+  // assignments, and we only need a snapshot here.)
+  if (!s_mciOpened || !g_playsound || g_paused) return;
   MCIERROR err = mciSendStringW(L"play langton_ants_bgm from 0 notify",
                                  nullptr, 0, s_bgmHwnd);
   if (err != 0) {
@@ -391,39 +391,50 @@ bool PauseWavFile() {
 }
 
 bool StopPlayWav() {
+  // Hard tear-down. SyncBgm is the normal pause path; this one is reserved
+  // for full lifecycle stops (app shutdown, IDM_TESTTRAP). Resets the
+  // local "is MCI playing" flag so the next SyncBgm call correctly
+  // re-opens the device instead of trying to resume.
+  s_audio_playing = false;
   return PostBgmSync(BgmCmd::Stop);
 }
 
-// Set true by AntPauseBgm when it actually paused the BGM. Cleared by
-// AntResumeBgm after resuming, or by ToggleSound on any explicit user
-// toggle — so an explicit mute/unmute during an ant pause "wins" over
-// the auto-resume that would otherwise fire when ants un-pause. Main
-// thread only.
-static bool s_bgm_paused_by_ants = false;
+bool SyncBgm() {
+  // Single source of truth: audio plays if the user wants it AND the
+  // simulation is currently running. Idempotent — if the desired state
+  // already matches s_audio_playing, do nothing.
+  const bool desired = g_playsound && !g_paused;
+  if (desired == s_audio_playing) return true;
+  if (desired) {
+    if (PlayWavFile(sound_file, kUseEmbeddedBgm)) {
+      s_audio_playing = true;
+      return true;
+    }
+    // Open / play failed — leave s_audio_playing false; caller sees the
+    // failure and can react (e.g., clear g_playsound + refresh the UI).
+    return false;
+  }
+  // desired == false, audio currently playing → pause. PauseWavFile is
+  // a no-op when the device isn't open (early-returns true) so we treat
+  // the transition as successful even in pathological "play failed
+  // earlier" states.
+  PauseWavFile();
+  s_audio_playing = false;
+  return true;
+}
 
 bool ToggleSound() {
-  // User is taking explicit control of sound; forget that we had auto-
-  // paused it so we don't later contradict their choice on ant resume.
-  s_bgm_paused_by_ants = false;
-  if (g_playsound) {
-    return PauseWavFile();
-  } else {
-    return PlayWavFile(sound_file, kUseEmbeddedBgm);
+  // Flip the user pref, then let SyncBgm decide what (if anything) needs
+  // to happen at the MCI layer. This is the only place outside SyncBgm
+  // itself that mutates g_playsound at runtime. If the resulting Play
+  // fails (missing WAV, driver error), revert the flip so the UI doesn't
+  // display "sound on" while audio is actually silent.
+  g_playsound = !g_playsound;
+  if (!SyncBgm()) {
+    g_playsound = !g_playsound;
+    return false;
   }
-}
-
-void AntPauseBgm() {
-  if (g_playsound) {
-    PauseWavFile();
-    s_bgm_paused_by_ants = true;
-  }
-}
-
-void AntResumeBgm() {
-  if (s_bgm_paused_by_ants) {
-    s_bgm_paused_by_ants = false;
-    PlayWavFile(sound_file, kUseEmbeddedBgm);
-  }
+  return true;
 }
 
 // ---------- Lifecycle -----------------------------------------------------

@@ -20,6 +20,7 @@
 #define IDB_TIME_BMP                111 /* "Speed" icon for toolbar strip, timer icon */
 #define IDB_CUSTOM_BMP              112 /* "Custom" icon for toolbar strip */
 #define IDB_STOP_BMP                113 /* "Stop" icon for toolbar strip */
+#define IDB_COLORS_BMP              114 /* "Colors" icon for toolbar strip */
 
 /* Main application resource, also used to attach menu */
 #define IDR_MAIN                    120
@@ -104,16 +105,21 @@
 // instead of using timer
 #define IDM_SINGLE                  261
 
-// Toolbar button identifier for "Num Ants" button with submenu.
+// Toolbar button identifier for "Num Ants" button with drop down menu.
 #define IDM_ANTS                    262
 
-// Toolbar button identifier for "Speed" button with submenu.
+// Toolbar button identifier for "Speed" button with drop down menu.
 #define IDM_SPEED                   263
 
-// Toolbar button identifier for "Custom" button with submenu.
+// Toolbar button identifier for "Custom" button with drop down menu.
 #define IDM_CUSTOM                  264
 #define IDM_CUSTOMPLACE             265
 #define IDM_CUSTOMSEED              266
+
+// Toolbar button identifier for "Colors" button with drop down menu.
+#define IDM_COLORS                  267
+
+#define IDM_UNDO                    268
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                270

@@ -63,6 +63,13 @@ void SignalAntsTick();
 // resumes from pause.
 void ReseedAnts(bool pulse = true);
 
+// Refreshes each running ant's marker color against the current
+// g_monochrome value (mono → match the trail color, otherwise pick from
+// magenta/cyan/yellow). Position, direction and onBg are preserved so
+// the simulation continues exactly where it was — used by IDM_MONOCHROME
+// so toggling mono behaves like the background-color menu (just colors).
+void RefreshAntColors();
+
 // Use a custom seed for the ants
 void CustomSeedAnts(const unsigned int custom_seed);
 

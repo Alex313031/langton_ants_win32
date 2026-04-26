@@ -7,12 +7,13 @@
 
 volatile bool g_running = false; // Global ant threads running state
 volatile bool g_paused  = false; // Affects g_running, used by IDM_PAUSED
+volatile bool g_stopped = true;  // True at startup (no animation yet) and after IDM_STOP. Drives "Play" vs "Resume" label on the pause/play toolbar button.
 
 bool g_monochrome = false; // Whether monochrome colors only is enabled
 
 volatile UINT g_num_ants = 1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
 
-unsigned long g_delay = kHyperSpeed; // Default until InitMenuDefaults reads the RC.
+unsigned long g_delay = kRealTime; // Default until InitMenuDefaults reads the RC.
 
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
@@ -37,6 +38,13 @@ struct AntThreadSlot {
   bool          placeOnBg         = true;
   volatile bool customSeedRequest = false; // Whether to use custom seed for seeding randomization
   UINT          customSeed        = 0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
+  // Color-refresh handoff: when set, the thread re-picks antColor against
+  // the current g_monochrome and overpaints its current cell so the new
+  // color is visible immediately (even when paused). Position / dir /
+  // onBg are left alone — used by the Monochrome toggle which is meant
+  // to behave like the background-color menu (just swap colors, don't
+  // touch ant draw state).
+  volatile bool colorRefreshRequest = false;
 };
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int           s_activeCount = 0;  // only touched from the main thread
@@ -148,6 +156,41 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       dir      = rand() & 3;
       continue;
     }
+    // Color-only refresh (Monochrome toggle). Re-pick antColor from the
+    // current g_monochrome and overpaint the ant's current cell so the
+    // new color is visible immediately (matters when paused — otherwise
+    // the next Langton step would surface it anyway). Position, dir and
+    // onBg are deliberately preserved — this mirrors how the background
+    // colour menu only swaps pixels and never touches ant draw state.
+    // cellX < 0 means we haven't placed yet; the next needsPlacement
+    // branch will pick a color naturally, so we skip the paint.
+    if (slot->colorRefreshRequest) {
+      slot->colorRefreshRequest = false;
+      if (g_monochrome) {
+        antColor = CurrentPathColor();
+      } else {
+        static const COLORREF kAntColors[3] = {
+          RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+        };
+        antColor = kAntColors[rand() % 3];
+      }
+      if (cellX >= 0 && cellY >= 0) {
+        EnterCriticalSection(&g_paintCS);
+        if (g_hdcMem != nullptr) {
+          const int px = cellX * CELL_PX;
+          const int py = cellY * CELL_PX;
+          RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+          HBRUSH hAnt = CreateSolidBrush(antColor);
+          FillRect(g_hdcMem, &rc, hAnt);
+          DeleteObject(hAnt);
+          RECT inval = { px, py + g_toolbarHeight,
+                         px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+          InvalidateRect(mainHwnd, &inval, FALSE);
+        }
+        LeaveCriticalSection(&g_paintCS);
+      }
+      continue;
+    }
     if (cxClient == 0 || cyClient == 0) {
       continue; // Window is minimized or has no drawable canvas; wait.
     }
@@ -175,10 +218,20 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           cellX = rand() % gridW;
           cellY = rand() % gridH;
           dir   = rand() % 4;
-          static const COLORREF kAntColors[3] = {
-            RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
-          };
-          antColor = kAntColors[rand() % 3];
+          if (g_monochrome) {
+            // Ant marker matches the trail color so the whole canvas is
+            // pure black-on-grey or white-on-grey. The cell-level
+            // distinction "this is an ant vs. this is a trail" goes away;
+            // isBlocked below stops detecting ant-vs-ant collisions
+            // (it keys off the magenta/cyan/yellow markers), so ants
+            // simply pass through each other in monochrome mode.
+            antColor = CurrentPathColor();
+          } else {
+            static const COLORREF kAntColors[3] = {
+              RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+            };
+            antColor = kAntColors[rand() % 3];
+          }
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
           const COLORREF sampled = GetPixel(g_hdcMem, px, py);
@@ -328,6 +381,20 @@ void SignalAntsTick() {
   // each SetEvent wakes exactly one waiter (the thread waiting on that specific
   // event), so all s_activeCount threads wake together per tick.
   for (int i = 0; i < s_activeCount; i++) {
+    if (s_slots[i].hTickEvent != nullptr) {
+      SetEvent(s_slots[i].hTickEvent);
+    }
+  }
+}
+
+void RefreshAntColors() {
+  // Flag every active slot for a color-only refresh, then pulse so the
+  // change shows up immediately even while paused. The thread re-picks
+  // antColor against the current g_monochrome and overpaints its current
+  // cell — position / direction / onBg stay untouched, so the simulation
+  // continues exactly where it was, just dressed in the new color scheme.
+  for (int i = 0; i < s_activeCount; i++) {
+    s_slots[i].colorRefreshRequest = true;
     if (s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
@@ -637,6 +704,10 @@ bool ShowAnts() {
     ShutdownAnts();
     return false;
   }
+  // The simulation is now actually running — clear the "stopped" hint so
+  // the pause/play button knows to say "Pause" / "Resume" instead of
+  // "Play" once the user starts interacting.
+  g_stopped = false;
   return true;
 }
 
@@ -646,15 +717,15 @@ void TogglePaintAnts(HWND hWnd) {
   }
   g_paused = !g_paused;
   // Pause = kill the timer so no more ticks fire. Every active thread sits
-  // parked on its tick event, zero CPU. Resume = re-arm the timer and also
+  // parked on its tick event, zero CPU. Resume = re-arm the timer and
   // give one immediate pulse so the window doesn't wait up to g_delay ms
-  // before redrawing. The BGM follows the simulation in lockstep via
-  // AntPauseBgm / AntResumeBgm — single-step lands here too (it enters
-  // the paused branch once, then further single-steps no-op this
-  // toggle), so the BGM stays paused until the user un-pauses.
+  // before redrawing. SyncBgm enforces "audio plays if sound enabled
+  // AND ants running", so it covers both the pause and resume sides of
+  // BGM in one call — single-step lands here too (it enters the paused
+  // branch once, then further single-steps no-op this toggle), so the
+  // BGM stays paused until the user un-pauses.
   if (g_paused) {
     KillTimer(hWnd, TIMER_ANTS);
-    AntPauseBgm();
   } else {
     // Drain any pending Custom-Seed placements into the thread slots before
     // re-arming the tick so the very first tick after resume picks up the
@@ -662,10 +733,14 @@ void TogglePaintAnts(HWND hWnd) {
     if (g_place_mode) {
       ApplyPlacements();
     }
-    AntResumeBgm();
+    // Once the user resumes, we're no longer in the "stopped" state — the
+    // pause/play button should next show "Pause", and a subsequent pause
+    // should give "Resume" rather than "Play".
+    g_stopped = false;
     SignalAntsTick();
     SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
   }
+  SyncBgm();
 }
 
 void EnterPlaceMode() {
@@ -719,14 +794,21 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   const int py = cellY * CELL_PX;
   // Sample the cell BEFORE we paint the marker — the thread that adopts
   // this position needs to know whether it started on background (turn
-  // right next tick) or on a path (turn left). Same color set the AntThread
-  // uses for ants, so collision detection treats placed ants identically.
+  // right next tick) or on a path (turn left). The color picker mirrors
+  // AntThread's needsPlacement branch: monochrome → match the trail color
+  // (ants vanish into their paths, no ant-vs-ant collision); otherwise
+  // pick from the magenta/cyan/yellow set so isBlocked sees the marker.
   const COLORREF sampled = GetPixel(g_hdcMem, px, py);
   const bool onBg = (sampled == g_bkg_color);
-  static const COLORREF kAntColors[3] = {
-    RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
-  };
-  const COLORREF antColor = kAntColors[rand() % 3];
+  COLORREF antColor;
+  if (g_monochrome) {
+    antColor = CurrentPathColor();
+  } else {
+    static const COLORREF kAntColors[3] = {
+      RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+    };
+    antColor = kAntColors[rand() % 3];
+  }
   RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
   HBRUSH hAnt = CreateSolidBrush(antColor);
   FillRect(g_hdcMem, &rc, hAnt);
