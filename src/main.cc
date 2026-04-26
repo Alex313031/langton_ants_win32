@@ -41,6 +41,14 @@ CRITICAL_SECTION g_paintCS;
 // Color menu. Used when filling the back buffer on resize and on WM_PAINT.
 COLORREF g_bkg_color = RGB_BLACK;
 
+// Background color the user had selected just before monochrome was turned
+// on. Captured on the off → on transition of IDM_MONOCHROME and restored
+// on the on → off transition, so the user can flip between monochrome
+// and their colorful setup without losing their bg choice. Default
+// matches g_bkg_color's initial value as a safe fallback if monochrome
+// was somehow active before any toggle had a chance to save a real value.
+static COLORREF s_pre_mono_bg = RGB_BLACK;
+
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = is_debug;
 
@@ -603,6 +611,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_MONOCHROME: {
+          // Capture the toggle direction BEFORE flipping g_monochrome:
+          // entering monochrome snapshots the current bg so we can
+          // restore it later; leaving monochrome paints that snapshot
+          // back. Without the direction snapshot we'd have to infer it
+          // after the fact.
+          const bool enteringMono = !g_monochrome;
+          if (enteringMono) {
+            s_pre_mono_bg = g_bkg_color;
+          }
           g_monochrome = !g_monochrome;
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           // Toggle the check mark on the menu item to show current state.
@@ -616,16 +633,36 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | colorState);
-          // Entering monochrome snaps the bg to grey (ant color then
-          // becomes white automatically via CurrentPathColor). The user
-          // can still switch to white or black manually after the fact.
           // Swap bg pixels in place via RecolorBackground rather than
           // clearing the canvas — same pattern as the background-color
           // menu, so existing ant trails are preserved.
-          if (g_monochrome && g_bkg_color != RGB_GREY) {
+          //
+          // Entering monochrome forces bg to grey (CurrentPathColor then
+          // returns white automatically). Leaving monochrome restores
+          // whatever bg was in use before the on transition, so the user
+          // can flip back and forth without losing their color choice.
+          if (enteringMono && g_bkg_color != RGB_GREY) {
             const COLORREF oldBg = g_bkg_color;
             g_bkg_color = RGB_GREY;
             CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
+            RecolorBackground(oldBg, g_bkg_color);
+          } else if (!enteringMono && g_bkg_color != s_pre_mono_bg) {
+            const COLORREF oldBg = g_bkg_color;
+            g_bkg_color = s_pre_mono_bg;
+            // Map the saved color back to its menu item ID so the radio
+            // mark in the Colors submenu lands on the right entry.
+            UINT restoredId = IDM_BLACK_BKG;
+            switch (s_pre_mono_bg) {
+              case RGB_WHITE: restoredId = IDM_WHITE_BKG; break;
+              case RGB_BLACK: restoredId = IDM_BLACK_BKG; break;
+              case RGB_GREY:  restoredId = IDM_GREY_BKG;  break;
+              case RGB_RED:   restoredId = IDM_RED_BKG;   break;
+              case RGB_GREEN: restoredId = IDM_GREEN_BKG; break;
+              case RGB_BLUE:  restoredId = IDM_BLUE_BKG;  break;
+              default:        restoredId = IDM_BLACK_BKG; break;
+            }
+            CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG,
+                               restoredId, MF_BYCOMMAND);
             RecolorBackground(oldBg, g_bkg_color);
           }
           // Refresh each running ant's cached antColor against the new
