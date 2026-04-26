@@ -10,7 +10,7 @@
 volatile bool g_playsound = false;
 
 // Tracks whether MCI is currently playing (vs paused / stopped / unopened).
-// Main-thread only — written exclusively by SyncBgm/ToggleSound after the
+// Main-thread only - written exclusively by SyncBgm/ToggleSound after the
 // PostBgmSync call has returned, so the worker never touches it. Lets
 // SyncBgm skip the work when audio is already in the right state.
 static bool s_audio_playing = false;
@@ -23,11 +23,11 @@ static bool s_audio_playing = false;
 // for ~10-50ms while the waveform driver stages buffers and starts the
 // mixer stream. When that call lived on the main thread (inside the
 // MM_MCINOTIFY loop-back handler) every loop iteration visibly froze
-// the ants canvas — especially at hyper/realtime speeds where a frame
+// the ants canvas - especially at hyper/realtime speeds where a frame
 // is 10 ms or less. Moving it to a worker keeps the UI smooth.
 //
 // Why the worker owns open + every other MCI op (not just the replay):
-// some MCI drivers are thread-affinity-bound — a command sent from a
+// some MCI drivers are thread-affinity-bound - a command sent from a
 // thread different than the one that opened the device sometimes
 // succeeds but silently drops the subsequent notify callback. Opening
 // the device on the worker and issuing every command (play, pause,
@@ -38,11 +38,11 @@ static bool s_audio_playing = false;
 // MCI to PostMessage(MM_MCINOTIFY) to a caller-chosen HWND when playback
 // finishes. Targeting a hidden window owned by the worker means the
 // loop re-issue ("play from 0 notify") is handled inside the worker's
-// own message loop — main thread is never in the loop path at all.
+// own message loop - main thread is never in the loop path at all.
 //
 // Main thread talks to the worker through a single-slot command queue
 // protected by s_bgmCS. User-triggered ops (Play / Pause / Stop) are
-// sync — main posts the command, signals s_bgmCmdEvent, and waits on
+// sync - main posts the command, signals s_bgmCmdEvent, and waits on
 // s_bgmDoneEvent. The loop replay needs no main-thread involvement, so
 // there is no async post path.
 // ==========================================================================
@@ -92,7 +92,7 @@ static std::wstring MciErrText(MCIERROR err) {
 
 // Materializes the IDR_BGM_WAVE resource to a file in the user's temp
 // directory and returns that path (empty on failure). MCI's string API can
-// only open named files — there is no "play from memory" form — so when
+// only open named files - there is no "play from memory" form - so when
 // we want to play the embedded WAV we have to stage it on disk first.
 // Windows' FindResource returns a pointer to the PE-loaded resource bytes
 // without extra allocation; we just WriteFile them out.
@@ -206,7 +206,7 @@ static bool WorkerResume() {
     return false;
   }
   // `resume` continues from the current playback position. Do NOT re-issue
-  // `play` here — that would reset to 0 and double-register the notify
+  // `play` here - that would reset to 0 and double-register the notify
   // callback.
   MCIERROR err = mciSendStringW(L"resume langton_ants_bgm", nullptr, 0, nullptr);
   if (err != 0) {
@@ -220,7 +220,7 @@ static bool WorkerPause() {
   if (!s_mciOpened) {
     return true;
   }
-  // `pause` suspends playback without resetting position — the pending
+  // `pause` suspends playback without resetting position - the pending
   // `notify` registration stays alive so MM_MCINOTIFY still fires on the
   // eventual natural completion after a subsequent resume.
   MCIERROR err = mciSendStringW(L"pause langton_ants_bgm", nullptr, 0, nullptr);
@@ -253,16 +253,16 @@ static bool WorkerStop() {
 }
 
 // Loop re-issue. Called from BgmHiddenWndProc when MCI fires a successful
-// MM_MCINOTIFY for the prior play. `from 0` is REQUIRED — after natural
+// MM_MCINOTIFY for the prior play. `from 0` is REQUIRED - after natural
 // completion MCI leaves the cursor at EOF, so a bare `play` would be a
 // silent no-op. The `notify` param re-registers s_bgmHwnd so the NEXT
 // completion also lands in our message loop.
 static void WorkerReplay() {
-  // Loop only while audio should still be playing right now — i.e., user
+  // Loop only while audio should still be playing right now - i.e., user
   // wants sound on AND the sim isn't paused. If a Pause came in between
   // the original play start and the MM_MCINOTIFY for that play, we want
   // to bail rather than restart. (Reading these volatile bools from the
-  // worker is benign — both are written by the main thread as plain
+  // worker is benign - both are written by the main thread as plain
   // assignments, and we only need a snapshot here.)
   if (!s_mciOpened || !g_playsound || g_paused) {
     return;
@@ -291,9 +291,9 @@ static bool ProcessCmd(const BgmCmdSlot& slot) {
 // DispatchMessage below fires MM_MCINOTIFY that MCI posted to s_bgmHwnd.
 //
 // wParam values we might see: MCI_NOTIFY_SUCCESSFUL (natural end-of-clip
-// — we loop), MCI_NOTIFY_SUPERSEDED (another play took over — do nothing),
-// MCI_NOTIFY_ABORTED (stop/close happened — do nothing), MCI_NOTIFY_FAILURE
-// (driver error — do nothing). The g_playsound guard in WorkerReplay also
+// - we loop), MCI_NOTIFY_SUPERSEDED (another play took over - do nothing),
+// MCI_NOTIFY_ABORTED (stop/close happened - do nothing), MCI_NOTIFY_FAILURE
+// (driver error - do nothing). The g_playsound guard in WorkerReplay also
 // protects against a late-arriving SUCCESSFUL notification that races a
 // user Pause.
 static LRESULT CALLBACK BgmHiddenWndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -323,7 +323,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
     SetEvent(s_bgmInitEvent);
     return 1;
   }
-  // HWND_MESSAGE parent makes it an invisible message-only window — no
+  // HWND_MESSAGE parent makes it an invisible message-only window - no
   // z-order, no taskbar, no focus changes. Pure PostMessage target.
   s_bgmHwnd = CreateWindowW(kBgmHiddenClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
                             wc.hInstance, nullptr);
@@ -358,7 +358,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
         SetEvent(s_bgmDoneEvent);
       }
     } else if (r == WAIT_OBJECT_0 + 2) {
-      // Window-message queue has something — dispatch everything pending.
+      // Window-message queue has something - dispatch everything pending.
       MSG msg;
       while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
         TranslateMessage(&msg);
@@ -433,7 +433,7 @@ bool SyncBgm() {
       s_audio_playing = true;
       return true;
     }
-    // Open / play failed — leave s_audio_playing false; caller sees the
+    // Open / play failed - leave s_audio_playing false; caller sees the
     // failure and can react (e.g., clear g_playsound + refresh the UI).
     return false;
   }
@@ -465,7 +465,7 @@ bool ToggleSound() {
 bool InitBgm() {
   bool ok = true;
   if (s_bgmInit) {
-    return true; // already initialized — treat as success
+    return true; // already initialized - treat as success
   }
   InitializeCriticalSection(&s_bgmCS);
   s_bgmCmdEvent  = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
@@ -483,7 +483,7 @@ bool InitBgm() {
   }
   // The worker does no time-critical work (only MCI setup during the
   // ~2s loop re-issue). Drop it below normal so the ant threads and
-  // main UI get scheduled first during any brief contention — the
+  // main UI get scheduled first during any brief contention - the
   // tens-of-ms audio-setup window is where visible stutters came from.
   SetThreadPriority(s_bgmWorker, THREAD_PRIORITY_BELOW_NORMAL);
   // Block until the worker has registered its class and created the
@@ -516,7 +516,7 @@ void ShutdownBgm() {
   }
   // Signal exit and join. If the worker is currently mid-mciSendString
   // it'll finish that command first, then loop back, see the exit event,
-  // destroy the hidden window and return — so "join" may wait up to one
+  // destroy the hidden window and return - so "join" may wait up to one
   // play-setup duration (tens of ms). Acceptable at shutdown.
   SetEvent(s_bgmExitEvent);
   WaitForSingleObject(s_bgmWorker, INFINITE);

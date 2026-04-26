@@ -45,7 +45,7 @@ IDB_STOP_BMP   BITMAP "res/stop.bmp"
 IDB_COLORS_BMP BITMAP "res/colors.bmp"
 
 // Embedded background music as a user-defined "WAVE" resource. The type
-// keyword `WAVE` is a convention (not a system RT_ id) — FindResourceW
+// keyword `WAVE` is a convention (not a system RT_ id) - FindResourceW
 // looks it up with the literal L"WAVE" string at runtime. Only loaded
 // when kUseEmbeddedBgm is true in utils.h; otherwise the .exe still
 // carries the bytes but the code path ignores them and reads the file

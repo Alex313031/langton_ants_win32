@@ -1,5 +1,5 @@
 /*------------------------------------------
-   Langton's Ants — Win32 GDI implementation
+   Langton's Ants - Win32 GDI implementation
    Copyright (c) 2026 Alex313031
   ------------------------------------------*/
 
@@ -78,7 +78,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.hIcon       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
   wndclass.hCursor     = LoadCursorW(nullptr, IDC_ARROW);
   // No stock brush matches our default bg (there's only black / white /
-  // grey / null), and we handle erase + paint ourselves — WM_ERASEBKGND
+  // grey / null), and we handle erase + paint ourselves - WM_ERASEBKGND
   // returns TRUE and WM_PAINT fills with g_bkg_color. nullptr here skips
   // the OS's pre-fill entirely so there's no flash of a wrong-colored
   // window before our first WM_PAINT.
@@ -118,7 +118,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   InitializeCriticalSection(&g_paintCS);
   // Tighten the system timer resolution from the default ~15.6ms down
   // to 1ms for the life of the process. SetTimer (driving the ant tick)
-  // and the sound subsystem both benefit — at Hyper / Realtime speeds
+  // and the sound subsystem both benefit - at Hyper / Realtime speeds
   // the default resolution rounds our requested interval up to the
   // nearest 15ms, so misses-and-catches-up visibly as stutter. Paired
   // with timeEndPeriod below.
@@ -128,7 +128,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // the 2-second loop re-issue) run off the main thread. Must come
   // before any PlayWavFile call; PostMessageW(WM_APP_AUTOPLAY) from
   // InitApp fires only after the message loop starts, well after this.
-  // BGM init failure isn't fatal — the rest of the app still works,
+  // BGM init failure isn't fatal - the rest of the app still works,
   // we just warn the user that audio won't be available.
   if (!InitBgm()) {
     ErrorBox(nullptr, L"BGM Initialization Error",
@@ -156,7 +156,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   RECT workArea          = {};
   const bool gotWorkArea = SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
 
-  // Create at a placeholder size — the real size depends on the toolbar
+  // Create at a placeholder size - the real size depends on the toolbar
   // height, which won't exist until WM_CREATE runs CreateAppToolbar.
   // SetWindowPos below resizes + centers before ShowWindow makes the
   // window visible, so the user never sees the placeholder.
@@ -204,7 +204,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   DeleteCriticalSection(&g_paintCS);
   // Match the timeBeginPeriod at startup. Not strictly needed (the OS
   // drops the requested resolution when the process exits) but good
-  // hygiene — especially on older Windows where the effect is system-
+  // hygiene - especially on older Windows where the effect is system-
   // wide rather than per-process.
   timeEndPeriod(1);
   return static_cast<int>(msg.wParam);
@@ -225,7 +225,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // InitApp creates the toolbar (which sets g_toolbarHeight) and
       // starts the simulation. Toolbar creation has to happen before the
       // first WM_SIZE so cyClient is computed against the correct
-      // toolbar offset — InitApp is still called from inside WM_CREATE
+      // toolbar offset - InitApp is still called from inside WM_CREATE
       // here, so any subsequent SetWindowPos / ShowWindow that triggers
       // WM_SIZE will see a valid g_toolbarHeight.
       InitApp(hWnd);
@@ -242,7 +242,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_APP_AUTOPLAY: {
       // Deferred startup auto-play. InitApp (called from WM_CREATE) posts
       // this message rather than calling SyncBgm directly so the MCI work
-      // runs in the normal WindowProc dispatch context — defensive against
+      // runs in the normal WindowProc dispatch context - defensive against
       // older Windows quirks with audio APIs invoked inside WM_CREATE.
       // SyncBgm reads g_playsound (seeded from the IDM_SOUND menu state in
       // InitMenuDefaults) and starts playback if the user wants sound.
@@ -266,7 +266,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // MINWIDTH / MINHEIGHT are the minimum desired ant CANVAS size.
       // The outer-window minimum has to be larger by the OS chrome
       // (AdjustWindowRectEx) plus the toolbar's current height, so the
-      // canvas can't be squeezed below MINWIDTH x MINHEIGHT — and as
+      // canvas can't be squeezed below MINWIDTH x MINHEIGHT - and as
       // the toolbar wraps onto extra rows at narrow widths, the min
       // grows accordingly because g_toolbarHeight grew on the last
       // WM_SIZE → LayoutToolbar pass.
@@ -311,9 +311,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       if (wParam == SIZE_MINIMIZED) {
         // Minimize freezes the simulation: we kill the tick source so the
         // ant threads park on their wait events with zero CPU use. We
-        // deliberately don't touch cxClient / cyClient or the back buffer —
+        // deliberately don't touch cxClient / cyClient or the back buffer -
         // the bitmap keeps holding the canvas, and each ant's thread-local
-        // cellX / cellY / dir / onBg state survives untouched — so when
+        // cellX / cellY / dir / onBg state survives untouched - so when
         // restore fires we come back exactly where we left off, trails
         // and all.
         s_was_minimized = true;
@@ -325,7 +325,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // g_toolbarHeight as needed.
       LayoutToolbar(hWnd);
       // cxClient / cyClient represent the ants canvas area, not the parent's client
-      // area — the toolbar isn't drawable space. Clamp to zero when the
+      // area - the toolbar isn't drawable space. Clamp to zero when the
       // window is smaller than the toolbar (extreme resize).
       cxClient = LOWORD(lParam);
       cyClient = HIWORD(lParam) - g_toolbarHeight;
@@ -340,7 +340,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       RecreateBackBuffer(hWnd, cxClient, cyClient);
       if (s_was_minimized) {
         s_was_minimized = false;
-        // Restored from minimize — bring the tick source back unless the
+        // Restored from minimize - bring the tick source back unless the
         // user had explicitly paused before minimizing (g_paused still
         // reflects that choice, so we honor it).
         if (!g_paused) {
@@ -354,7 +354,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // send TBN_DROPDOWN when the user clicks the arrow. We handle it for
       // IDM_ANTS and IDM_SPEED by popping up the corresponding Settings
       // submenu anchored under the button. lParam points to an NMTOOLBAR
-      // whose rcButton is in toolbar-client coords — ClientToScreen on the
+      // whose rcButton is in toolbar-client coords - ClientToScreen on the
       // toolbar's HWND (hdr.hwndFrom) gives the screen-coord anchor
       // TrackPopupMenu wants.
       LPNMHDR pnmh = reinterpret_cast<LPNMHDR>(lParam);
@@ -372,7 +372,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
         // Reusing the live HMENU from the main menu bar means radio check
         // marks stay in perfect sync with the existing IDM_CONC_* /
-        // IDM_SLOW..IDM_HYPER handlers — no duplicate items, no manual
+        // IDM_SLOW..IDM_HYPER handlers - no duplicate items, no manual
         // state sync needed.
         if (pnmtb->iItem == IDM_ANTS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
@@ -429,14 +429,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_SPEED: {
-          // Button-body click on the Speed split button — mirrors IDM_ANTS.
+          // Button-body click on the Speed split button - mirrors IDM_ANTS.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hSpeed    = GetSubMenu(hSettings, 4);
           PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
           break;
         }
         case IDM_CUSTOM: {
-          // Button-body click on the Custom split button — mirrors IDM_ANTS.
+          // Button-body click on the Custom split button - mirrors IDM_ANTS.
           // Place-ant mode lives on its own menu item now (IDM_CUSTOMPLACE).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hCustom   = GetSubMenu(hSettings, 7);
@@ -444,7 +444,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_COLORS: {
-          // Button-body click on the Colors split button — mirrors IDM_ANTS.
+          // Button-body click on the Colors split button - mirrors IDM_ANTS.
           // The dropdown is the existing Settings → Colors submenu so the
           // IDM_*_BKG / IDM_MONOCHROME handlers below pick up the selection
           // unchanged.
@@ -457,7 +457,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Always re-enters place mode from a clean slate: pause the sim
           // and set g_stopped = true so the toolbar's pause/play button
           // says "Play" (rather than "Resume") after the user is done
-          // placing, wipe the canvas, and reset the placement list —
+          // placing, wipe the canvas, and reset the placement list -
           // discarding any ants dropped during a prior, un-resumed
           // placement session. Audio follows the pause via SyncBgm.
           if (!g_paused) {
@@ -465,7 +465,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
           }
-          // Refresh the pause/play button label unconditionally — when
+          // Refresh the pause/play button label unconditionally - when
           // entering place mode while already paused, the !g_paused
           // branch above didn't run and the label would otherwise stay
           // at "Resume" instead of flipping to "Play".
@@ -491,7 +491,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_UNDO: {
-          // Ctrl+Z accelerator. Only does anything in place mode —
+          // Ctrl+Z accelerator. Only does anything in place mode -
           // pops the most recent placement off the list and erases its
           // marker. UndoLastPlacement logs and no-ops outside place
           // mode or when there's nothing left to undo.
@@ -512,7 +512,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_PAUSED: {
           // If we're about to resume out of place mode the placements get
           // drained inside TogglePaintAnts and g_num_ants may shrink to the
-          // placed count — track that here so we can refresh the Num Ants
+          // placed count - track that here so we can refresh the Num Ants
           // radio after the toggle.
           const bool drainedPlacements = (g_paused && g_place_mode);
           TogglePaintAnts(hWnd);
@@ -531,7 +531,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDM_STOP: {
           // Halt the simulation, wipe the canvas, and reseed the threads so a
-          // subsequent Resume starts from fresh random positions — "ready to
+          // subsequent Resume starts from fresh random positions - "ready to
           // start new ants with new settings". Pause via TogglePaintAnts so
           // the timer + BGM are quieted in the same code path the user gets
           // from the Pause button. Place-mode and any pending placements are
@@ -546,7 +546,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           // Mark the simulation as stopped (fresh state) so the toolbar's
           // pause/play button switches its label from "Resume" to "Play".
-          // Refresh unconditionally — when the user hits Stop while already
+          // Refresh unconditionally - when the user hits Stop while already
           // paused, the !g_paused branch above didn't run SetPauseButton
           // and the label would otherwise stay at the old "Resume".
           g_stopped = true;
@@ -580,7 +580,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // once, giving the ant thread one iteration before it blocks again.
           //
           // To exit single-step mode the user presses IDM_PAUSED, which flips
-          // g_paused back to false and re-arms the timer — normal operation
+          // g_paused back to false and re-arms the timer - normal operation
           // resumes with no extra logic needed here.
           if (!g_paused) {
             TogglePaintAnts(hWnd); // toggles g_paused=true and KillTimer
@@ -591,7 +591,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             SetPauseButton(g_paused);
           }
           // Pulse every active ant thread's tick event once. The timer is
-          // off (paused), so this is the only source of ticks — each thread
+          // off (paused), so this is the only source of ticks - each thread
           // wakes, moves its ant by one space.
           SignalAntsTick();
           break;
@@ -600,9 +600,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Clear the back buffer to the current background color, then
           // reseed every ant so their positions, directions, and marker
           // colors all reroll on the next tick. All user settings (speed,
-          // num ants, monochrome, etc.) stay intact — only the runtime
+          // num ants, monochrome, etc.) stay intact - only the runtime
           // per-ant state resets. If the user was mid-placement, abandon it
-          // — REPAINT and Custom Seed are mutually exclusive intents.
+          // - REPAINT and Custom Seed are mutually exclusive intents.
           if (g_place_mode) {
             ExitPlaceMode();
           }
@@ -674,7 +674,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                         MF_BYCOMMAND | (g_monochrome ? MF_CHECKED : MF_UNCHECKED));
           // Grey out or restore the chromatic bg options. White, black,
           // and grey all count as monochrome, so only the R/G/B entries
-          // get disabled. Also grey the entire Ant Colors submenu — in
+          // get disabled. Also grey the entire Ant Colors submenu - in
           // monochrome the marker always matches the trail color so the
           // user-picked ant color is moot.
           HMENU hBkgMenu        = GetSubMenu(hSettings, 5);
@@ -687,7 +687,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           EnableMenuItem(hBkgMenu, IDM_MAGENTAANT, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_ALLCOLORANT, MF_BYCOMMAND | colorState);
           // Swap bg pixels in place via RecolorBackground rather than
-          // clearing the canvas — same pattern as the background-color
+          // clearing the canvas - same pattern as the background-color
           // menu, so existing ant trails are preserved.
           //
           // Entering monochrome forces bg to grey (CurrentPathColor then
@@ -735,7 +735,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             RecolorBackground(oldBg, g_bkg_color);
           }
           // Refresh each running ant's cached antColor against the new
-          // g_monochrome — color-only, no position/dir/onBg touched, so
+          // g_monochrome - color-only, no position/dir/onBg touched, so
           // the simulation continues exactly where it was. RefreshAntColors
           // pulses the tick events so the new colors show up immediately
           // even while paused.
@@ -842,7 +842,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               g_delay = g_default_speed;
               break;
           }
-          // Replace the timer with the new interval — but only if the
+          // Replace the timer with the new interval - but only if the
           // simulation is currently running. If we're paused (including
           // mid-Custom-placement before any ants are dropped) the timer
           // is intentionally off, and re-arming it here would silently
@@ -851,7 +851,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (!g_paused) {
             SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
             // Pulse every active thread once so they stop waiting on the
-            // old interval — the next WM_TIMER tick fires at the new rate.
+            // old interval - the next WM_TIMER tick fires at the new rate.
             SignalAntsTick();
           }
           break;
@@ -887,7 +887,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_CONTEXTMENU: {
       // TrackPopupMenu is called with the actual Settings submenu handle from
       // the menu bar. Because it is the same HMENU object, all checkmarks and
-      // grayed states are shared automatically — no extra synchronization is
+      // grayed states are shared automatically - no extra synchronization is
       // needed. WM_COMMAND messages dispatched from the popup go to hWnd and
       // are handled by the existing WM_COMMAND cases below.
       int x = GET_X_LPARAM(lParam);
@@ -951,11 +951,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // Tear down every ant thread, signal their tick events, and close
       // their handles in one shot.
       ShutdownAnts();
-      // Tear down MCI here too — most shutdowns go through ShutDownApp
+      // Tear down MCI here too - most shutdowns go through ShutDownApp
       // (which calls StopPlayWav), but if the window is destroyed by any
       // other path (external DestroyWindow, session end, etc.) we still
       // need to close the waveform device and delete the temp BGM file.
-      // StopPlayWav must come BEFORE ShutdownBgm — it's a sync post to
+      // StopPlayWav must come BEFORE ShutdownBgm - it's a sync post to
       // the worker, so the worker has to still be alive to process it.
       // StopPlayWav is a no-op if the device was never opened;
       // ShutdownBgm is a no-op if the worker was never started.
@@ -992,8 +992,8 @@ bool InitApp(HWND hWnd) {
     return false;
   }
   // Build the toolbar first so g_toolbarHeight is set before the first
-  // WM_SIZE. A failure here isn't fatal — the menu bar still drives
-  // every feature — so we warn the user and keep going.
+  // WM_SIZE. A failure here isn't fatal - the menu bar still drives
+  // every feature - so we warn the user and keep going.
   if (!CreateAppToolbar(hWnd, g_hInstance)) {
     ErrorBox(hWnd, L"Toolbar Creation Error", L"Failed to create application toolbar. ");
     ok = false;
@@ -1009,7 +1009,7 @@ bool InitApp(HWND hWnd) {
   // Defer the audio kick-off to WM_APP_AUTOPLAY: posting (rather than
   // calling SyncBgm directly here) makes sure the MCI work runs in the
   // normal WindowProc dispatch context once the message loop is pumping.
-  // Always post — the handler's SyncBgm is a no-op when g_playsound is
+  // Always post - the handler's SyncBgm is a no-op when g_playsound is
   // false, so it's RC-driven via InitMenuDefaults' IDM_SOUND read with
   // no extra branching here.
   PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
@@ -1018,13 +1018,13 @@ bool InitApp(HWND hWnd) {
 
 void ShutDownApp() {
   // Stop the BGM first (sync post to the worker), THEN tear the worker
-  // down. Both calls are idempotent — WM_DESTROY will call them again
+  // down. Both calls are idempotent - WM_DESTROY will call them again
   // harmlessly on the way out.
   StopPlayWav();
   ShutdownBgm();
   // De-initialize logging, which closes any console window open
   logging::DeInitLogging(g_hInstance); // Can't log anything more after this
-  // WM_DESTROY will call ShutdownAnts() for us — DestroyWindow triggers that
+  // WM_DESTROY will call ShutdownAnts() for us - DestroyWindow triggers that
   // path synchronously, so we don't need to touch thread state here.
   DestroyWindow(mainHwnd);
 }

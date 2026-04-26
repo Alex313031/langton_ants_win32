@@ -47,7 +47,7 @@ struct AntThreadSlot {
   // Color-refresh handoff: when set, the thread re-picks antColor against
   // the current g_monochrome and overpaints its current cell so the new
   // color is visible immediately (even when paused). Position / dir /
-  // onBg are left alone — used by the Monochrome toggle which is meant
+  // onBg are left alone - used by the Monochrome toggle which is meant
   // to behave like picking a Colors entry (just swap colors, don't
   // touch ant draw state).
   volatile bool colorRefreshRequest = false;
@@ -56,7 +56,7 @@ static AntThreadSlot s_slots[kMaxAntThreads];
 static int s_activeCount = 0; // only touched from the main thread
 
 // --- Place-mode state -----------------------------------------------------
-// All touched from the main (UI) thread only — set when the user enters
+// All touched from the main (UI) thread only - set when the user enters
 // place mode, populated by PlaceAntAtClient on each click, drained by
 // ApplyPlacements when the user resumes. Per-entry onBg is sampled BEFORE
 // we paint the ant marker so the thread that adopts this position knows
@@ -81,7 +81,7 @@ static bool ApplyPlacements();
 // Path/ant color chosen for contrast against the current background: white
 // unless the background is white or green, in which case black. Re-read on
 // every step so the ant adapts immediately if the user changes the bg
-// mid-simulation. (Existing trails are left alone — see the comment on
+// mid-simulation. (Existing trails are left alone - see the comment on
 // RecolorBackground.)
 static COLORREF CurrentPathColor() {
   if (g_bkg_color == RGB_WHITE || g_bkg_color == RGB_GREEN) {
@@ -98,14 +98,14 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // Per-ant state, thread-local so no synchronization is needed for it. The
   // shared state (g_hdcMem / the back buffer bitmap) is protected by
   // g_paintCS inside the tick loop.
-  //   cellX / cellY — current cell in the CELL_PX grid, negative means
+  //   cellX / cellY - current cell in the CELL_PX grid, negative means
   //                   "needs placement" (first tick, or canvas shrank under
   //                   us and our old cell is out of range).
-  //   dir           — 0=N, 1=E, 2=S, 3=W. Right turn = +1, left = +3,
+  //   dir           - 0=N, 1=E, 2=S, 3=W. Right turn = +1, left = +3,
   //                   reverse = +2, all mod 4.
   // rand() on Win32 uses per-thread state, so srand'ing here seeds only
   // this thread's sequence. Mixing in something that varies per slot
-  // keeps simultaneous starts distinct — otherwise all kMaxAntThreads
+  // keeps simultaneous starts distinct - otherwise all kMaxAntThreads
   // ants would spawn at the same cell facing the same way.
   //
   // Two seeding modes:
@@ -117,7 +117,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   //     hash constant 0x9E3779B9 spreads tiny indices into well-
   //     distributed seeds so adjacent slots don't all spawn at near-
   //     identical positions.
-  //   - No custom seed: mix GetTickCount() with the thread ID — the
+  //   - No custom seed: mix GetTickCount() with the thread ID - the
   //     intent there is "different every run", so non-determinism is
   //     a feature, not a bug.
   DWORD seed;
@@ -133,7 +133,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // Per-ant marker color. Picked once at placement (see needsPlacement
   // branch below) from {magenta, cyan, yellow} so multiple ants on the
   // canvas are easy to tell apart. Collision detection treats any of
-  // those three as "another ant" — see isBlocked in the step branch.
+  // those three as "another ant" - see isBlocked in the step branch.
   COLORREF antColor = RGB_MAGENTA;
   // onBg tracks whether the cell the ant is sitting on was an unvisited
   // background cell or a path cell *before* we painted the ant marker
@@ -160,7 +160,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // Main thread may have requested a reseed (IDM_REPAINT). Clearing
     // cellX triggers the needsPlacement branch below, which rerolls
     // position, direction, and marker color from the current rand()
-    // state — so each reseed produces a fresh layout.
+    // state - so each reseed produces a fresh layout.
     if (slot->reseedRequest) {
       slot->reseedRequest = false;
       cellX               = -1;
@@ -168,7 +168,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // Place-mode handoff. The main thread painted the marker on the canvas
     // already and recorded what was under it (placeOnBg), so we adopt the
     // user-clicked position + the marker's color and skip stepping this
-    // tick — the next tick will do a normal Langton step from here. The
+    // tick - the next tick will do a normal Langton step from here. The
     // direction is rolled from rand() (which may have been seeded by a
     // custom seed at thread startup), so a custom seed only varies the
     // direction in place mode; position and color stay user-controlled.
@@ -183,9 +183,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     }
     // Color-only refresh (Monochrome toggle). Re-pick antColor from the
     // current g_monochrome and overpaint the ant's current cell so the
-    // new color shows up immediately (matters when paused — otherwise
+    // new color shows up immediately (matters when paused - otherwise
     // the next Langton step would draw it anyway). Position, dir and
-    // onBg are deliberately preserved — this mirrors how the background
+    // onBg are deliberately preserved - this mirrors how the background
     // colour menu only swaps pixels and never touches ant draw state.
     // cellX < 0 means we haven't placed yet; the next needsPlacement
     // branch will pick a color naturally, so we skip the paint.
@@ -223,7 +223,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       continue; // Window is minimized or has no drawable canvas; wait.
     }
 
-    // Serialize every GDI operation on the back buffer — multiple ant threads
+    // Serialize every GDI operation on the back buffer - multiple ant threads
     // can be inside this section trying to enter at the same time, and the
     // main thread also grabs it in WM_PAINT and RecreateBackBuffer.
     EnterCriticalSection(&g_paintCS);
@@ -240,7 +240,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // First-tick placement, or recovery after a resize that shrank
           // the grid below our old cell. Sample the cell to decide onBg
           // (could be bg or a stale trail), roll this ant's marker color,
-          // then overpaint. No Langton step this tick — next tick starts
+          // then overpaint. No Langton step this tick - next tick starts
           // stepping normally.
           cellX = rand() % gridW;
           cellY = rand() % gridH;
@@ -275,7 +275,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           InvalidateRect(mainHwnd, &inval, FALSE);
         } else {
           // Classic Langton's step. We can't GetPixel the cell under the
-          // ant — it's magenta — so we use the cached onBg from when the
+          // ant - it's magenta - so we use the cached onBg from when the
           // ant arrived. On bg cell turn right, on path cell turn left,
           // flip the cell's color, then step forward one cell.
           dir                       = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
@@ -293,7 +293,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
 
           // Try to step forward. A target cell is "blocked" if it's out of
           // bounds (wall) or currently occupied by another ant (magenta).
-          // On block, reverse direction 180° and try the other way — the
+          // On block, reverse direction 180° and try the other way - the
           // same "bounce" rule covers both walls and ant-vs-ant collisions.
           // If the reversed cell is also blocked, stay put for this tick;
           // the subsequent sample-at-new-cell step still works because it
@@ -303,7 +303,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
               return true;
             }
             // Treat any of the three ant marker colors as "occupied by
-            // another ant" — this ant might be magenta, the neighbor
+            // another ant" - this ant might be magenta, the neighbor
             // might be cyan, etc. A trail pixel is always black/white,
             // so the false-positive surface here is small.
             const COLORREF c = GetPixel(g_hdcMem, x * CELL_PX, y * CELL_PX);
@@ -428,7 +428,7 @@ void RefreshAntColors() {
   // Flag every active slot for a color-only refresh, then pulse so the
   // change shows up immediately even while paused. The thread re-picks
   // antColor against the current g_monochrome and overpaints its current
-  // cell — position / direction / onBg stay untouched, so the simulation
+  // cell - position / direction / onBg stay untouched, so the simulation
   // continues exactly where it was, just dressed in the new color scheme.
   for (int i = 0; i < s_activeCount; i++) {
     s_slots[i].colorRefreshRequest = true;
@@ -441,7 +441,7 @@ void RefreshAntColors() {
 void ReseedAnts(bool pulse) {
   // Flag every active slot so the next tick re-rolls its cellX / cellY /
   // dir / antColor. When pulse is true, also SetEvent each tick event so
-  // the reseed runs even while paused — that's the "Repaint now" path.
+  // the reseed runs even while paused - that's the "Repaint now" path.
   // When pulse is false (IDM_STOP), the threads stay parked on their
   // tick events and the wiped canvas stays blank until something else
   // (typically the resume path in TogglePaintAnts) pulses them.
@@ -522,7 +522,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
     FillRect(g_hdcMem, &rc, hBrush);
     DeleteObject(hBrush);
     // Re-paint placement markers on the freshly-wiped canvas so the user's
-    // clicks are still visible while paused. Their pre-seed color stays —
+    // clicks are still visible while paused. Their pre-seed color stays -
     // the AntThread placementRequested handler re-rolls antColor from the
     // seeded rand() once the simulation resumes, so the moving ant may
     // briefly differ in color until the first Langton step overpaints
@@ -542,7 +542,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   LeaveCriticalSection(&g_paintCS);
 
   // Stage the seed on the slot scratch fields BEFORE EnsureThreadCount
-  // creates the threads — AntThread reads customSeedRequest in its
+  // creates the threads - AntThread reads customSeedRequest in its
   // startup block, picks up customSeed, and srand's its per-thread rand()
   // from it. Reset the other request flags too so a stale placement /
   // reseed from a prior session can't fire on the very first tick.
@@ -554,7 +554,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   }
   if (!EnsureThreadCount(desiredCount)) {
     LOG(ERROR) << L"EnsureThreadCount(" << desiredCount
-               << L") failed during respawn — pool may be smaller than expected!";
+               << L") failed during respawn - pool may be smaller than expected!";
     ok = false;
   }
 
@@ -565,7 +565,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // Restore the simulation's previous play state. If the user was running,
   // re-arm the timer and pulse so the first tick happens immediately
   // rather than waiting up to g_delay ms. If the user was paused, leave
-  // the timer off — the threads sit on their tick events until resume.
+  // the timer off - the threads sit on their tick events until resume.
   if (wasRunning && mainHwnd != nullptr) {
     SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr);
     SignalAntsTick();
@@ -610,7 +610,7 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
                << (g_hdcMem ? L"set" : L"null") << L")";
     return false;
   }
-  // Fast path: the existing bitmap already matches — keep it, no work,
+  // Fast path: the existing bitmap already matches - keep it, no work,
   // no state loss. Common on restore-from-minimize without a resize.
   if (g_hbmMem != nullptr) {
     BITMAP bm = {};
@@ -634,7 +634,7 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   EnterCriticalSection(&g_paintCS);
   // Prime hbmNew through a scratch DC: fill with bg, then blit the old
   // back buffer's contents into the top-left. This preserves ant trails
-  // across the resize — and also covers any minimize-then-restore path
+  // across the resize - and also covers any minimize-then-restore path
   // where something fires an intermediate WM_SIZE and triggers this
   // slow branch. On grow, the extra margin stays bg; on shrink, the
   // excess rows / columns of the old bitmap get clipped off.
@@ -735,7 +735,7 @@ bool SetNumAnts(const unsigned int num) {
   }
   g_num_ants = clamped;
   // If the pool is already running (i.e. we're past ShowAnts), resize it to
-  // match. Before ShowAnts there is nothing to resize — ShowAnts will spawn
+  // match. Before ShowAnts there is nothing to resize - ShowAnts will spawn
   // the right number of threads using g_num_ants directly.
   if (g_running) {
     if (!EnsureThreadCount(static_cast<int>(clamped))) {
@@ -768,7 +768,7 @@ bool ShowAnts() {
     ShutdownAnts();
     return false;
   }
-  // The simulation is now actually running — clear the "stopped" hint so
+  // The simulation is now actually running - clear the "stopped" hint so
   // the pause/play button knows to say "Pause" / "Resume" instead of
   // "Play" once the user starts interacting.
   g_stopped = false;
@@ -787,7 +787,7 @@ bool TogglePaintAnts(HWND hWnd) {
   // give one immediate pulse so the window doesn't wait up to g_delay ms
   // before redrawing. SyncBgm enforces "audio plays if sound enabled
   // AND ants running", so it covers both the pause and resume sides of
-  // BGM in one call — single-step lands here too (it enters the paused
+  // BGM in one call - single-step lands here too (it enters the paused
   // branch once, then further single-steps no-op this toggle), so the
   // BGM stays paused until the user un-pauses.
   if (g_paused) {
@@ -799,13 +799,13 @@ bool TogglePaintAnts(HWND hWnd) {
     if (g_place_mode) {
       ApplyPlacements();
     }
-    // Once the user resumes, we're no longer in the "stopped" state — the
+    // Once the user resumes, we're no longer in the "stopped" state - the
     // pause/play button should next show "Pause", and a subsequent pause
     // should give "Resume" rather than "Play".
     g_stopped = false;
     SignalAntsTick();
     if (SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr) == 0) {
-      LOG(ERROR) << L"TogglePaintAnts: SetTimer failed on resume — "
+      LOG(ERROR) << L"TogglePaintAnts: SetTimer failed on resume - "
                     L"simulation will sit idle until something else "
                     L"re-arms the tick source";
       ok = false;
@@ -820,7 +820,7 @@ void EnterPlaceMode() {
   // for pausing the simulation and clearing the canvas (matching the
   // Custom-Seed semantic of "lay out a fresh field by hand").
   // Seed the main thread's rand() once on entry so the first session of a
-  // run doesn't always produce the same color sequence — AntThread seeds
+  // run doesn't always produce the same color sequence - AntThread seeds
   // its own threads but the main thread is otherwise unseeded.
   srand(static_cast<unsigned>(GetTickCount()));
   g_placed_ants_count = 0;
@@ -829,7 +829,7 @@ void EnterPlaceMode() {
 
 void ExitPlaceMode() {
   // Discard pending placements without applying them. The markers we already
-  // painted on the canvas stay put — they'll be overpainted by ant trails
+  // painted on the canvas stay put - they'll be overpainted by ant trails
   // once the simulation resumes (or wiped by the next IDM_REPAINT).
   g_placed_ants_count = 0;
   g_place_mode        = false;
@@ -870,7 +870,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   const int px = cellX * CELL_PX;
   const int py = cellY * CELL_PX;
-  // Sample the cell BEFORE we paint the marker — the thread that adopts
+  // Sample the cell BEFORE we paint the marker - the thread that adopts
   // this position needs to know whether it started on background (turn
   // right next tick) or on a path (turn left). The color picker mirrors
   // AntThread's needsPlacement branch: monochrome → match the trail color
@@ -920,7 +920,7 @@ bool UndoLastPlacement() {
   }
   // Pop the last placement and erase its marker. Place mode always
   // starts from a wiped canvas (IDM_CUSTOMPLACE handler), so every
-  // placement cell sits over background — repainting with g_bkg_color
+  // placement cell sits over background - repainting with g_bkg_color
   // restores the cell to its pre-click state.
   const int idx   = g_placed_ants_count - 1;
   const int cellX = s_placedAnts[idx].cellX;
@@ -949,11 +949,11 @@ static bool ApplyPlacements() {
   }
   if (g_placed_ants_count > 0) {
     // The placed count becomes the new active ant count. SetNumAnts updates
-    // g_num_ants and resizes the thread pool to match — the main.cc caller
+    // g_num_ants and resizes the thread pool to match - the main.cc caller
     // refreshes the IDM_CONC_N menu radio after this returns.
     if (!SetNumAnts(static_cast<unsigned int>(g_placed_ants_count))) {
       LOG(ERROR) << L"SetNumAnts(" << g_placed_ants_count
-                 << L") failed — placed ants may not all have a thread to drive them";
+                 << L") failed - placed ants may not all have a thread to drive them";
       ok = false;
     }
     for (int i = 0; i < g_placed_ants_count; i++) {
@@ -988,14 +988,14 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
           EndDialog(hDlg, IDCANCEL);
           return TRUE;
         case IDOK: {
-          // 32 chars is plenty — UINT_MAX in decimal is 10 digits, plus
+          // 32 chars is plenty - UINT_MAX in decimal is 10 digits, plus
           // null terminator. ValidateCustomSeed already enforces all-digit
           // input no greater than INT_MAX.
           wchar_t buf[32] = {};
           GetDlgItemTextW(hDlg, IDC_CUSTOMSEED, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCustomSeed(buf)) {
             ErrorBox(hDlg, L"Custom Seed Validation Error",
-                     L"Invalid input — must be a positive integer.");
+                     L"Invalid input - must be a positive integer.");
             // Re-focus the edit so the user can correct without retabbing.
             // Dialog stays open (return TRUE without EndDialog).
             SetFocus(GetDlgItem(hDlg, IDC_CUSTOMSEED));

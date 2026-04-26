@@ -10,7 +10,7 @@ inline const std::wstring sound_file = L"ants.wav";
 // Compile-time switch for how the background music is sourced. When true,
 // PlayWavFile ignores its wav_file argument and plays the WAV baked into
 // the .exe as the IDR_BGM_WAVE resource (extracted to a temp file so MCI
-// can open it — MCI's string API has no "play from memory" form, and we
+// can open it - MCI's string API has no "play from memory" form, and we
 // need MCI specifically to decode MS ADPCM reliably on Win2K). When false,
 // PlayWavFile reads the file by name from the exe directory as before.
 // Flip here and rebuild; callers pass this through to PlayWavFile.
@@ -18,7 +18,7 @@ inline constexpr bool kUseEmbeddedBgm = true;
 
 // User preference: true if the user wants sound enabled. Toggled by the
 // IDM_SOUND menu / toolbar button (via ToggleSound). Audio actually plays
-// only when this is true AND the simulation is running (!g_paused) — see
+// only when this is true AND the simulation is running (!g_paused) - see
 // SyncBgm below; it's the one place that starts and stops audio.
 extern volatile bool g_playsound;
 
@@ -40,7 +40,7 @@ bool PlayWavFile(const std::wstring& wav_file, bool use_embedded);
 bool PauseWavFile();
 
 // Fully stops playback and releases the MCI device (stop + close). Used by
-// ShutDownApp for cleanup on exit — not by the mute toggle.
+// ShutDownApp for cleanup on exit - not by the mute toggle.
 bool StopPlayWav();
 
 // Toggles the user's sound preference (g_playsound) and re-syncs MCI
@@ -58,7 +58,7 @@ bool ToggleSound();
 bool SyncBgm();
 
 // Spins up the BGM worker thread. The worker owns the MCI device
-// end-to-end — every mciSendString (open, play, pause, resume, stop,
+// end-to-end - every mciSendString (open, play, pause, resume, stop,
 // close, and the loop re-issue) runs on this thread, including the
 // MM_MCINOTIFY loop-back that drives looping. Main thread interacts
 // only through the public API above, which posts commands to a small

@@ -24,7 +24,7 @@ extern unsigned long g_delay;
 extern bool g_place_mode;
 
 // How many ants the user has placed in the current place-mode session.
-// Capped at kMaxAntThreads — once it hits the cap, further clicks no-op.
+// Capped at kMaxAntThreads - once it hits the cap, further clicks no-op.
 extern int g_placed_ants_count;
 
 // Back buffer for preserving ant paths
@@ -64,7 +64,7 @@ void SignalAntsTick();
 // Requests that every active ant reroll its position, direction, and
 // marker color on its next tick. With pulse = true (the default, used by
 // IDM_REPAINT) the tick events are signalled so the reseed runs even
-// while paused — that's what makes "Repaint now" repaint immediately.
+// while paused - that's what makes "Repaint now" repaint immediately.
 // With pulse = false (IDM_STOP) the flag is set but no event fires, so
 // the threads stay parked and the canvas stays blank until the user
 // resumes from pause.
@@ -73,7 +73,7 @@ void ReseedAnts(bool pulse = true);
 // Refreshes each running ant's marker color against the current
 // g_monochrome value (mono → match the trail color, otherwise pick from
 // magenta/cyan/yellow). Position, direction and onBg are preserved so
-// the simulation continues exactly where it was — used by IDM_MONOCHROME
+// the simulation continues exactly where it was - used by IDM_MONOCHROME
 // so toggling mono behaves like picking a Colors entry (just swaps colors).
 void RefreshAntColors();
 

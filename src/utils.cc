@@ -6,7 +6,7 @@
 #include "sound.h" // g_playsound for HandleToolbarTooltips
 
 // The toolbar child window handle. Kept file-static so nothing else can
-// accidentally mutate it — other TUs interact only via the functions below.
+// accidentally mutate it - other TUs interact only via the functions below.
 static HWND s_hToolbar = nullptr;
 
 // Saved original toolbar WndProc so our subclass can chain through to it.
@@ -75,7 +75,7 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Concurrent ants — exactly one IDM_CONC_N must be CHECKED in the RC.
+  // Concurrent ants - exactly one IDM_CONC_N must be CHECKED in the RC.
   // IDs are consecutive (IDM_CONC_1..IDM_CONC_32) so we can probe them in a loop.
   for (UINT id = IDM_CONC_1; id <= IDM_CONC_32; ++id) {
     if (GetMenuState(hConc, id, MF_BYCOMMAND) & MF_CHECKED) {
@@ -84,12 +84,12 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Sound — seed the user's sound preference from the IDM_SOUND menu
+  // Sound - seed the user's sound preference from the IDM_SOUND menu
   // check. SyncBgm later (via WM_APP_AUTOPLAY) reads this to decide
   // whether to start playback at startup.
   g_playsound = (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) != 0;
 
-  // Ant color — exactly one of the IDM_*ANT items must be CHECKED in
+  // Ant color - exactly one of the IDM_*ANT items must be CHECKED in
   // the RC. Map the checked one to g_ant_color (kRandomAntColor for
   // the "Random" entry, otherwise the literal RGB).
   const struct {
@@ -108,7 +108,7 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Monochrome toggle — grey out chromatic bg items and the Ant Colors
+  // Monochrome toggle - grey out chromatic bg items and the Ant Colors
   // submenu (monochrome forces the marker to the trail color regardless
   // of g_ant_color), and override the RC's bg CHECKED to grey
   // (monochrome defaults to grey bg + white ants regardless of what the
@@ -156,9 +156,9 @@ const std::wstring GetExeDir() {
 // BMP file at the path the user chose.
 //
 // BMP layout (no palette for 32-bit):
-//   BITMAPFILEHEADER  (14 bytes) — magic 'BM', file size, pixel data offset
-//   BITMAPINFOHEADER  (40 bytes) — dimensions, bit depth, compression
-//   Pixel data        (w * h * 4 bytes) — 32-bit BGRA, bottom-up row order
+//   BITMAPFILEHEADER  (14 bytes) - magic 'BM', file size, pixel data offset
+//   BITMAPINFOHEADER  (40 bytes) - dimensions, bit depth, compression
+//   Pixel data        (w * h * 4 bytes) - 32-bit BGRA, bottom-up row order
 bool SaveClientBitmap(HWND hWnd) {
   // Prompt the user for a destination path
   wchar_t szFile[MAX_PATH] = {};
@@ -298,13 +298,13 @@ bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message)
 // uxtheme.dll and calling SetWindowTheme with empty theme/class strings.
 // XP+ themed toolbars render buttons as flat panels that only show a raised
 // outline on hover; disabling the theme falls back to the classic renderer
-// which gives every button a permanent 3D raised bevel — the look consistent
+// which gives every button a permanent 3D raised bevel - the look consistent
 // with the Win2000/XP-Classic appearance across every Windows version.
 //
 // We bind dynamically rather than linking uxtheme.lib so the binary still
 // loads on Windows 2000 (where uxtheme.dll does not exist). If LoadLibrary
-// fails there is nothing to disable anyway — classic rendering is already
-// in effect — so we just return quietly.
+// fails there is nothing to disable anyway - classic rendering is already
+// in effect - so we just return quietly.
 static void DisableWindowTheme(HWND hWnd) {
   HMODULE hUxTheme = LoadLibraryW(L"uxtheme.dll");
   if (hUxTheme == nullptr) {
@@ -322,13 +322,13 @@ static void DisableWindowTheme(HWND hWnd) {
 
 // Subclass for the toolbar, handling two things:
 //
-//   WM_ERASEBKGND — fill the client area with the standard 3D face color.
+//   WM_ERASEBKGND - fill the client area with the standard 3D face color.
 //     On real Windows this is redundant (the opaque toolbar paints its own
 //     background during WM_PAINT anyway), but Wine's toolbar does not
 //     reliably fill the background, leaving the control transparent.
 //     Painting it here covers Wine without changing anything on real Windows.
 //
-//   WM_PAINT — chain to the original proc so it draws buttons/background,
+//   WM_PAINT - chain to the original proc so it draws buttons/background,
 //     then draw a single-pixel raised line along the bottom via
 //     DrawEdge(BDR_RAISEDOUTER, BF_BOTTOM). This gives the classic
 //     early-2000s Win32 separator between toolbar and the content area
@@ -347,13 +347,13 @@ static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, 
     LRESULT result = CallWindowProcW(s_origToolbarProc, hWnd, msg, wParam, lParam);
     // Now stamp a raised edge around the client rect on top of whatever it
     // drew. GetDC gives a fresh client DC outside the BeginPaint/EndPaint
-    // cycle that the original proc used — that's fine, we just need to
+    // cycle that the original proc used - that's fine, we just need to
     // draw a few lines and release.
     HDC hdc = GetDC(hWnd);
     if (hdc != nullptr) {
       RECT rc;
       GetClientRect(hWnd, &rc);
-      // BDR_RAISEDINNER — single-pixel highlight/shadow, subtler than BDR_RAISEDOUTER
+      // BDR_RAISEDINNER - single-pixel highlight/shadow, subtler than BDR_RAISEDOUTER
       // BF_BOTTOM restricts drawing to one edge.
       DrawEdge(hdc, &rc, BDR_RAISEDINNER | BDR_RAISEDOUTER, BF_BOTTOM);
 
@@ -393,7 +393,7 @@ static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, 
 //
 // A toolbar in Win32 is its own child window of class TOOLBARCLASSNAME
 // (provided by the Common Controls DLL). We populate it with buttons that
-// pull their images from a "bitmap strip" — a single wide bitmap where each
+// pull their images from a "bitmap strip" - a single wide bitmap where each
 // button's image is a fixed-size slice. All of this app's toolbar icons are
 // loaded from its own resources (IDB_* bitmaps in langton_ants.rc) rather than
 // from the comctl32 standard strip, so the look stays consistent across
@@ -401,21 +401,21 @@ static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, 
 //
 // Button clicks arrive as WM_COMMAND messages to the parent, with wParam
 // low-word set to the button's idCommand. Here we map the save button to
-// IDM_SAVE_AS so it shares the existing menu handler — no duplicate code.
+// IDM_SAVE_AS so it shares the existing menu handler - no duplicate code.
 bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   bool ok = true;
-  // Styles note — we deliberately do NOT use TBSTYLE_FLAT here. Per MSDN it
+  // Styles note - we deliberately do NOT use TBSTYLE_FLAT here. Per MSDN it
   // makes the toolbar transparent, meaning the parent is responsible for
   // painting the background. With WS_CLIPCHILDREN on our main window (which
   // we need to keep parent painting out of the toolbar's rect), there is
   // nothing to paint the background, so the area renders as whatever is in
-  // the surface — desktop on Win2000, black on XP+ under DWM. Without
+  // the surface - desktop on Win2000, black on XP+ under DWM. Without
   // TBSTYLE_FLAT the toolbar is opaque: it paints its own background, which
   // the theme engine on XP+ handles automatically (themed raised look), and
   // Win2000 falls back to classic 3D raised shading.
   //
-  // TBSTYLE_TOOLTIPS — show tooltip popups when the cursor hovers.
-  // TBSTYLE_WRAPABLE — when the parent isn't wide enough to fit every
+  // TBSTYLE_TOOLTIPS - show tooltip popups when the cursor hovers.
+  // TBSTYLE_WRAPABLE - when the parent isn't wide enough to fit every
   // button on one row, the toolbar wraps overflow buttons onto a new
   // row instead of clipping them. LayoutToolbar's TB_AUTOSIZE call
   // re-runs the wrap on each WM_SIZE and re-reads the resulting height
@@ -437,7 +437,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // Tighten the per-button padding around the icon. Defaults are roughly
   // 7 px horizontal and 6 px vertical per button on most Windows
   // versions, which makes the toolbar visibly taller than the icons need
-  // — shrinking the vertical pad is what brings the toolbar height down.
+  // - shrinking the vertical pad is what brings the toolbar height down.
   // LOWORD = horizontal pad, HIWORD = vertical pad.
   // SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(6, 5));
 
@@ -484,12 +484,12 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
 
   // --- Buttons -------------------------------------------------------------
   // TBBUTTON fields:
-  //   iBitmap   — index into the loaded image list (ignored for TBSTYLE_SEP)
-  //   idCommand — WM_COMMAND id sent when the button is clicked
-  //   fsState   — TBSTATE_ENABLED for clickable (0 for separators)
-  //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
-  //   dwData    — app-defined extra data we don't need
-  //   iString   — tooltip/label text pointer (cast through INT_PTR)
+  //   iBitmap   - index into the loaded image list (ignored for TBSTYLE_SEP)
+  //   idCommand - WM_COMMAND id sent when the button is clicked
+  //   fsState   - TBSTATE_ENABLED for clickable (0 for separators)
+  //   fsStyle   - TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
+  //   dwData    - app-defined extra data we don't need
+  //   iString   - tooltip/label text pointer (cast through INT_PTR)
   // Three separators: one between Save As and Pause (divides file ops
   // from simulation control), one between Stop and Num Ants (divides
   // transport controls from simulation knobs), and one between Sound
@@ -612,7 +612,7 @@ void LayoutToolbar(HWND hWnd) {
 // TB_SETBUTTONINFO updates any subset of a TBBUTTON's fields by command ID.
 // dwMask picks which fields to apply; here we want the icon and the text.
 // The toolbar copies the text string internally, so passing a string literal
-// via const_cast is safe — the control won't mutate the memory we point at.
+// via const_cast is safe - the control won't mutate the memory we point at.
 void SetPauseButton(bool paused) {
   if (s_hToolbar == nullptr) {
     return;
@@ -666,7 +666,7 @@ bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
                << idCommand << L" (button missing from the toolbar?)";
     return false;
   }
-  // Convert the bottom-left corner to screen space — that's where
+  // Convert the bottom-left corner to screen space - that's where
   // TrackPopupMenu wants its anchor.
   POINT pt = {rc.left, rc.bottom};
   ClientToScreen(s_hToolbar, &pt);
@@ -734,7 +734,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = g_playsound ? L"Mute Background Sounds" : L"Play Background Sounds";
       break;
     default:
-      return false; // unknown button — let the default handling run
+      return false; // unknown button - let the default handling run
   }
   pdi->lpszText = const_cast<LPWSTR>(text);
   return true;
@@ -775,7 +775,7 @@ const std::wstring GetVersionString() {
   // VERSION_STRING is a narrow C string literal built by stringize macros,
   // so we can't feed it straight to std::wstring. Build the wide form
   // directly from the same integer macros (single source of truth in
-  // version.h) — std::to_wstring keeps it standards-clean across MinGW
+  // version.h) - std::to_wstring keeps it standards-clean across MinGW
   // and MSVC alike.
   return std::to_wstring(MAJOR_VERSION) + L"." + std::to_wstring(MINOR_VERSION) + L"." +
          std::to_wstring(BUILD_VERSION);

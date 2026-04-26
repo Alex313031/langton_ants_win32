@@ -16,7 +16,7 @@ extern volatile bool g_paused;  // Keep track of paused state. PauseAnts() uses 
 extern volatile bool g_stopped; // True at startup (no animation has happened yet) and after
                                 // IDM_STOP. Cleared the moment the simulation actually starts
                                 // playing (ShowAnts / TogglePaintAnts unpause). Purely a label hint
-                                // — chooses "Play" vs "Resume" on the toolbar's pause/play button.
+                                // - chooses "Play" vs "Resume" on the toolbar's pause/play button.
 
 extern CRITICAL_SECTION g_paintCS; // For thread sync on back buffer access
 
