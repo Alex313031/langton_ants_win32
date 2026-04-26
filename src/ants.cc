@@ -95,12 +95,26 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   //   dir           — 0=N, 1=E, 2=S, 3=W. Right turn = +1, left = +3,
   //                   reverse = +2, all mod 4.
   // rand() on Win32 uses per-thread state, so srand'ing here seeds only
-  // this thread's sequence. Mixing GetTickCount() with the thread ID keeps
-  // simultaneous starts distinct — otherwise all kMaxAntThreads ants would
-  // spawn at the same cell facing the same way.
+  // this thread's sequence. Mixing in something that varies per slot
+  // keeps simultaneous starts distinct — otherwise all kMaxAntThreads
+  // ants would spawn at the same cell facing the same way.
+  //
+  // Two seeding modes:
+  //   - Custom seed (user typed one): mix the seed with the slot's
+  //     index in s_slots, NOT the OS thread ID. Slot indices are 0..N-1
+  //     and stable across runs, so the same custom seed + same ant
+  //     count reproduces the same per-slot rand() sequence (and thus
+  //     the same starting cells / directions / colors). The Fibonacci
+  //     hash constant 0x9E3779B9 spreads tiny indices into well-
+  //     distributed seeds so adjacent slots don't all spawn at near-
+  //     identical positions.
+  //   - No custom seed: mix GetTickCount() with the thread ID — the
+  //     intent there is "different every run", so non-determinism is
+  //     a feature, not a bug.
   DWORD seed;
   if (slot->customSeedRequest) {
-    seed = static_cast<DWORD>(slot->customSeed) ^ GetCurrentThreadId();
+    const DWORD slotIdx = static_cast<DWORD>(slot - s_slots);
+    seed = static_cast<DWORD>(slot->customSeed) ^ (slotIdx * 0x9E3779B9u);
   } else {
     seed = GetTickCount() ^ GetCurrentThreadId();
   }
