@@ -11,6 +11,8 @@ volatile bool g_stopped = true;  // True at startup (no animation yet) and after
 
 bool g_monochrome = false; // Whether monochrome colors only is enabled
 
+COLORREF g_ant_color = kRandomAntColor; // Fixed ant marker color, or kRandomAntColor for per-ant random pick
+
 volatile UINT g_num_ants = 1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
 
 unsigned long g_delay = kRealTime; // Default until InitMenuDefaults reads the RC.
@@ -185,11 +187,13 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       slot->colorRefreshRequest = false;
       if (g_monochrome) {
         antColor = CurrentPathColor();
-      } else {
+      } else if (g_ant_color == kRandomAntColor) {
         static const COLORREF kAntColors[3] = {
           RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
         };
         antColor = kAntColors[rand() % 3];
+      } else {
+        antColor = g_ant_color;
       }
       if (cellX >= 0 && cellY >= 0) {
         EnterCriticalSection(&g_paintCS);
@@ -243,11 +247,13 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
             // (it keys off the magenta/cyan/yellow markers), so ants
             // simply pass through each other in monochrome mode.
             antColor = CurrentPathColor();
-          } else {
+          } else if (g_ant_color == kRandomAntColor) {
             static const COLORREF kAntColors[3] = {
               RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
             };
             antColor = kAntColors[rand() % 3];
+          } else {
+            antColor = g_ant_color;
           }
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
@@ -458,11 +464,11 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   const bool inPlaceMode         = g_place_mode && g_placed_ants_count > 0;
 
   if (inPlaceMode) {
-    LOG(INFO) << L"Using custom seed " << custom_seed
-              << L" for ant direction";
+    LOG(INFO) << L"Using custom seed '" << custom_seed
+              << L"' for ant direction";
   } else {
-    LOG(INFO) << L"Using custom seed " << custom_seed
-              << L" for ant placement, direction, and color.";
+    LOG(INFO) << L"Using custom seed '" << custom_seed
+              << L"' for ant placement, direction, and color.";
   }
 
   // Stop the timer for the duration of the respawn so no stray WM_TIMER
@@ -753,9 +759,11 @@ bool ShowAnts() {
   return true;
 }
 
-void TogglePaintAnts(HWND hWnd) {
+bool TogglePaintAnts(HWND hWnd) {
+  bool ok = true;
   if (hWnd == nullptr) {
-    return;
+    LOG(ERROR) << L"TogglePaintAnts: null hWnd";
+    return false;
   }
   g_paused = !g_paused;
   // Pause = kill the timer so no more ticks fire. Every active thread sits
@@ -780,9 +788,15 @@ void TogglePaintAnts(HWND hWnd) {
     // should give "Resume" rather than "Play".
     g_stopped = false;
     SignalAntsTick();
-    SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
+    if (SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr) == 0) {
+      LOG(ERROR) << L"TogglePaintAnts: SetTimer failed on resume — "
+                    L"simulation will sit idle until something else "
+                    L"re-arms the tick source";
+      ok = false;
+    }
   }
   SyncBgm();
+  return ok;
 }
 
 void EnterPlaceMode() {
@@ -845,11 +859,13 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   COLORREF antColor;
   if (g_monochrome) {
     antColor = CurrentPathColor();
-  } else {
+  } else if (g_ant_color == kRandomAntColor) {
     static const COLORREF kAntColors[3] = {
       RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
     };
     antColor = kAntColors[rand() % 3];
+  } else {
+    antColor = g_ant_color;
   }
   RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
   HBRUSH hAnt = CreateSolidBrush(antColor);

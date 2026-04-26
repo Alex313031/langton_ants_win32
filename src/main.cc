@@ -106,6 +106,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     if (init_logging) {
       logging::SetIsDCheck(is_dcheck);
       LOG(INFO) << L"---- Welcome to Langton's Ants Win32 ----";
+      LOG(INFO) << L"Version: " << GetVersionString();
     } else {
       ErrorBox(nullptr, L"Logging Initialization Failure", L"InitLogging failed!");
       return 3;
@@ -666,12 +667,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                         MF_BYCOMMAND | (g_monochrome ? MF_CHECKED : MF_UNCHECKED));
           // Grey out or restore the chromatic bg options. White, black,
           // and grey all count as monochrome, so only the R/G/B entries
-          // get disabled.
+          // get disabled. Also grey the entire Ant Colors submenu — in
+          // monochrome the marker always matches the trail color so the
+          // user-picked ant color is moot.
           HMENU hBkgMenu = GetSubMenu(hSettings, 5);
           const UINT colorState = g_monochrome ? MF_GRAYED : MF_ENABLED;
           EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_CYANANT,     MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_YELLOWANT,   MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_MAGENTAANT,  MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_ALLCOLORANT, MF_BYCOMMAND | colorState);
           // Swap bg pixels in place via RecolorBackground rather than
           // clearing the canvas — same pattern as the background-color
           // menu, so existing ant trails are preserved.
@@ -741,6 +748,29 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Invalidate the whole client area so WM_PAINT blits the updated
           // back buffer to the screen. FALSE = do not erase background first
           // (we handle that in WM_PAINT ourselves).
+          InvalidateRect(hWnd, nullptr, FALSE);
+          break;
+        }
+        case IDM_CYANANT:
+        case IDM_YELLOWANT:
+        case IDM_MAGENTAANT:
+        case IDM_ALLCOLORANT: {
+          // Update g_ant_color to whatever the user picked, refresh the
+          // radio mark in the Ant Colors submenu, and signal each
+          // running ant to re-roll its cached marker against the new
+          // preference (RefreshAntColors keeps position / dir / onBg
+          // intact and only swaps the visible color).
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
+          CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT,
+                             command, MF_BYCOMMAND);
+          switch (command) {
+            case IDM_CYANANT:    g_ant_color = RGB_CYAN;        break;
+            case IDM_YELLOWANT:  g_ant_color = RGB_YELLOW;      break;
+            case IDM_MAGENTAANT: g_ant_color = RGB_MAGENTA;     break;
+            default:             g_ant_color = kRandomAntColor; break;
+          }
+          RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
@@ -903,19 +933,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
   return 0;
 }
 
-void ShutDownApp() {
-  // Stop the BGM first (sync post to the worker), THEN tear the worker
-  // down. Both calls are idempotent — WM_DESTROY will call them again
-  // harmlessly on the way out.
-  StopPlayWav();
-  ShutdownBgm();
-  // De-initialize logging, which closes any console window open
-  logging::DeInitLogging(g_hInstance); // Can't log anything more after this
-  // WM_DESTROY will call ShutdownAnts() for us — DestroyWindow triggers that
-  // path synchronously, so we don't need to touch thread state here.
-  DestroyWindow(mainHwnd);
-}
-
 bool InitApp(HWND hWnd) {
   bool ok = false;
   if (hWnd == nullptr) {
@@ -945,6 +962,19 @@ bool InitApp(HWND hWnd) {
   // no extra branching here.
   PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
   return ok;
+}
+
+void ShutDownApp() {
+  // Stop the BGM first (sync post to the worker), THEN tear the worker
+  // down. Both calls are idempotent — WM_DESTROY will call them again
+  // harmlessly on the way out.
+  StopPlayWav();
+  ShutdownBgm();
+  // De-initialize logging, which closes any console window open
+  logging::DeInitLogging(g_hInstance); // Can't log anything more after this
+  // WM_DESTROY will call ShutdownAnts() for us — DestroyWindow triggers that
+  // path synchronously, so we don't need to touch thread state here.
+  DestroyWindow(mainHwnd);
 }
 
 bool LaunchHelp(HWND hWnd) {

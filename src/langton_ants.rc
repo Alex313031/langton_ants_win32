@@ -143,12 +143,20 @@ BEGIN
         BEGIN
             MENUITEM "&Use MonoChrome", IDM_MONOCHROME
             MENUITEM SEPARATOR
-            MENUITEM "&White", IDM_WHITE_BKG
             MENUITEM "&Black", IDM_BLACK_BKG
+            MENUITEM "&White", IDM_WHITE_BKG
             MENUITEM "&Grey",  IDM_GREY_BKG
             MENUITEM "&Red",   IDM_RED_BKG
             MENUITEM "&Green", IDM_GREEN_BKG
             MENUITEM "&Blue",  IDM_BLUE_BKG, CHECKED
+            MENUITEM SEPARATOR
+            POPUP "&Ant Colors"
+            BEGIN
+                MENUITEM "C&yan",    IDM_CYANANT
+                MENUITEM "&Yellow",  IDM_YELLOWANT
+                MENUITEM "&Magenta", IDM_MAGENTAANT
+                MENUITEM "&Random",  IDM_ALLCOLORANT, CHECKED
+            END
         END
         MENUITEM SEPARATOR
         POPUP "&Customize"

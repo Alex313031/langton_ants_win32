@@ -90,15 +90,36 @@ void InitMenuDefaults(HWND hWnd) {
   // whether to start playback at startup.
   g_playsound = (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) != 0;
 
-  // Monochrome toggle — grey out chromatic bg items and override the RC's
-  // bg CHECKED to grey (monochrome defaults to grey bg + white ants
-  // regardless of what the RC otherwise selected; white and black remain
-  // selectable afterward).
+  // Ant color — exactly one of the IDM_*ANT items must be CHECKED in
+  // the RC. Map the checked one to g_ant_color (kRandomAntColor for
+  // the "Random" entry, otherwise the literal RGB).
+  const struct { UINT id; COLORREF color; } antColors[] = {
+    { IDM_CYANANT,     RGB_CYAN },
+    { IDM_YELLOWANT,   RGB_YELLOW },
+    { IDM_MAGENTAANT,  RGB_MAGENTA },
+    { IDM_ALLCOLORANT, kRandomAntColor },
+  };
+  for (const auto& a : antColors) {
+    if (GetMenuState(hSettings, a.id, MF_BYCOMMAND) & MF_CHECKED) {
+      g_ant_color = a.color;
+      break;
+    }
+  }
+
+  // Monochrome toggle — grey out chromatic bg items and the Ant Colors
+  // submenu (monochrome forces the marker to the trail color regardless
+  // of g_ant_color), and override the RC's bg CHECKED to grey
+  // (monochrome defaults to grey bg + white ants regardless of what the
+  // RC otherwise selected; white and black remain selectable afterward).
   if (GetMenuState(hSettings, IDM_MONOCHROME, MF_BYCOMMAND) & MF_CHECKED) {
     g_monochrome = true;
     EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_CYANANT,     MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_YELLOWANT,   MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_MAGENTAANT,  MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_ALLCOLORANT, MF_BYCOMMAND | MF_GRAYED);
     if (g_bkg_color != RGB_GREY) {
       g_bkg_color = RGB_GREY;
       CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
@@ -630,20 +651,35 @@ void SetSoundButton(bool playing) {
               reinterpret_cast<LPARAM>(&bi));
 }
 
-void PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
-  if (s_hToolbar == nullptr || hMenu == nullptr) return;
+bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
+  bool ok = true;
+  if (s_hToolbar == nullptr || hMenu == nullptr) {
+    LOG(ERROR) << L"PopupUnderToolbarButton: toolbar="
+               << (s_hToolbar ? L"set" : L"null")
+               << L", hMenu=" << (hMenu ? L"set" : L"null")
+               << L" (called before toolbar ready or with null menu)";
+    return false;
+  }
   // TB_GETRECT returns the button's rect in toolbar-client coords.
   RECT rc;
   if (!SendMessageW(s_hToolbar, TB_GETRECT, idCommand,
                    reinterpret_cast<LPARAM>(&rc))) {
-    return;
+    LOG(ERROR) << L"PopupUnderToolbarButton: TB_GETRECT failed for "
+                  L"command id " << idCommand
+               << L" (button missing from the toolbar?)";
+    return false;
   }
   // Convert the bottom-left corner to screen space — that's where
   // TrackPopupMenu wants its anchor.
   POINT pt = { rc.left, rc.bottom };
   ClientToScreen(s_hToolbar, &pt);
-  TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN,
-                 pt.x, pt.y, 0, hOwner, nullptr);
+  if (!TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN,
+                      pt.x, pt.y, 0, hOwner, nullptr)) {
+    LOG(ERROR) << L"PopupUnderToolbarButton: TrackPopupMenu failed for "
+                  L"command id " << idCommand;
+    ok = false;
+  }
+  return ok;
 }
 
 bool HandleToolbarTooltips(NMHDR* pnmh) {
@@ -673,7 +709,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = L"Choose how many ants to spawn";
       break;
     case IDM_SPEED:
-      text = L"Change crawl speed";
+      text = L"Change iteration (crawling) speed";
       break;
     case IDM_CUSTOM:
       text = L"Customize ant placement and starting \"seed\"";
@@ -729,4 +765,15 @@ bool ValidateCustomSeed(LPCWSTR cSeed) {
      is_valid = (seedValue > 0 && seedValue <= INT_MAX);
   }
   return is_valid;
+}
+
+const std::wstring GetVersionString() {
+  // VERSION_STRING is a narrow C string literal built by stringize macros,
+  // so we can't feed it straight to std::wstring. Build the wide form
+  // directly from the same integer macros (single source of truth in
+  // version.h) — std::to_wstring keeps it standards-clean across MinGW
+  // and MSVC alike.
+  return std::to_wstring(MAJOR_VERSION) + L"." +
+         std::to_wstring(MINOR_VERSION) + L"." +
+         std::to_wstring(BUILD_VERSION);
 }

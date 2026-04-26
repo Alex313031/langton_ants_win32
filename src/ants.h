@@ -5,6 +5,13 @@
 
 extern bool g_monochrome;
 
+// User's ant marker color preference (set from Colors → Ant Colors).
+// Set to kRandomAntColor (the default) to roll a per-ant color from
+// {magenta, cyan, yellow}; otherwise every ant uses this exact COLORREF.
+// Ignored entirely while g_monochrome is true.
+inline constexpr COLORREF kRandomAntColor = 0xFFFFFFFFu;
+extern COLORREF g_ant_color;
+
 extern volatile UINT g_num_ants;
 
 extern unsigned long g_delay;
@@ -102,7 +109,10 @@ bool SetNumAnts(const unsigned int num);
 bool ShowAnts();
 
 // Pauses/resumes painting, for i.e. taking a snapshot, or showing a friend the current state.
-void TogglePaintAnts(HWND hWnd);
+// Returns true on success; returns false on a null hWnd, or when the
+// resume path's SetTimer call fails (the timer can't be re-armed and
+// the simulation will sit idle even though g_paused was cleared).
+bool TogglePaintAnts(HWND hWnd);
 
 // Enters "place ants" mode: clears any pending placement list and sets
 // g_place_mode = true. Caller is responsible for ensuring the simulation

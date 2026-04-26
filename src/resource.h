@@ -122,8 +122,13 @@
 // Not in a UI menu, just keyboard accelerator
 #define IDM_UNDO                    268
 
+#define IDM_CYANANT                 269
+#define IDM_YELLOWANT               270
+#define IDM_MAGENTAANT              271
+#define IDM_ALLCOLORANT             272
+
 // Dev menu item, test debug trap
-#define IDM_TESTTRAP                270
+#define IDM_TESTTRAP                280
 
 // Timer ID for painting
 #define TIMER_ANTS                  300
