@@ -1,10 +1,10 @@
 #include "sound.h"
 
+#include <logging.h>
+
 #include "globals.h"
 #include "resource.h"
-#include "utils.h"   // GetExeDir for the non-embedded file-source path
-
-#include <logging.h>
+#include "utils.h" // GetExeDir for the non-embedded file-source path
 
 // User preference, NOT actual playback state. See sound.h.
 volatile bool g_playsound = false;
@@ -51,33 +51,33 @@ static bool s_audio_playing = false;
 
 enum class BgmCmd {
   None,
-  Play,   // open if device is closed; resume if it's paused
+  Play, // open if device is closed; resume if it's paused
   Pause,
-  Stop,   // stop + close + temp-file cleanup
+  Stop, // stop + close + temp-file cleanup
 };
 
 struct BgmCmdSlot {
-  BgmCmd       cmd          = BgmCmd::None;
+  BgmCmd cmd = BgmCmd::None;
   std::wstring wav;
-  bool         use_embedded = false;
+  bool use_embedded = false;
 };
 
 static CRITICAL_SECTION s_bgmCS;
-static BgmCmdSlot       s_slot;
-static bool             s_lastResult    = false;
-static HANDLE           s_bgmCmdEvent   = nullptr; // auto-reset: "cmd pending"
-static HANDLE           s_bgmDoneEvent  = nullptr; // auto-reset: "sync cmd done"
-static HANDLE           s_bgmExitEvent  = nullptr; // manual-reset: "shut down"
-static HANDLE           s_bgmInitEvent  = nullptr; // manual-reset: "worker ready"
-static HANDLE           s_bgmWorker     = nullptr;
-static bool             s_bgmInit       = false;
-static bool             s_bgmInitOk     = false;   // worker setup succeeded
+static BgmCmdSlot s_slot;
+static bool s_lastResult     = false;
+static HANDLE s_bgmCmdEvent  = nullptr; // auto-reset: "cmd pending"
+static HANDLE s_bgmDoneEvent = nullptr; // auto-reset: "sync cmd done"
+static HANDLE s_bgmExitEvent = nullptr; // manual-reset: "shut down"
+static HANDLE s_bgmInitEvent = nullptr; // manual-reset: "worker ready"
+static HANDLE s_bgmWorker    = nullptr;
+static bool s_bgmInit        = false;
+static bool s_bgmInitOk      = false; // worker setup succeeded
 
 // ---------- Worker-thread-only MCI state ----------------------------------
 // Touched only from BgmWorkerProc; no synchronization needed.
 
-static HWND         s_bgmHwnd          = nullptr; // hidden notify target
-static bool         s_mciOpened        = false;
+static HWND s_bgmHwnd   = nullptr; // hidden notify target
+static bool s_mciOpened = false;
 static std::wstring s_embeddedTempPath;
 static const wchar_t kMciBgmAlias[]    = L"langton_ants_bgm";
 static const wchar_t kBgmHiddenClass[] = L"LangtonAntsBgmHidden";
@@ -108,28 +108,28 @@ static std::wstring ExtractEmbeddedWavToTemp() {
     return std::wstring();
   }
   const LPVOID pData = LockResource(hGlob);
-  const DWORD size = SizeofResource(nullptr, hRsrc);
+  const DWORD size   = SizeofResource(nullptr, hRsrc);
   if (pData == nullptr || size == 0) {
     LOG(ERROR) << L"LockResource/SizeofResource returned empty for IDR_BGM_WAVE";
     return std::wstring();
   }
 
   wchar_t tempDir[MAX_PATH] = {};
-  DWORD n = GetTempPathW(MAX_PATH, tempDir);
+  DWORD n                   = GetTempPathW(MAX_PATH, tempDir);
   if (n == 0 || n > MAX_PATH) {
     LOG(ERROR) << L"GetTempPathW failed";
     return std::wstring();
   }
   std::wstring tempPath = std::wstring(tempDir) + L"langton_ants_bgm.wav";
 
-  HANDLE hFile = CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE hFile = CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                             FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
     LOG(ERROR) << L"CreateFile temp failed for " << tempPath;
     return std::wstring();
   }
   DWORD written = 0;
-  BOOL ok = WriteFile(hFile, pData, size, &written, nullptr);
+  BOOL ok       = WriteFile(hFile, pData, size, &written, nullptr);
   CloseHandle(hFile);
   if (!ok || written != size) {
     LOG(ERROR) << L"WriteFile temp WAV short-write: " << written << L"/" << size;
@@ -153,11 +153,15 @@ static bool WorkerOpenPlay(const std::wstring& wav_file, bool use_embedded) {
   std::wstring file;
   if (use_embedded) {
     file = ExtractEmbeddedWavToTemp();
-    if (file.empty()) return false;
+    if (file.empty()) {
+      return false;
+    }
     s_embeddedTempPath = file;
   } else {
     const std::wstring cwd = GetExeDir();
-    if (cwd.empty()) return false;
+    if (cwd.empty()) {
+      return false;
+    }
     file = cwd + wav_file;
   }
   // Quoting the path keeps spaces or punctuation in the exe dir from
@@ -198,7 +202,9 @@ static bool WorkerOpenPlay(const std::wstring& wav_file, bool use_embedded) {
 }
 
 static bool WorkerResume() {
-  if (!s_mciOpened) return false;
+  if (!s_mciOpened) {
+    return false;
+  }
   // `resume` continues from the current playback position. Do NOT re-issue
   // `play` here — that would reset to 0 and double-register the notify
   // callback.
@@ -211,23 +217,33 @@ static bool WorkerResume() {
 }
 
 static bool WorkerPause() {
-  if (!s_mciOpened) return true;
+  if (!s_mciOpened) {
+    return true;
+  }
   // `pause` suspends playback without resetting position — the pending
   // `notify` registration stays alive so MM_MCINOTIFY still fires on the
   // eventual natural completion after a subsequent resume.
   MCIERROR err = mciSendStringW(L"pause langton_ants_bgm", nullptr, 0, nullptr);
-  if (err != 0) LOG(ERROR) << L"MCI pause failed: " << MciErrText(err);
+  if (err != 0) {
+    LOG(ERROR) << L"MCI pause failed: " << MciErrText(err);
+  }
   return true;
 }
 
 static bool WorkerStop() {
-  if (!s_mciOpened) return true;
+  if (!s_mciOpened) {
+    return true;
+  }
   // Full tear-down: stop halts playback, close releases the waveform
   // device so a subsequent open can succeed cleanly.
   MCIERROR err = mciSendStringW(L"stop langton_ants_bgm", nullptr, 0, nullptr);
-  if (err != 0) LOG(ERROR) << L"MCI stop failed: " << MciErrText(err);
+  if (err != 0) {
+    LOG(ERROR) << L"MCI stop failed: " << MciErrText(err);
+  }
   err = mciSendStringW(L"close langton_ants_bgm", nullptr, 0, nullptr);
-  if (err != 0) LOG(ERROR) << L"MCI close failed: " << MciErrText(err);
+  if (err != 0) {
+    LOG(ERROR) << L"MCI close failed: " << MciErrText(err);
+  }
   s_mciOpened = false;
   if (!s_embeddedTempPath.empty()) {
     DeleteFileW(s_embeddedTempPath.c_str());
@@ -248,9 +264,10 @@ static void WorkerReplay() {
   // to bail rather than restart. (Reading these volatile bools from the
   // worker is benign — both are written by the main thread as plain
   // assignments, and we only need a snapshot here.)
-  if (!s_mciOpened || !g_playsound || g_paused) return;
-  MCIERROR err = mciSendStringW(L"play langton_ants_bgm from 0 notify",
-                                 nullptr, 0, s_bgmHwnd);
+  if (!s_mciOpened || !g_playsound || g_paused) {
+    return;
+  }
+  MCIERROR err = mciSendStringW(L"play langton_ants_bgm from 0 notify", nullptr, 0, s_bgmHwnd);
   if (err != 0) {
     LOG(ERROR) << L"MCI replay failed: " << MciErrText(err);
   }
@@ -260,11 +277,13 @@ static void WorkerReplay() {
 static bool ProcessCmd(const BgmCmdSlot& slot) {
   switch (slot.cmd) {
     case BgmCmd::Play:
-      return s_mciOpened ? WorkerResume()
-                          : WorkerOpenPlay(slot.wav, slot.use_embedded);
-    case BgmCmd::Pause: return WorkerPause();
-    case BgmCmd::Stop:  return WorkerStop();
-    default:            return false;
+      return s_mciOpened ? WorkerResume() : WorkerOpenPlay(slot.wav, slot.use_embedded);
+    case BgmCmd::Pause:
+      return WorkerPause();
+    case BgmCmd::Stop:
+      return WorkerStop();
+    default:
+      return false;
   }
 }
 
@@ -277,8 +296,7 @@ static bool ProcessCmd(const BgmCmdSlot& slot) {
 // (driver error — do nothing). The g_playsound guard in WorkerReplay also
 // protects against a late-arriving SUCCESSFUL notification that races a
 // user Pause.
-static LRESULT CALLBACK BgmHiddenWndProc(HWND hWnd, UINT msg,
-                                         WPARAM wp, LPARAM lp) {
+static LRESULT CALLBACK BgmHiddenWndProc(HWND hWnd, UINT msg, WPARAM wp, LPARAM lp) {
   if (msg == MM_MCINOTIFY) {
     if (wp == MCI_NOTIFY_SUCCESSFUL) {
       WorkerReplay();
@@ -294,11 +312,11 @@ static LRESULT CALLBACK BgmHiddenWndProc(HWND hWnd, UINT msg,
 //   - s_bgmCmdEvent  (auto-reset)  : main thread posted a command.
 //   - window messages              : MCI notifications to s_bgmHwnd.
 static DWORD WINAPI BgmWorkerProc(LPVOID) {
-  WNDCLASSW wc = {};
+  WNDCLASSW wc     = {};
   wc.lpfnWndProc   = BgmHiddenWndProc;
   wc.hInstance     = GetModuleHandleW(nullptr);
   wc.lpszClassName = kBgmHiddenClass;
-  ATOM classAtom = RegisterClassW(&wc);
+  ATOM classAtom   = RegisterClassW(&wc);
   if (classAtom == 0 && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
     LOG(ERROR) << L"BGM RegisterClass failed";
     s_bgmInitOk = false;
@@ -307,8 +325,8 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
   }
   // HWND_MESSAGE parent makes it an invisible message-only window — no
   // z-order, no taskbar, no focus changes. Pure PostMessage target.
-  s_bgmHwnd = CreateWindowW(kBgmHiddenClass, L"", 0, 0, 0, 0, 0,
-                              HWND_MESSAGE, nullptr, wc.hInstance, nullptr);
+  s_bgmHwnd = CreateWindowW(kBgmHiddenClass, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr,
+                            wc.hInstance, nullptr);
   if (s_bgmHwnd == nullptr) {
     LOG(ERROR) << L"BGM CreateWindow failed";
     UnregisterClassW(kBgmHiddenClass, wc.hInstance);
@@ -319,7 +337,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
   s_bgmInitOk = true;
   SetEvent(s_bgmInitEvent);
 
-  HANDLE handles[2] = { s_bgmExitEvent, s_bgmCmdEvent };
+  HANDLE handles[2] = {s_bgmExitEvent, s_bgmCmdEvent};
   while (true) {
     DWORD r = MsgWaitForMultipleObjects(2, handles, FALSE, INFINITE, QS_ALLINPUT);
     if (r == WAIT_OBJECT_0) {
@@ -364,9 +382,12 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
 
 // Post a command and wait for the worker to finish processing it. Returns
 // the worker's bool result. Main thread only.
-static bool PostBgmSync(BgmCmd cmd, const std::wstring& wav = std::wstring(),
-                        bool use_embedded = false) {
-  if (!s_bgmInit) return false;
+static bool PostBgmSync(BgmCmd cmd,
+                        const std::wstring& wav = std::wstring(),
+                        bool use_embedded       = false) {
+  if (!s_bgmInit) {
+    return false;
+  }
   EnterCriticalSection(&s_bgmCS);
   s_slot.cmd          = cmd;
   s_slot.wav          = wav;
@@ -404,7 +425,9 @@ bool SyncBgm() {
   // simulation is currently running. If audio is already in the right
   // state, do nothing.
   const bool desired = g_playsound && !g_paused;
-  if (desired == s_audio_playing) return true;
+  if (desired == s_audio_playing) {
+    return true;
+  }
   if (desired) {
     if (PlayWavFile(sound_file, kUseEmbeddedBgm)) {
       s_audio_playing = true;
@@ -441,12 +464,14 @@ bool ToggleSound() {
 
 bool InitBgm() {
   bool ok = true;
-  if (s_bgmInit) return true;  // already initialized — treat as success
+  if (s_bgmInit) {
+    return true; // already initialized — treat as success
+  }
   InitializeCriticalSection(&s_bgmCS);
   s_bgmCmdEvent  = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
   s_bgmDoneEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
-  s_bgmExitEvent = CreateEventW(nullptr, TRUE,  FALSE, nullptr); // manual-reset
-  s_bgmInitEvent = CreateEventW(nullptr, TRUE,  FALSE, nullptr); // manual-reset
+  s_bgmExitEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);  // manual-reset
+  s_bgmInitEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);  // manual-reset
   if (!s_bgmCmdEvent || !s_bgmDoneEvent || !s_bgmExitEvent || !s_bgmInitEvent) {
     LOG(ERROR) << L"CreateEventW failed for one or more BGM sync events";
     return false;
@@ -468,11 +493,16 @@ bool InitBgm() {
   if (!s_bgmInitOk) {
     LOG(ERROR) << L"BGM worker init failed (hidden notify window setup)";
     WaitForSingleObject(s_bgmWorker, INFINITE);
-    CloseHandle(s_bgmWorker);    s_bgmWorker    = nullptr;
-    CloseHandle(s_bgmCmdEvent);  s_bgmCmdEvent  = nullptr;
-    CloseHandle(s_bgmDoneEvent); s_bgmDoneEvent = nullptr;
-    CloseHandle(s_bgmExitEvent); s_bgmExitEvent = nullptr;
-    CloseHandle(s_bgmInitEvent); s_bgmInitEvent = nullptr;
+    CloseHandle(s_bgmWorker);
+    s_bgmWorker = nullptr;
+    CloseHandle(s_bgmCmdEvent);
+    s_bgmCmdEvent = nullptr;
+    CloseHandle(s_bgmDoneEvent);
+    s_bgmDoneEvent = nullptr;
+    CloseHandle(s_bgmExitEvent);
+    s_bgmExitEvent = nullptr;
+    CloseHandle(s_bgmInitEvent);
+    s_bgmInitEvent = nullptr;
     DeleteCriticalSection(&s_bgmCS);
     return false;
   }
@@ -481,18 +511,25 @@ bool InitBgm() {
 }
 
 void ShutdownBgm() {
-  if (!s_bgmInit) return;
+  if (!s_bgmInit) {
+    return;
+  }
   // Signal exit and join. If the worker is currently mid-mciSendString
   // it'll finish that command first, then loop back, see the exit event,
   // destroy the hidden window and return — so "join" may wait up to one
   // play-setup duration (tens of ms). Acceptable at shutdown.
   SetEvent(s_bgmExitEvent);
   WaitForSingleObject(s_bgmWorker, INFINITE);
-  CloseHandle(s_bgmWorker);    s_bgmWorker    = nullptr;
-  CloseHandle(s_bgmCmdEvent);  s_bgmCmdEvent  = nullptr;
-  CloseHandle(s_bgmDoneEvent); s_bgmDoneEvent = nullptr;
-  CloseHandle(s_bgmExitEvent); s_bgmExitEvent = nullptr;
-  CloseHandle(s_bgmInitEvent); s_bgmInitEvent = nullptr;
+  CloseHandle(s_bgmWorker);
+  s_bgmWorker = nullptr;
+  CloseHandle(s_bgmCmdEvent);
+  s_bgmCmdEvent = nullptr;
+  CloseHandle(s_bgmDoneEvent);
+  s_bgmDoneEvent = nullptr;
+  CloseHandle(s_bgmExitEvent);
+  s_bgmExitEvent = nullptr;
+  CloseHandle(s_bgmInitEvent);
+  s_bgmInitEvent = nullptr;
   DeleteCriticalSection(&s_bgmCS);
   s_bgmInit = false;
 }

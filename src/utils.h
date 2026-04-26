@@ -1,9 +1,10 @@
 #ifndef LANGTON_ANTS_UTILS_H_
 #define LANGTON_ANTS_UTILS_H_
 
+// clang-format off
 #include "framework.h"
-
 #include <logging.h>
+// clang-format on
 
 // Color constants
 #define RGB_BLACK   RGB(0, 0, 0)
@@ -40,7 +41,8 @@ inline constexpr INT CW_HEIGHT = 640;
 inline constexpr INT MINWIDTH  = 256;
 inline constexpr INT MINHEIGHT = 256;
 
-extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives below it.
+extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
+                            // below it.
 
 // Gets default settings from CHECKED state of menu items
 void InitMenuDefaults(HWND hWnd);

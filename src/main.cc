@@ -17,8 +17,8 @@ HINSTANCE g_hInstance = nullptr;
 int cxClient = 0;
 int cyClient = 0;
 
-static bool s_resizing = false;
-static POINT s_resizeOrigin = {};
+static bool s_resizing        = false;
+static POINT s_resizeOrigin   = {};
 static SIZE s_resizeStartSize = {};
 
 // Tracks whether the last WM_SIZE minimized the window. Set by WM_SIZE on
@@ -65,18 +65,18 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   icex.dwICC  = ICC_STANDARD_CLASSES | ICC_BAR_CLASSES;
   InitCommonControlsEx(&icex);
 
-  static const LPCWSTR appTitle = APP_NAME;
+  static const LPCWSTR appTitle    = APP_NAME;
   static const LPCWSTR szClassName = MAIN_WNDCLASS;
 
   WNDCLASSEXW wndclass;
-  wndclass.cbSize        = sizeof(WNDCLASSEX);
-  wndclass.style         = 0;
-  wndclass.lpfnWndProc   = WindowProc;
-  wndclass.cbClsExtra    = 0;
-  wndclass.cbWndExtra    = 0;
-  wndclass.hInstance     = hInstance;
-  wndclass.hIcon         = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
-  wndclass.hCursor       = LoadCursorW(nullptr, IDC_ARROW);
+  wndclass.cbSize      = sizeof(WNDCLASSEX);
+  wndclass.style       = 0;
+  wndclass.lpfnWndProc = WindowProc;
+  wndclass.cbClsExtra  = 0;
+  wndclass.cbWndExtra  = 0;
+  wndclass.hInstance   = hInstance;
+  wndclass.hIcon       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
+  wndclass.hCursor     = LoadCursorW(nullptr, IDC_ARROW);
   // No stock brush matches our default bg (there's only black / white /
   // grey / null), and we handle erase + paint ourselves — WM_ERASEBKGND
   // returns TRUE and WM_PAINT fills with g_bkg_color. nullptr here skips
@@ -92,10 +92,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 2;
   } else {
     // Set up our logging using mini_logger library.
-    const logging::LogDest kLogSink = debug_console ? logging::LOG_TO_ALL : logging::LOG_NONE;
+    const logging::LogDest kLogSink     = debug_console ? logging::LOG_TO_ALL : logging::LOG_NONE;
     static const std::wstring file_name = std::wstring(INTERNAL_NAME);
     static const std::wstring file_extension = L".log";
-    const std::wstring kLogFile = file_name + file_extension;
+    const std::wstring kLogFile              = file_name + file_extension;
     logging::LogInitSettings LoggingSettings;
     LoggingSettings.log_sink          = kLogSink;
     LoggingSettings.logfile_name      = kLogFile;
@@ -137,7 +137,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   }
 
   static constexpr DWORD exStyle =
-#if _WIN32_WINNT > 0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
+#if _WIN32_WINNT > \
+    0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
       WS_EX_OVERLAPPEDWINDOW | WS_EX_COMPOSITED;
 #else
       WS_EX_OVERLAPPEDWINDOW;
@@ -145,25 +146,22 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // WS_CLIPCHILDREN keeps the parent's painting out of child windows' regions
   // (here: the toolbar). The toolbar is responsible for drawing itself; the
   // OS handles its theming (themed on XP+, classic on Win2000).
-  static constexpr DWORD style =
-      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
+  static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
+                                 WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
   // SPI_GETWORKAREA gives us the screen minus the taskbar. Available
   // back to Win2000 and correct regardless of which edge the taskbar is
   // docked on. Used below to center the window after the toolbar height
   // is known; if the query fails we fall back to letting the OS place
   // the window itself (CW_USEDEFAULT).
-  RECT workArea = {};
-  const bool gotWorkArea =
-      SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
+  RECT workArea          = {};
+  const bool gotWorkArea = SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
 
   // Create at a placeholder size — the real size depends on the toolbar
   // height, which won't exist until WM_CREATE runs CreateAppToolbar.
   // SetWindowPos below resizes + centers before ShowWindow makes the
   // window visible, so the user never sees the placeholder.
-  mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style,
-                         CW_USEDEFAULT, CW_USEDEFAULT,
-                         CW_USEDEFAULT, CW_USEDEFAULT,
-                         nullptr, nullptr, hInstance, nullptr);
+  mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style, CW_USEDEFAULT, CW_USEDEFAULT,
+                             CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, hInstance, nullptr);
 
   if (mainHwnd == nullptr) {
     return 1;
@@ -174,18 +172,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // (borders + titlebar + menu, computed by AdjustWindowRectEx) plus
   // the toolbar's measured height (set by CreateAppToolbar inside
   // WM_CREATE, which has already returned by the time we get here).
-  RECT outer = { 0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight };
+  RECT outer = {0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight};
   AdjustWindowRectEx(&outer, style, TRUE, exStyle);
   const int outerW = outer.right - outer.left;
   const int outerH = outer.bottom - outer.top;
-  int xPos = CW_USEDEFAULT;
-  int yPos = CW_USEDEFAULT;
+  int xPos         = CW_USEDEFAULT;
+  int yPos         = CW_USEDEFAULT;
   if (gotWorkArea) {
-    xPos = workArea.left + ((workArea.right  - workArea.left) - outerW) / 2;
-    yPos = workArea.top  + ((workArea.bottom - workArea.top) - outerH) / 2;
+    xPos = workArea.left + ((workArea.right - workArea.left) - outerW) / 2;
+    yPos = workArea.top + ((workArea.bottom - workArea.top) - outerH) / 2;
   }
-  SetWindowPos(mainHwnd, nullptr, xPos, yPos, outerW, outerH,
-               SWP_NOZORDER | SWP_NOACTIVATE);
+  SetWindowPos(mainHwnd, nullptr, xPos, yPos, outerW, outerH, SWP_NOZORDER | SWP_NOACTIVATE);
 
   ShowWindow(mainHwnd, iCmdShow);
   if (!UpdateWindow(mainHwnd)) {
@@ -252,7 +249,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // If the open/play fails, drop the user pref to false and uncheck
       // the menu so the UI doesn't keep promising audio that never plays.
       if (!SyncBgm()) {
-        g_playsound = false;
+        g_playsound     = false;
         HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
         CheckMenuItem(hSettings, IDM_SOUND, MF_BYCOMMAND | MF_UNCHECKED);
       }
@@ -273,16 +270,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // the toolbar wraps onto extra rows at narrow widths, the min
       // grows accordingly because g_toolbarHeight grew on the last
       // WM_SIZE → LayoutToolbar pass.
-      RECT canvasMin = { 0, 0, MINWIDTH, MINHEIGHT };
-      AdjustWindowRectEx(&canvasMin,
-                         static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)),
-                         TRUE,
+      RECT canvasMin = {0, 0, MINWIDTH, MINHEIGHT};
+      AdjustWindowRectEx(&canvasMin, static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)), TRUE,
                          static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)));
       pMinMaxInfo->ptMinTrackSize.x = canvasMin.right - canvasMin.left;
-      pMinMaxInfo->ptMinTrackSize.y =
-          (canvasMin.bottom - canvasMin.top) + g_toolbarHeight;
-      const int MAXWIDTH  = GetSystemMetrics(SM_CXMAXIMIZED);
-      const int MAXHEIGHT = GetSystemMetrics(SM_CYMAXIMIZED);
+      pMinMaxInfo->ptMinTrackSize.y = (canvasMin.bottom - canvasMin.top) + g_toolbarHeight;
+      const int MAXWIDTH            = GetSystemMetrics(SM_CXMAXIMIZED);
+      const int MAXHEIGHT           = GetSystemMetrics(SM_CYMAXIMIZED);
       pMinMaxInfo->ptMaxTrackSize.x = MAXWIDTH;
       pMinMaxInfo->ptMaxTrackSize.y = MAXHEIGHT;
       break;
@@ -307,8 +301,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // Blit the whole back buffer to the window at (0, g_toolbarHeight).
         // Back buffer coords are ants-canvas-local (0..cxClient-1, 0..cyClient-1);
         // shifting by the toolbar height places the canvas below the toolbar.
-        BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient,
-               g_hdcMem, 0, 0, SRCCOPY);
+        BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient, g_hdcMem, 0, 0, SRCCOPY);
       }
       LeaveCriticalSection(&g_paintCS);
       EndPaint(hWnd, &ps);
@@ -336,7 +329,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // window is smaller than the toolbar (extreme resize).
       cxClient = LOWORD(lParam);
       cyClient = HIWORD(lParam) - g_toolbarHeight;
-      if (cyClient < 0) cyClient = 0;
+      if (cyClient < 0) {
+        cyClient = 0;
+      }
       // The ants canvas changed size, so recreate the back buffer to match.
       // If it grew, the old bitmap would be too small and BitBlt would read
       // outside its bounds; if it shrank, the old one just wastes memory.
@@ -366,11 +361,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // Toolbar tooltip requests are cheap and noisy, so let utils.cc answer
       // them first and only fall through to other toolbar notifications when
       // it wasn't a tooltip message.
-      if (HandleToolbarTooltips(pnmh)) break;
+      if (HandleToolbarTooltips(pnmh)) {
+        break;
+      }
       if (pnmh->code == TBN_DROPDOWN) {
         LPNMTOOLBAR pnmtb = reinterpret_cast<LPNMTOOLBAR>(lParam);
         // Anchor whatever popup we show just below the button's bottom edge.
-        POINT pt = { pnmtb->rcButton.left, pnmtb->rcButton.bottom };
+        POINT pt = {pnmtb->rcButton.left, pnmtb->rcButton.bottom};
         ClientToScreen(pnmh->hwndFrom, &pt);
 
         // Reusing the live HMENU from the main menu bar means radio check
@@ -380,29 +377,25 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         if (pnmtb->iItem == IDM_ANTS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hAnts     = GetSubMenu(hSettings, 3);
-          TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN,
-                         pt.x, pt.y, 0, hWnd, nullptr);
+          TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_SPEED) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hSpeed    = GetSubMenu(hSettings, 4);
-          TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN,
-                         pt.x, pt.y, 0, hWnd, nullptr);
+          TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_CUSTOM) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hCustom   = GetSubMenu(hSettings, 7);
-          TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN,
-                         pt.x, pt.y, 0, hWnd, nullptr);
+          TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_COLORS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkg      = GetSubMenu(hSettings, 5);
-          TrackPopupMenu(hBkg, TPM_LEFTALIGN | TPM_TOPALIGN,
-                         pt.x, pt.y, 0, hWnd, nullptr);
+          TrackPopupMenu(hBkg, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
       }
@@ -483,7 +476,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // running. The next Play resumes it through the same call.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc = { 0, 0, cxClient, cyClient };
+            RECT rc       = {0, 0, cxClient, cyClient};
             HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
             FillRect(g_hdcMem, &rc, hBrush);
             DeleteObject(hBrush);
@@ -531,8 +524,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           SetPauseButton(g_paused);
           if (drainedPlacements && g_num_ants >= 1 && g_num_ants <= kMaxAntThreads) {
             HMENU hConc = GetSubMenu(hSettings, 3);
-            CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32,
-                               IDM_CONC_1 + (g_num_ants - 1), MF_BYCOMMAND);
+            CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32, IDM_CONC_1 + (g_num_ants - 1),
+                               MF_BYCOMMAND);
           }
           break;
         }
@@ -548,7 +541,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
           }
-          if (g_place_mode) ExitPlaceMode();
+          if (g_place_mode) {
+            ExitPlaceMode();
+          }
           // Mark the simulation as stopped (fresh state) so the toolbar's
           // pause/play button switches its label from "Resume" to "Play".
           // Refresh unconditionally — when the user hits Stop while already
@@ -562,7 +557,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Play will resume audio if it was on before.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc = { 0, 0, cxClient, cyClient };
+            RECT rc       = {0, 0, cxClient, cyClient};
             HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
             FillRect(g_hdcMem, &rc, hBrush);
             DeleteObject(hBrush);
@@ -608,10 +603,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // num ants, monochrome, etc.) stay intact — only the runtime
           // per-ant state resets. If the user was mid-placement, abandon it
           // — REPAINT and Custom Seed are mutually exclusive intents.
-          if (g_place_mode) ExitPlaceMode();
+          if (g_place_mode) {
+            ExitPlaceMode();
+          }
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc = { 0, 0, cxClient, cyClient };
+            RECT rc       = {0, 0, cxClient, cyClient};
             HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
             FillRect(g_hdcMem, &rc, hBrush);
             DeleteObject(hBrush);
@@ -670,7 +667,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (enteringMono) {
             s_pre_mono_bg = g_bkg_color;
           }
-          g_monochrome = !g_monochrome;
+          g_monochrome    = !g_monochrome;
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           // Toggle the check mark on the menu item to show current state.
           CheckMenuItem(hSettings, IDM_MONOCHROME,
@@ -680,14 +677,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // get disabled. Also grey the entire Ant Colors submenu — in
           // monochrome the marker always matches the trail color so the
           // user-picked ant color is moot.
-          HMENU hBkgMenu = GetSubMenu(hSettings, 5);
+          HMENU hBkgMenu        = GetSubMenu(hSettings, 5);
           const UINT colorState = g_monochrome ? MF_GRAYED : MF_ENABLED;
-          EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_RED_BKG, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
-          EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | colorState);
-          EnableMenuItem(hBkgMenu, IDM_CYANANT,     MF_BYCOMMAND | colorState);
-          EnableMenuItem(hBkgMenu, IDM_YELLOWANT,   MF_BYCOMMAND | colorState);
-          EnableMenuItem(hBkgMenu, IDM_MAGENTAANT,  MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_BLUE_BKG, MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_CYANANT, MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_YELLOWANT, MF_BYCOMMAND | colorState);
+          EnableMenuItem(hBkgMenu, IDM_MAGENTAANT, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_ALLCOLORANT, MF_BYCOMMAND | colorState);
           // Swap bg pixels in place via RecolorBackground rather than
           // clearing the canvas — same pattern as the background-color
@@ -699,12 +696,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // can flip back and forth without losing their color choice.
           if (enteringMono && g_bkg_color != RGB_GREY) {
             const COLORREF oldBg = g_bkg_color;
-            g_bkg_color = RGB_GREY;
+            g_bkg_color          = RGB_GREY;
             CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, IDM_GREY_BKG, MF_BYCOMMAND);
             RecolorBackground(oldBg, g_bkg_color);
           } else if (!enteringMono && g_bkg_color != s_pre_mono_bg) {
             const COLORREF oldBg = g_bkg_color;
-            g_bkg_color = s_pre_mono_bg;
+            g_bkg_color          = s_pre_mono_bg;
             // Map the saved color back to its menu item ID so the radio
             // mark in the Colors submenu lands on the right entry. The
             // default arm matches the app's current default bg so a
@@ -712,16 +709,29 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             // sensible.
             UINT restoredId = IDM_BLUE_BKG;
             switch (s_pre_mono_bg) {
-              case RGB_WHITE: restoredId = IDM_WHITE_BKG; break;
-              case RGB_BLACK: restoredId = IDM_BLACK_BKG; break;
-              case RGB_GREY:  restoredId = IDM_GREY_BKG;  break;
-              case RGB_RED:   restoredId = IDM_RED_BKG;   break;
-              case RGB_GREEN: restoredId = IDM_GREEN_BKG; break;
-              case RGB_BLUE:  restoredId = IDM_BLUE_BKG;  break;
-              default:        restoredId = IDM_BLUE_BKG;  break;
+              case RGB_WHITE:
+                restoredId = IDM_WHITE_BKG;
+                break;
+              case RGB_BLACK:
+                restoredId = IDM_BLACK_BKG;
+                break;
+              case RGB_GREY:
+                restoredId = IDM_GREY_BKG;
+                break;
+              case RGB_RED:
+                restoredId = IDM_RED_BKG;
+                break;
+              case RGB_GREEN:
+                restoredId = IDM_GREEN_BKG;
+                break;
+              case RGB_BLUE:
+                restoredId = IDM_BLUE_BKG;
+                break;
+              default:
+                restoredId = IDM_BLUE_BKG;
+                break;
             }
-            CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG,
-                               restoredId, MF_BYCOMMAND);
+            CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, restoredId, MF_BYCOMMAND);
             RecolorBackground(oldBg, g_bkg_color);
           }
           // Refresh each running ant's cached antColor against the new
@@ -744,12 +754,24 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
           switch (command) {
-            case IDM_WHITE_BKG: g_bkg_color = RGB_WHITE; break;
-            case IDM_BLACK_BKG: g_bkg_color = RGB_BLACK; break;
-            case IDM_GREY_BKG:  g_bkg_color = RGB_GREY; break;
-            case IDM_RED_BKG:   g_bkg_color = RGB_RED;   break;
-            case IDM_GREEN_BKG: g_bkg_color = RGB_GREEN; break;
-            default:            g_bkg_color = RGB_BLUE;  break;
+            case IDM_WHITE_BKG:
+              g_bkg_color = RGB_WHITE;
+              break;
+            case IDM_BLACK_BKG:
+              g_bkg_color = RGB_BLACK;
+              break;
+            case IDM_GREY_BKG:
+              g_bkg_color = RGB_GREY;
+              break;
+            case IDM_RED_BKG:
+              g_bkg_color = RGB_RED;
+              break;
+            case IDM_GREEN_BKG:
+              g_bkg_color = RGB_GREEN;
+              break;
+            default:
+              g_bkg_color = RGB_BLUE;
+              break;
           }
           // Swap only the old background pixels over to the new color. Ant path
           // pixels are left untouched, so existing ants paths are preserved across
@@ -772,13 +794,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // intact and only swaps the visible color).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
-          CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT,
-                             command, MF_BYCOMMAND);
+          CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT, command, MF_BYCOMMAND);
           switch (command) {
-            case IDM_CYANANT:    g_ant_color = RGB_CYAN;        break;
-            case IDM_YELLOWANT:  g_ant_color = RGB_YELLOW;      break;
-            case IDM_MAGENTAANT: g_ant_color = RGB_MAGENTA;     break;
-            default:             g_ant_color = kRandomAntColor; break;
+            case IDM_CYANANT:
+              g_ant_color = RGB_CYAN;
+              break;
+            case IDM_YELLOWANT:
+              g_ant_color = RGB_YELLOW;
+              break;
+            case IDM_MAGENTAANT:
+              g_ant_color = RGB_MAGENTA;
+              break;
+            default:
+              g_ant_color = kRandomAntColor;
+              break;
           }
           RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
@@ -793,11 +822,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           HMENU hDelay    = GetSubMenu(hSettings, 4);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
           switch (command) {
-            case IDM_SLOW:     g_delay = kSlowSpeed;  break;
-            case IDM_MEDIUM:   g_delay = kMedSpeed;   break;
-            case IDM_FAST:     g_delay = kHighSpeed;  break;
-            case IDM_HYPER:    g_delay = kHyperSpeed; break;
-            case IDM_REALTIME: g_delay = kRealTime;   break;
+            case IDM_SLOW:
+              g_delay = kSlowSpeed;
+              break;
+            case IDM_MEDIUM:
+              g_delay = kMedSpeed;
+              break;
+            case IDM_FAST:
+              g_delay = kHighSpeed;
+              break;
+            case IDM_HYPER:
+              g_delay = kHyperSpeed;
+              break;
+            case IDM_REALTIME:
+              g_delay = kRealTime;
+              break;
             default:
               LOG(ERROR) << "Unhandled speed type";
               g_delay = g_default_speed;
@@ -856,22 +895,22 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // lParam is (-1, -1) when triggered by keyboard (Menu key / Shift+F10).
       // Fall back to the top-left corner of the client area in that case.
       if (x == -1 && y == -1) {
-        POINT pt = { 0, 0 };
+        POINT pt = {0, 0};
         ClientToScreen(hWnd, &pt);
         x = pt.x;
         y = pt.y;
       }
       HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-      TrackPopupMenu(hSettings, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
-                     x, y, 0, hWnd, nullptr);
+      TrackPopupMenu(hSettings, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN, x, y, 0, hWnd,
+                     nullptr);
       break;
     }
     case WM_MBUTTONDOWN: {
       RECT rc;
       GetCursorPos(&s_resizeOrigin);
       GetWindowRect(hWnd, &rc);
-      s_resizeStartSize = { rc.right - rc.left, rc.bottom - rc.top };
-      s_resizing = true;
+      s_resizeStartSize = {rc.right - rc.left, rc.bottom - rc.top};
+      s_resizing        = true;
       SetCapture(hWnd);
       break;
     }
@@ -881,8 +920,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         GetCursorPos(&pt);
         int w = s_resizeStartSize.cx + (pt.x - s_resizeOrigin.x);
         int h = s_resizeStartSize.cy + (pt.y - s_resizeOrigin.y);
-        if (w < GetSystemMetrics(SM_CXMINTRACK)) w = GetSystemMetrics(SM_CXMINTRACK);
-        if (h < GetSystemMetrics(SM_CYMINTRACK)) h = GetSystemMetrics(SM_CYMINTRACK);
+        if (w < GetSystemMetrics(SM_CXMINTRACK)) {
+          w = GetSystemMetrics(SM_CXMINTRACK);
+        }
+        if (h < GetSystemMetrics(SM_CYMINTRACK)) {
+          h = GetSystemMetrics(SM_CYMINTRACK);
+        }
         SetWindowPos(hWnd, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
       }
       break;
@@ -952,8 +995,7 @@ bool InitApp(HWND hWnd) {
   // WM_SIZE. A failure here isn't fatal — the menu bar still drives
   // every feature — so we warn the user and keep going.
   if (!CreateAppToolbar(hWnd, g_hInstance)) {
-    ErrorBox(hWnd, L"Toolbar Creation Error",
-             L"Failed to create application toolbar. ");
+    ErrorBox(hWnd, L"Toolbar Creation Error", L"Failed to create application toolbar. ");
     ok = false;
   } else {
     ok = true;

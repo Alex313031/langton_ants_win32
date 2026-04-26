@@ -1,6 +1,7 @@
 #ifndef LANGTON_ANTS_FRAMEWORK_H_
 #define LANGTON_ANTS_FRAMEWORK_H_
 
+// clang-format off
 #include "version.h" // Keep this at the top!
 
 #define NOMINMAX
@@ -26,6 +27,8 @@
   #endif // inline
  #endif
 #endif
+
+// clang-format on
 
 // Alias
 #ifndef __FUNC__

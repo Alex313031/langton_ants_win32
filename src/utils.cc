@@ -3,7 +3,7 @@
 #include "ants.h"
 #include "globals.h"
 #include "resource.h"
-#include "sound.h"   // g_playsound for HandleToolbarTooltips
+#include "sound.h" // g_playsound for HandleToolbarTooltips
 
 // The toolbar child window handle. Kept file-static so nothing else can
 // accidentally mutate it — other TUs interact only via the functions below.
@@ -45,13 +45,12 @@ void InitMenuDefaults(HWND hWnd) {
   HMENU hBkgMenu  = GetSubMenu(hSettings, 5); // Colors menu (bg colors + monochrome)
 
   // Background color
-  const struct { UINT id; COLORREF color; } bkgs[] = {
-    { IDM_WHITE_BKG, RGB_WHITE },
-    { IDM_BLACK_BKG, RGB_BLACK },
-    { IDM_GREY_BKG,  RGB_GREY },
-    { IDM_RED_BKG,   RGB_RED   },
-    { IDM_GREEN_BKG, RGB_GREEN },
-    { IDM_BLUE_BKG,  RGB_BLUE  },
+  const struct {
+    UINT id;
+    COLORREF color;
+  } bkgs[] = {
+      {IDM_WHITE_BKG, RGB_WHITE}, {IDM_BLACK_BKG, RGB_BLACK}, {IDM_GREY_BKG, RGB_GREY},
+      {IDM_RED_BKG, RGB_RED},     {IDM_GREEN_BKG, RGB_GREEN}, {IDM_BLUE_BKG, RGB_BLUE},
   };
   for (const auto& b : bkgs) {
     if (GetMenuState(hBkgMenu, b.id, MF_BYCOMMAND) & MF_CHECKED) {
@@ -61,16 +60,16 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Draw delay
-  const struct { UINT id; unsigned long ms; } delays[] = {
-    { IDM_SLOW,     kSlowSpeed },
-    { IDM_MEDIUM,   kMedSpeed },
-    { IDM_FAST,     kHighSpeed },
-    { IDM_HYPER,    kHyperSpeed },
-    { IDM_REALTIME, kRealTime },
+  const struct {
+    UINT id;
+    unsigned long ms;
+  } delays[] = {
+      {IDM_SLOW, kSlowSpeed},   {IDM_MEDIUM, kMedSpeed},   {IDM_FAST, kHighSpeed},
+      {IDM_HYPER, kHyperSpeed}, {IDM_REALTIME, kRealTime},
   };
   for (const auto& d : delays) {
     if (GetMenuState(hDelay, d.id, MF_BYCOMMAND) & MF_CHECKED) {
-      g_delay = d.ms;
+      g_delay         = d.ms;
       g_default_speed = d.ms;
       break;
     }
@@ -93,11 +92,14 @@ void InitMenuDefaults(HWND hWnd) {
   // Ant color — exactly one of the IDM_*ANT items must be CHECKED in
   // the RC. Map the checked one to g_ant_color (kRandomAntColor for
   // the "Random" entry, otherwise the literal RGB).
-  const struct { UINT id; COLORREF color; } antColors[] = {
-    { IDM_CYANANT,     RGB_CYAN },
-    { IDM_YELLOWANT,   RGB_YELLOW },
-    { IDM_MAGENTAANT,  RGB_MAGENTA },
-    { IDM_ALLCOLORANT, kRandomAntColor },
+  const struct {
+    UINT id;
+    COLORREF color;
+  } antColors[] = {
+      {IDM_CYANANT, RGB_CYAN},
+      {IDM_YELLOWANT, RGB_YELLOW},
+      {IDM_MAGENTAANT, RGB_MAGENTA},
+      {IDM_ALLCOLORANT, kRandomAntColor},
   };
   for (const auto& a : antColors) {
     if (GetMenuState(hSettings, a.id, MF_BYCOMMAND) & MF_CHECKED) {
@@ -113,12 +115,12 @@ void InitMenuDefaults(HWND hWnd) {
   // RC otherwise selected; white and black remain selectable afterward).
   if (GetMenuState(hSettings, IDM_MONOCHROME, MF_BYCOMMAND) & MF_CHECKED) {
     g_monochrome = true;
-    EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_RED_BKG, MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | MF_GRAYED);
-    EnableMenuItem(hBkgMenu, IDM_BLUE_BKG,  MF_BYCOMMAND | MF_GRAYED);
-    EnableMenuItem(hBkgMenu, IDM_CYANANT,     MF_BYCOMMAND | MF_GRAYED);
-    EnableMenuItem(hBkgMenu, IDM_YELLOWANT,   MF_BYCOMMAND | MF_GRAYED);
-    EnableMenuItem(hBkgMenu, IDM_MAGENTAANT,  MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_BLUE_BKG, MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_CYANANT, MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_YELLOWANT, MF_BYCOMMAND | MF_GRAYED);
+    EnableMenuItem(hBkgMenu, IDM_MAGENTAANT, MF_BYCOMMAND | MF_GRAYED);
     EnableMenuItem(hBkgMenu, IDM_ALLCOLORANT, MF_BYCOMMAND | MF_GRAYED);
     if (g_bkg_color != RGB_GREY) {
       g_bkg_color = RGB_GREY;
@@ -159,17 +161,17 @@ const std::wstring GetExeDir() {
 //   Pixel data        (w * h * 4 bytes) — 32-bit BGRA, bottom-up row order
 bool SaveClientBitmap(HWND hWnd) {
   // Prompt the user for a destination path
-  wchar_t szFile[MAX_PATH]  = {};
-  OPENFILENAMEW ofn         = {};
-  ofn.lStructSize  = sizeof(OPENFILENAMEW);
-  ofn.hwndOwner    = hWnd;
-  ofn.lpstrFile    = szFile;
-  ofn.nMaxFile     = MAX_PATH;
-  ofn.lpstrFilter  = L"Bitmap Files (*.bmp)\0*.bmp\0All Files (*.*)\0*.*\0";
-  ofn.nFilterIndex = 1;
-  ofn.lpstrDefExt  = L"bmp";
-  ofn.lpstrTitle   = L"Save Bitmap As";
-  ofn.Flags        = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
+  wchar_t szFile[MAX_PATH] = {};
+  OPENFILENAMEW ofn        = {};
+  ofn.lStructSize          = sizeof(OPENFILENAMEW);
+  ofn.hwndOwner            = hWnd;
+  ofn.lpstrFile            = szFile;
+  ofn.nMaxFile             = MAX_PATH;
+  ofn.lpstrFilter          = L"Bitmap Files (*.bmp)\0*.bmp\0All Files (*.*)\0*.*\0";
+  ofn.nFilterIndex         = 1;
+  ofn.lpstrDefExt          = L"bmp";
+  ofn.lpstrTitle           = L"Save Bitmap As";
+  ofn.Flags                = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
 
   if (!GetSaveFileNameW(&ofn)) {
     return false; // user cancelled or dialog error
@@ -198,13 +200,13 @@ bool SaveClientBitmap(HWND hWnd) {
   // Describe the desired output: 32-bit bottom-up RGB (the standard BMP layout)
   // biHeight positive = bottom-up, which is what all BMP readers expect.
   BITMAPINFOHEADER bi = {};
-  bi.biSize        = sizeof(BITMAPINFOHEADER);
-  bi.biWidth       = width;
-  bi.biHeight      = height;
-  bi.biPlanes      = 1;
-  bi.biBitCount    = 32;
-  bi.biCompression = BI_RGB;
-  bi.biSizeImage   = static_cast<DWORD>(width * height * 4);
+  bi.biSize           = sizeof(BITMAPINFOHEADER);
+  bi.biWidth          = width;
+  bi.biHeight         = height;
+  bi.biPlanes         = 1;
+  bi.biBitCount       = 32;
+  bi.biCompression    = BI_RGB;
+  bi.biSizeImage      = static_cast<DWORD>(width * height * 4);
 
   // GetDIBits copies the selected bitmap's pixels into our buffer in the format
   // described by bi. With BI_RGB and 32 bits, each pixel is 4 bytes: BGRA
@@ -217,23 +219,22 @@ bool SaveClientBitmap(HWND hWnd) {
 
   // Build the BMP file header
   const DWORD pixelDataOffset = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-  BITMAPFILEHEADER bf = {};
-  bf.bfType    = 0x4D42; // 'BM' signature
-  bf.bfSize    = pixelDataOffset + bi.biSizeImage;
-  bf.bfOffBits = pixelDataOffset;
+  BITMAPFILEHEADER bf         = {};
+  bf.bfType                   = 0x4D42; // 'BM' signature
+  bf.bfSize                   = pixelDataOffset + bi.biSizeImage;
+  bf.bfOffBits                = pixelDataOffset;
 
   // Write the three sections to the file
-  HANDLE hFile = CreateFileW(szFile, GENERIC_WRITE, 0, nullptr,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE hFile =
+      CreateFileW(szFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
     return false;
   }
 
   DWORD written;
-  const bool ok =
-      WriteFile(hFile, &bf,           sizeof(bf),      &written, nullptr) &&
-      WriteFile(hFile, &bi,           sizeof(bi),      &written, nullptr) &&
-      WriteFile(hFile, pixels.data(), bi.biSizeImage,  &written, nullptr);
+  const bool ok = WriteFile(hFile, &bf, sizeof(bf), &written, nullptr) &&
+                  WriteFile(hFile, &bi, sizeof(bi), &written, nullptr) &&
+                  WriteFile(hFile, pixels.data(), bi.biSizeImage, &written, nullptr);
 
   CloseHandle(hFile);
   return ok;
@@ -245,7 +246,7 @@ inline static void __KillInt3Asm() {
       "ud2");
 #else
   __asm int 3 // Execute int3 interrupt
-  __asm {
+      __asm {
     UD2
   } // Execute 0x0F, 0x0B
 #endif // __MINGW32__
@@ -306,10 +307,12 @@ bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message)
 // in effect — so we just return quietly.
 static void DisableWindowTheme(HWND hWnd) {
   HMODULE hUxTheme = LoadLibraryW(L"uxtheme.dll");
-  if (hUxTheme == nullptr) return;
-  typedef HRESULT (WINAPI *SetWindowThemeFn)(HWND, LPCWSTR, LPCWSTR);
-  SetWindowThemeFn pSetWindowTheme = reinterpret_cast<SetWindowThemeFn>(
-      GetProcAddress(hUxTheme, "SetWindowTheme"));
+  if (hUxTheme == nullptr) {
+    return;
+  }
+  typedef HRESULT(WINAPI * SetWindowThemeFn)(HWND, LPCWSTR, LPCWSTR);
+  SetWindowThemeFn pSetWindowTheme =
+      reinterpret_cast<SetWindowThemeFn>(GetProcAddress(hUxTheme, "SetWindowTheme"));
   if (pSetWindowTheme != nullptr) {
     // Empty strings (not nullptr) mean "use no theme" for this window.
     pSetWindowTheme(hWnd, L"", L"");
@@ -331,8 +334,7 @@ static void DisableWindowTheme(HWND hWnd) {
 //     early-2000s Win32 separator between toolbar and the content area
 //     below. The edge must be drawn AFTER the original paint because the
 //     original's button rendering would otherwise overwrite it.
-static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg,
-                                            WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   if (msg == WM_ERASEBKGND) {
     HDC hdc = reinterpret_cast<HDC>(wParam);
     RECT rc;
@@ -359,20 +361,23 @@ static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg,
       // gaps rather than visible dividers. Walk the button list ourselves
       // and stamp an etched vertical line into each separator's rect so
       // groups stay visually distinct.
-      const int count = static_cast<int>(
-          SendMessageW(hWnd, TB_BUTTONCOUNT, 0, 0));
+      const int count = static_cast<int>(SendMessageW(hWnd, TB_BUTTONCOUNT, 0, 0));
       for (int i = 0; i < count; i++) {
         TBBUTTON btn = {};
-        if (!SendMessageW(hWnd, TB_GETBUTTON, i,
-                         reinterpret_cast<LPARAM>(&btn))) continue;
-        if (!(btn.fsStyle & TBSTYLE_SEP)) continue;
+        if (!SendMessageW(hWnd, TB_GETBUTTON, i, reinterpret_cast<LPARAM>(&btn))) {
+          continue;
+        }
+        if (!(btn.fsStyle & TBSTYLE_SEP)) {
+          continue;
+        }
         RECT ir;
-        if (!SendMessageW(hWnd, TB_GETITEMRECT, i,
-                         reinterpret_cast<LPARAM>(&ir))) continue;
+        if (!SendMessageW(hWnd, TB_GETITEMRECT, i, reinterpret_cast<LPARAM>(&ir))) {
+          continue;
+        }
         // A 2-pixel-wide rect centered in the separator, inset vertically
         // by a couple pixels so the line doesn't touch the toolbar edges.
         const int xMid = (ir.left + ir.right) / 2;
-        RECT lineRect = { xMid - 1, ir.top + 2, xMid + 1, ir.bottom - 2 };
+        RECT lineRect  = {xMid - 1, ir.top + 2, xMid + 1, ir.bottom - 2};
         // EDGE_ETCHED + BF_LEFT paints a sunken-outer / raised-inner pair
         // along the left side of the rect, giving a 2-pixel etched line.
         DrawEdge(hdc, &lineRect, EDGE_ETCHED, BF_LEFT);
@@ -417,11 +422,9 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // into g_toolbarHeight, so the ants canvas stays correctly offset
   // even after a wrap.
   // CCS_TOP is the default (toolbar docks to top of parent) so we omit it.
-  HWND hTB = CreateWindowExW(
-      0, TOOLBARCLASSNAME, nullptr,
-      WS_CHILD | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE,
-      0, 0, CW_USEDEFAULT, CW_USEDEFAULT,
-      hParent, nullptr, hInst, nullptr);
+  HWND hTB =
+      CreateWindowExW(0, TOOLBARCLASSNAME, nullptr, WS_CHILD | TBSTYLE_TOOLTIPS | TBSTYLE_WRAPABLE,
+                      0, 0, CW_USEDEFAULT, CW_USEDEFAULT, hParent, nullptr, hInst, nullptr);
   if (hTB == nullptr) {
     LOG(ERROR) << L"CreateWindowExW for toolbar failed";
     return false;
@@ -436,7 +439,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // versions, which makes the toolbar visibly taller than the icons need
   // — shrinking the vertical pad is what brings the toolbar height down.
   // LOWORD = horizontal pad, HIWORD = vertical pad.
-  //SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(6, 5));
+  // SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(6, 5));
 
   // --- Bitmap loading ------------------------------------------------------
   // Each TB_ADDBITMAP adds images to the toolbar's internal image list and
@@ -448,40 +451,36 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // Pause/Play and Sound/Mute indices are stored in file-statics so
   // Set*Button() can swap between them on state changes.
   TBADDBITMAP tbab = {};
-  tbab.hInst = hInst;
-  tbab.nID = IDB_SAVE_BMP;
-  const int idxSave = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.hInst       = hInst;
+  tbab.nID         = IDB_SAVE_BMP;
+  const int idxSave =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_PAUSE_BMP;
-  s_idxPause = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_PLAY_BMP;
-  s_idxPlay = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_STOP_BMP;
-  s_idxStop = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_ANTS_BMP;
-  s_idxAnts = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_TIME_BMP;
-  s_idxSpeed = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  s_idxPause =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_PLAY_BMP;
+  s_idxPlay = static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_STOP_BMP;
+  s_idxStop = static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_ANTS_BMP;
+  s_idxAnts = static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_TIME_BMP;
+  s_idxSpeed =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_CUSTOM_BMP;
-  s_idxCustom = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  s_idxCustom =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_COLORS_BMP;
-  s_idxColors = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  s_idxColors =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_SOUND_BMP;
-  s_idxSound = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_MUTE_BMP;
-  s_idxMute = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
-  tbab.nID = IDB_EXIT_BMP;
-  const int idxExit = static_cast<int>(
-      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  s_idxSound =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_MUTE_BMP;
+  s_idxMute = static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID  = IDB_EXIT_BMP;
+  const int idxExit =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
 
   // --- Buttons -------------------------------------------------------------
   // TBBUTTON fields:
@@ -503,7 +502,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[0].fsStyle   = TBSTYLE_BUTTON;
   tbButtons[0].iString   = reinterpret_cast<INT_PTR>(L"Save As");
 
-  tbButtons[1].fsStyle   = TBSTYLE_SEP;
+  tbButtons[1].fsStyle = TBSTYLE_SEP;
 
   tbButtons[2].iBitmap   = s_idxPause;
   tbButtons[2].idCommand = IDM_PAUSED;
@@ -517,7 +516,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[3].fsStyle   = TBSTYLE_BUTTON;
   tbButtons[3].iString   = reinterpret_cast<INT_PTR>(L"Stop");
 
-  tbButtons[4].fsStyle   = TBSTYLE_SEP;
+  tbButtons[4].fsStyle = TBSTYLE_SEP;
 
   tbButtons[5].iBitmap   = s_idxAnts;
   tbButtons[5].idCommand = IDM_ANTS;
@@ -549,7 +548,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[9].fsStyle   = TBSTYLE_BUTTON;
   tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[10].fsStyle  = TBSTYLE_SEP;
+  tbButtons[10].fsStyle = TBSTYLE_SEP;
 
   tbButtons[11].iBitmap   = idxExit;
   tbButtons[11].idCommand = IDM_EXIT;
@@ -557,9 +556,8 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
   tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Exit");
 
-  SendMessageW(hTB, TB_ADDBUTTONS,
-              sizeof(tbButtons) / sizeof(tbButtons[0]),
-              reinterpret_cast<LPARAM>(tbButtons));
+  SendMessageW(hTB, TB_ADDBUTTONS, sizeof(tbButtons) / sizeof(tbButtons[0]),
+               reinterpret_cast<LPARAM>(tbButtons));
 
   // Enable split-button dropdown arrows. Without this, TBSTYLE_DROPDOWN makes
   // the entire button act as a dropdown and the button body stops sending a
@@ -573,8 +571,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // Real Windows ignores it because its WM_PAINT paints over what our
   // WM_ERASEBKGND filled, but Wine needs it to avoid a transparent bar.
   s_origToolbarProc = reinterpret_cast<WNDPROC>(
-      SetWindowLongPtrW(hTB, GWLP_WNDPROC,
-                       reinterpret_cast<LONG_PTR>(ToolbarSubclassProc)));
+      SetWindowLongPtrW(hTB, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(ToolbarSubclassProc)));
 
   // Turn off Visual Styles for this toolbar so every button gets the
   // classic always-visible raised bevel, not just on hover. No-op on Win2K
@@ -617,11 +614,13 @@ void LayoutToolbar(HWND hWnd) {
 // The toolbar copies the text string internally, so passing a string literal
 // via const_cast is safe — the control won't mutate the memory we point at.
 void SetPauseButton(bool paused) {
-  if (s_hToolbar == nullptr) return;
+  if (s_hToolbar == nullptr) {
+    return;
+  }
   TBBUTTONINFOW bi = {};
-  bi.cbSize  = sizeof(bi);
-  bi.dwMask  = TBIF_IMAGE | TBIF_TEXT;
-  bi.iImage  = paused ? s_idxPlay : s_idxPause;
+  bi.cbSize        = sizeof(bi);
+  bi.dwMask        = TBIF_IMAGE | TBIF_TEXT;
+  bi.iImage        = paused ? s_idxPlay : s_idxPause;
   // Three label states sharing one button:
   //   not paused           → "Pause"   (running, click to pause)
   //   paused, mid-run      → "Resume"  (was playing, click to continue)
@@ -636,61 +635,61 @@ void SetPauseButton(bool paused) {
     label = L"Resume";
   }
   bi.pszText = const_cast<LPWSTR>(label);
-  SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_PAUSED,
-              reinterpret_cast<LPARAM>(&bi));
+  SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_PAUSED, reinterpret_cast<LPARAM>(&bi));
 }
 
 void SetSoundButton(bool playing) {
-  if (s_hToolbar == nullptr) return;
+  if (s_hToolbar == nullptr) {
+    return;
+  }
   TBBUTTONINFOW bi = {};
-  bi.cbSize  = sizeof(bi);
-  bi.dwMask  = TBIF_IMAGE | TBIF_TEXT;
-  bi.iImage  = playing ? s_idxMute : s_idxSound;
-  bi.pszText = const_cast<LPWSTR>(playing ? L"Mute" : L"Sound");
-  SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_SOUND,
-              reinterpret_cast<LPARAM>(&bi));
+  bi.cbSize        = sizeof(bi);
+  bi.dwMask        = TBIF_IMAGE | TBIF_TEXT;
+  bi.iImage        = playing ? s_idxMute : s_idxSound;
+  bi.pszText       = const_cast<LPWSTR>(playing ? L"Mute" : L"Sound");
+  SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_SOUND, reinterpret_cast<LPARAM>(&bi));
 }
 
 bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
   bool ok = true;
   if (s_hToolbar == nullptr || hMenu == nullptr) {
-    LOG(ERROR) << L"PopupUnderToolbarButton: toolbar="
-               << (s_hToolbar ? L"set" : L"null")
+    LOG(ERROR) << L"PopupUnderToolbarButton: toolbar=" << (s_hToolbar ? L"set" : L"null")
                << L", hMenu=" << (hMenu ? L"set" : L"null")
                << L" (called before toolbar ready or with null menu)";
     return false;
   }
   // TB_GETRECT returns the button's rect in toolbar-client coords.
   RECT rc;
-  if (!SendMessageW(s_hToolbar, TB_GETRECT, idCommand,
-                   reinterpret_cast<LPARAM>(&rc))) {
+  if (!SendMessageW(s_hToolbar, TB_GETRECT, idCommand, reinterpret_cast<LPARAM>(&rc))) {
     LOG(ERROR) << L"PopupUnderToolbarButton: TB_GETRECT failed for "
-                  L"command id " << idCommand
-               << L" (button missing from the toolbar?)";
+                  L"command id "
+               << idCommand << L" (button missing from the toolbar?)";
     return false;
   }
   // Convert the bottom-left corner to screen space — that's where
   // TrackPopupMenu wants its anchor.
-  POINT pt = { rc.left, rc.bottom };
+  POINT pt = {rc.left, rc.bottom};
   ClientToScreen(s_hToolbar, &pt);
-  if (!TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN,
-                      pt.x, pt.y, 0, hOwner, nullptr)) {
+  if (!TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hOwner, nullptr)) {
     LOG(ERROR) << L"PopupUnderToolbarButton: TrackPopupMenu failed for "
-                  L"command id " << idCommand;
+                  L"command id "
+               << idCommand;
     ok = false;
   }
   return ok;
 }
 
 bool HandleToolbarTooltips(NMHDR* pnmh) {
-  if (pnmh == nullptr || s_hToolbar == nullptr) return false;
+  if (pnmh == nullptr || s_hToolbar == nullptr) {
+    return false;
+  }
   // TTN_GETDISPINFOW and TTN_NEEDTEXTW have the same numeric value; accepting
   // both keeps us portable across comctl32 versions. For ANSI comctl the code
   // would be TTN_NEEDTEXTA, but this app is Unicode-only so we ignore that.
   if (pnmh->code != TTN_GETDISPINFOW && pnmh->code != TTN_NEEDTEXTW) {
     return false;
   }
-  NMTTDISPINFOW* pdi = reinterpret_cast<NMTTDISPINFOW*>(pnmh);
+  NMTTDISPINFOW* pdi  = reinterpret_cast<NMTTDISPINFOW*>(pnmh);
   const int idCommand = static_cast<int>(pdi->hdr.idFrom);
 
   // Descriptive tooltip strings per button. State-toggling buttons read the
@@ -720,9 +719,13 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
     case IDM_PAUSED:
       // Mirror the three-state label SetPauseButton picks: "Play Ants"
       // (paused + stopped), "Resume Ants" (paused mid-run), or "Pause Ants".
-      if (!g_paused)     text = L"Pause Ants";
-      else if (g_stopped) text = L"Play Ants";
-      else                text = L"Resume Ants";
+      if (!g_paused) {
+        text = L"Pause Ants";
+      } else if (g_stopped) {
+        text = L"Play Ants";
+      } else {
+        text = L"Resume Ants";
+      }
       break;
     case IDM_STOP:
       text = L"Stop ants and clear the ant field";
@@ -730,7 +733,8 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
     case IDM_SOUND:
       text = g_playsound ? L"Mute Background Sounds" : L"Play Background Sounds";
       break;
-    default: return false; // unknown button — let the default handling run
+    default:
+      return false; // unknown button — let the default handling run
   }
   pdi->lpszText = const_cast<LPWSTR>(text);
   return true;
@@ -762,7 +766,7 @@ bool ValidateCustomSeed(LPCWSTR cSeed) {
     LOG(WARN) << L"Custom seed value was 0";
     is_valid = false;
   } else {
-     is_valid = (seedValue > 0 && seedValue <= INT_MAX);
+    is_valid = (seedValue > 0 && seedValue <= INT_MAX);
   }
   return is_valid;
 }
@@ -773,7 +777,6 @@ const std::wstring GetVersionString() {
   // directly from the same integer macros (single source of truth in
   // version.h) — std::to_wstring keeps it standards-clean across MinGW
   // and MSVC alike.
-  return std::to_wstring(MAJOR_VERSION) + L"." +
-         std::to_wstring(MINOR_VERSION) + L"." +
+  return std::to_wstring(MAJOR_VERSION) + L"." + std::to_wstring(MINOR_VERSION) + L"." +
          std::to_wstring(BUILD_VERSION);
 }

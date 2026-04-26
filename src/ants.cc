@@ -7,13 +7,16 @@
 
 volatile bool g_running = false; // Global ant threads running state
 volatile bool g_paused  = false; // Affects g_running, used by IDM_PAUSED
-volatile bool g_stopped = true;  // True at startup (no animation yet) and after IDM_STOP. Drives "Play" vs "Resume" label on the pause/play toolbar button.
+volatile bool g_stopped = true;  // True at startup (no animation yet) and after IDM_STOP. Drives
+                                 // "Play" vs "Resume" label on the pause/play toolbar button.
 
 bool g_monochrome = false; // Whether monochrome colors only is enabled
 
-COLORREF g_ant_color = kRandomAntColor; // Fixed ant marker color, or kRandomAntColor for per-ant random pick
+COLORREF g_ant_color =
+    kRandomAntColor; // Fixed ant marker color, or kRandomAntColor for per-ant random pick
 
-volatile UINT g_num_ants = 1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
+volatile UINT g_num_ants =
+    1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
 
 unsigned long g_delay = kRealTime; // Default until InitMenuDefaults reads the RC.
 
@@ -25,21 +28,22 @@ unsigned long g_delay = kRealTime; // Default until InitMenuDefaults reads the R
 // lets us dynamically spawn/terminate individual threads when the user
 // changes the Num Ants setting.
 struct AntThreadSlot {
-  HANDLE        hThread          = nullptr;
-  HANDLE        hTickEvent       = nullptr; // auto-reset; SetEvent = "go draw"
-  volatile bool exitRequest    = false;   // set true to make thread exit cleanly
-  volatile bool reseedRequest  = false;   // set true to reroll position / color / dir
+  HANDLE hThread              = nullptr;
+  HANDLE hTickEvent           = nullptr; // auto-reset; SetEvent = "go draw"
+  volatile bool exitRequest   = false;   // set true to make thread exit cleanly
+  volatile bool reseedRequest = false;   // set true to reroll position / color / dir
   // Place-mode handoff: when placementRequested is set the thread adopts
   // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
   // a random direction, and skips the step (the marker is already painted on
   // the canvas by PlaceAntAtClient). Cleared by the thread once consumed.
   volatile bool placementRequested = false;
-  int           placeCellX        = 0;
-  int           placeCellY        = 0;
-  COLORREF      placeColor        = 0;
-  bool          placeOnBg         = true;
-  volatile bool customSeedRequest = false; // Whether to use custom seed for seeding randomization
-  UINT          customSeed        = 0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
+  int placeCellX                   = 0;
+  int placeCellY                   = 0;
+  COLORREF placeColor              = 0;
+  bool placeOnBg                   = true;
+  volatile bool customSeedRequest  = false; // Whether to use custom seed for seeding randomization
+  UINT customSeed =
+      0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
   // Color-refresh handoff: when set, the thread re-picks antColor against
   // the current g_monochrome and overpaints its current cell so the new
   // color is visible immediately (even when paused). Position / dir /
@@ -49,7 +53,7 @@ struct AntThreadSlot {
   volatile bool colorRefreshRequest = false;
 };
 static AntThreadSlot s_slots[kMaxAntThreads];
-static int           s_activeCount = 0;  // only touched from the main thread
+static int s_activeCount = 0; // only touched from the main thread
 
 // --- Place-mode state -----------------------------------------------------
 // All touched from the main (UI) thread only — set when the user enters
@@ -58,14 +62,14 @@ static int           s_activeCount = 0;  // only touched from the main thread
 // we paint the ant marker so the thread that adopts this position knows
 // whether it started on background (turn right) or a path (turn left).
 struct PlacedAnt {
-  int      cellX;
-  int      cellY;
+  int cellX;
+  int cellY;
   COLORREF color;
-  bool     onBg;
+  bool onBg;
 };
 static PlacedAnt s_placedAnts[kMaxAntThreads];
-bool             g_place_mode        = false;
-int              g_placed_ants_count = 0;
+bool g_place_mode       = false;
+int g_placed_ants_count = 0;
 
 // Forward-declared so TogglePaintAnts can drain pending placements into
 // thread slots before re-arming the timer. Returns true on success;
@@ -119,13 +123,13 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   DWORD seed;
   if (slot->customSeedRequest) {
     const DWORD slotIdx = static_cast<DWORD>(slot - s_slots);
-    seed = static_cast<DWORD>(slot->customSeed) ^ (slotIdx * 0x9E3779B9u);
+    seed                = static_cast<DWORD>(slot->customSeed) ^ (slotIdx * 0x9E3779B9u);
   } else {
     seed = GetTickCount() ^ GetCurrentThreadId();
   }
   srand(static_cast<unsigned int>(seed));
   int cellX = -1, cellY = -1;
-  int dir   = 0;
+  int dir = 0;
   // Per-ant marker color. Picked once at placement (see needsPlacement
   // branch below) from {magenta, cyan, yellow} so multiple ants on the
   // canvas are easy to tell apart. Collision detection treats any of
@@ -137,8 +141,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // still interprets correctly if g_bkg_color changes mid-flight.
   bool onBg = true;
   // Direction → (dx, dy) in cell units, matching the encoding above.
-  static const int kDx[4] = {  0, 1, 0, -1 };
-  static const int kDy[4] = { -1, 0, 1,  0 };
+  static const int kDx[4] = {0, 1, 0, -1};
+  static const int kDy[4] = {-1, 0, 1, 0};
 
   while (true) {
     // Block until SignalAntsTick signals this slot's private event. Auto-reset,
@@ -150,14 +154,16 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     }
     // Two exit paths: global shutdown OR this individual slot was asked to die
     // (EnsureThreadCount shrinking the pool).
-    if (!g_running || slot->exitRequest) break;
+    if (!g_running || slot->exitRequest) {
+      break;
+    }
     // Main thread may have requested a reseed (IDM_REPAINT). Clearing
     // cellX triggers the needsPlacement branch below, which rerolls
     // position, direction, and marker color from the current rand()
     // state — so each reseed produces a fresh layout.
     if (slot->reseedRequest) {
       slot->reseedRequest = false;
-      cellX = -1;
+      cellX               = -1;
     }
     // Place-mode handoff. The main thread painted the marker on the canvas
     // already and recorded what was under it (placeOnBg), so we adopt the
@@ -168,11 +174,11 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // direction in place mode; position and color stay user-controlled.
     if (slot->placementRequested) {
       slot->placementRequested = false;
-      cellX    = slot->placeCellX;
-      cellY    = slot->placeCellY;
-      antColor = slot->placeColor;
-      onBg     = slot->placeOnBg;
-      dir      = rand() & 3;
+      cellX                    = slot->placeCellX;
+      cellY                    = slot->placeCellY;
+      antColor                 = slot->placeColor;
+      onBg                     = slot->placeOnBg;
+      dir                      = rand() & 3;
       continue;
     }
     // Color-only refresh (Monochrome toggle). Re-pick antColor from the
@@ -189,7 +195,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
         antColor = CurrentPathColor();
       } else if (g_ant_color == kRandomAntColor) {
         static const COLORREF kAntColors[3] = {
-          RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+            RGB_MAGENTA,
+            RGB_CYAN,
+            RGB_YELLOW,
         };
         antColor = kAntColors[rand() % 3];
       } else {
@@ -200,12 +208,11 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
         if (g_hdcMem != nullptr) {
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
-          RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
-          HBRUSH hAnt = CreateSolidBrush(antColor);
+          RECT rc      = {px, py, px + CELL_PX, py + CELL_PX};
+          HBRUSH hAnt  = CreateSolidBrush(antColor);
           FillRect(g_hdcMem, &rc, hAnt);
           DeleteObject(hAnt);
-          RECT inval = { px, py + g_toolbarHeight,
-                         px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+          RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
         }
         LeaveCriticalSection(&g_paintCS);
@@ -228,8 +235,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       const int gridW = cxClient / CELL_PX;
       const int gridH = cyClient / CELL_PX;
       if (gridW >= 2 && gridH >= 2) {
-        const bool needsPlacement = (cellX < 0 || cellY < 0 ||
-                                     cellX >= gridW || cellY >= gridH);
+        const bool needsPlacement = (cellX < 0 || cellY < 0 || cellX >= gridW || cellY >= gridH);
         if (needsPlacement) {
           // First-tick placement, or recovery after a resize that shrank
           // the grid below our old cell. Sample the cell to decide onBg
@@ -249,37 +255,38 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
             antColor = CurrentPathColor();
           } else if (g_ant_color == kRandomAntColor) {
             static const COLORREF kAntColors[3] = {
-              RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+                RGB_MAGENTA,
+                RGB_CYAN,
+                RGB_YELLOW,
             };
             antColor = kAntColors[rand() % 3];
           } else {
             antColor = g_ant_color;
           }
-          const int px = cellX * CELL_PX;
-          const int py = cellY * CELL_PX;
+          const int px           = cellX * CELL_PX;
+          const int py           = cellY * CELL_PX;
           const COLORREF sampled = GetPixel(g_hdcMem, px, py);
-          onBg = (sampled == g_bkg_color);
-          RECT antRc = { px, py, px + CELL_PX, py + CELL_PX };
-          HBRUSH hAnt = CreateSolidBrush(antColor);
+          onBg                   = (sampled == g_bkg_color);
+          RECT antRc             = {px, py, px + CELL_PX, py + CELL_PX};
+          HBRUSH hAnt            = CreateSolidBrush(antColor);
           FillRect(g_hdcMem, &antRc, hAnt);
           DeleteObject(hAnt);
-          RECT inval = { px, py + g_toolbarHeight,
-                         px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+          RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
         } else {
           // Classic Langton's step. We can't GetPixel the cell under the
           // ant — it's magenta — so we use the cached onBg from when the
           // ant arrived. On bg cell turn right, on path cell turn left,
           // flip the cell's color, then step forward one cell.
-          dir = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
+          dir                       = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
           const COLORREF trailColor = onBg ? CurrentPathColor() : g_bkg_color;
-          const int px = cellX * CELL_PX;
-          const int py = cellY * CELL_PX;
+          const int px              = cellX * CELL_PX;
+          const int py              = cellY * CELL_PX;
           // Overpaint the vacating cell with the flipped trail color.
           // This both performs the Langton flip and removes the magenta
           // overlay, leaving a clean mark the next ant will classify
           // correctly via GetPixel.
-          RECT trailRc = { px, py, px + CELL_PX, py + CELL_PX };
+          RECT trailRc  = {px, py, px + CELL_PX, py + CELL_PX};
           HBRUSH hTrail = CreateSolidBrush(trailColor);
           FillRect(g_hdcMem, &trailRc, hTrail);
           DeleteObject(hTrail);
@@ -292,7 +299,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // the subsequent sample-at-new-cell step still works because it
           // reads the trail color we just painted on the vacating cell.
           auto isBlocked = [&](int x, int y) -> bool {
-            if (x < 0 || x >= gridW || y < 0 || y >= gridH) return true;
+            if (x < 0 || x >= gridW || y < 0 || y >= gridH) {
+              return true;
+            }
             // Treat any of the three ant marker colors as "occupied by
             // another ant" — this ant might be magenta, the neighbor
             // might be cyan, etc. A trail pixel is always black/white,
@@ -304,8 +313,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           int ny = cellY + kDy[dir];
           if (isBlocked(nx, ny)) {
             dir = (dir + 2) & 3;
-            nx = cellX + kDx[dir];
-            ny = cellY + kDy[dir];
+            nx  = cellX + kDx[dir];
+            ny  = cellY + kDy[dir];
             if (isBlocked(nx, ny)) {
               nx = cellX;
               ny = cellY;
@@ -318,14 +327,14 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // turn decision. Anything matching the current bg counts as
           // "unvisited"; anything else (including stale trails from
           // before a bg change) counts as path.
-          const int npx = cellX * CELL_PX;
-          const int npy = cellY * CELL_PX;
+          const int npx          = cellX * CELL_PX;
+          const int npy          = cellY * CELL_PX;
           const COLORREF sampled = GetPixel(g_hdcMem, npx, npy);
-          onBg = (sampled == g_bkg_color);
+          onBg                   = (sampled == g_bkg_color);
 
           // Paint the ant on the new cell using this ant's chosen marker
           // color (locked in at placement, see needsPlacement branch).
-          RECT antRc = { npx, npy, npx + CELL_PX, npy + CELL_PX };
+          RECT antRc  = {npx, npy, npx + CELL_PX, npy + CELL_PX};
           HBRUSH hAnt = CreateSolidBrush(antColor);
           FillRect(g_hdcMem, &antRc, hAnt);
           DeleteObject(hAnt);
@@ -336,10 +345,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // it just posts WM_PAINT to the window's owning (main) thread.
           // Coords shift by g_toolbarHeight to go from back-buffer space
           // into window-client space.
-          RECT invalOld = { px, py + g_toolbarHeight,
-                            px + CELL_PX, py + CELL_PX + g_toolbarHeight };
-          RECT invalNew = { npx, npy + g_toolbarHeight,
-                            npx + CELL_PX, npy + CELL_PX + g_toolbarHeight };
+          RECT invalOld = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
+          RECT invalNew = {npx, npy + g_toolbarHeight, npx + CELL_PX,
+                           npy + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &invalOld, FALSE);
           InvalidateRect(mainHwnd, &invalNew, FALSE);
         }
@@ -359,15 +367,21 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
 // mutating s_slots / s_activeCount doesn't need its own critical section.
 
 bool EnsureThreadCount(int targetCount) {
-  if (targetCount < 1)              targetCount = 1;
-  if (targetCount > kMaxAntThreads) targetCount = kMaxAntThreads;
+  if (targetCount < 1) {
+    targetCount = 1;
+  }
+  if (targetCount > kMaxAntThreads) {
+    targetCount = kMaxAntThreads;
+  }
 
   // Grow: spawn new slots up to targetCount.
   while (s_activeCount < targetCount) {
-    const int i = s_activeCount;
+    const int i            = s_activeCount;
     s_slots[i].exitRequest = false;
-    s_slots[i].hTickEvent    = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (s_slots[i].hTickEvent == nullptr) return false;
+    s_slots[i].hTickEvent  = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (s_slots[i].hTickEvent == nullptr) {
+      return false;
+    }
     s_slots[i].hThread = CreateThread(nullptr, 0, AntThread, &s_slots[i], 0, nullptr);
     if (s_slots[i].hThread == nullptr) {
       CloseHandle(s_slots[i].hTickEvent);
@@ -386,7 +400,7 @@ bool EnsureThreadCount(int targetCount) {
   // can only observe exitRequest after a wake, so we SetEvent to force it
   // to run the check. Then join and clean up.
   while (s_activeCount > targetCount) {
-    const int i = s_activeCount - 1;
+    const int i            = s_activeCount - 1;
     s_slots[i].exitRequest = true;
     SetEvent(s_slots[i].hTickEvent);
     WaitForSingleObject(s_slots[i].hThread, INFINITE);
@@ -432,7 +446,7 @@ void ReseedAnts(bool pulse) {
   // tick events and the wiped canvas stays blank until something else
   // (typically the resume path in TogglePaintAnts) pulses them.
   for (int i = 0; i < s_activeCount; i++) {
-    s_slots[i].reseedRequest = true;
+    s_slots[i].reseedRequest     = true;
     s_slots[i].customSeedRequest = false;
     if (pulse && s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
@@ -454,18 +468,17 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
     LOG(ERROR) << L"No ant threads active, nothing to seed";
     return false;
   }
-  const int desiredCount         = s_activeCount;
-  const bool wasRunning          = !g_paused;
+  const int desiredCount = s_activeCount;
+  const bool wasRunning  = !g_paused;
   // Place mode and Custom Seed are not mutually exclusive: when both are
   // active, the user-clicked positions are kept and the seed only drives
   // the per-ant direction + color. Captured up front so the wipe-canvas
   // step below can be followed by a marker re-paint that preserves what
   // the user has already placed.
-  const bool inPlaceMode         = g_place_mode && g_placed_ants_count > 0;
+  const bool inPlaceMode = g_place_mode && g_placed_ants_count > 0;
 
   if (inPlaceMode) {
-    LOG(INFO) << L"Using custom seed '" << custom_seed
-              << L"' for ant direction";
+    LOG(INFO) << L"Using custom seed '" << custom_seed << L"' for ant direction";
   } else {
     LOG(INFO) << L"Using custom seed '" << custom_seed
               << L"' for ant placement, direction, and color.";
@@ -504,7 +517,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // changing the seed "repaints the whole thing").
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-    RECT rc = { 0, 0, cxClient, cyClient };
+    RECT rc       = {0, 0, cxClient, cyClient};
     HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
     FillRect(g_hdcMem, &rc, hBrush);
     DeleteObject(hBrush);
@@ -517,10 +530,10 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
     if (inPlaceMode && g_hdcMem != nullptr) {
       for (int i = 0; i < g_placed_ants_count; i++) {
         const PlacedAnt& a = s_placedAnts[i];
-        const int px = a.cellX * CELL_PX;
-        const int py = a.cellY * CELL_PX;
-        RECT mrc = { px, py, px + CELL_PX, py + CELL_PX };
-        HBRUSH hAnt = CreateSolidBrush(a.color);
+        const int px       = a.cellX * CELL_PX;
+        const int py       = a.cellY * CELL_PX;
+        RECT mrc           = {px, py, px + CELL_PX, py + CELL_PX};
+        HBRUSH hAnt        = CreateSolidBrush(a.color);
         FillRect(g_hdcMem, &mrc, hAnt);
         DeleteObject(hAnt);
       }
@@ -593,28 +606,26 @@ void ShutdownAnts() {
 bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   bool ok = true;
   if (cx <= 0 || cy <= 0 || g_hdcMem == nullptr) {
-    LOG(ERROR) << L"Invalid input (cx=" << cx
-               << L", cy=" << cy
-               << L", g_hdcMem=" << (g_hdcMem ? L"set" : L"null") << L")";
+    LOG(ERROR) << L"Invalid input (cx=" << cx << L", cy=" << cy << L", g_hdcMem="
+               << (g_hdcMem ? L"set" : L"null") << L")";
     return false;
   }
   // Fast path: the existing bitmap already matches — keep it, no work,
   // no state loss. Common on restore-from-minimize without a resize.
   if (g_hbmMem != nullptr) {
     BITMAP bm = {};
-    if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bm) &&
-        bm.bmWidth == cx && bm.bmHeight == cy) {
-      return true;  // existing buffer is already the right size
+    if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bm) && bm.bmWidth == cx && bm.bmHeight == cy) {
+      return true; // existing buffer is already the right size
     }
   }
   // Slow path: dimensions changed, allocate a fresh bitmap. Borrow the
   // window DC only to query its pixel format for CreateCompatibleBitmap.
-  HDC hdcWin = GetDC(hWnd);
+  HDC hdcWin     = GetDC(hWnd);
   HBITMAP hbmNew = CreateCompatibleBitmap(hdcWin, cx, cy);
   ReleaseDC(hWnd, hdcWin);
   if (hbmNew == nullptr) {
-    LOG(ERROR) << L"CreateCompatibleBitmap(" << cx
-               << L"x" << cy << L") failed, out of GDI resources.";
+    LOG(ERROR) << L"CreateCompatibleBitmap(" << cx << L"x" << cy
+               << L") failed, out of GDI resources.";
     return false;
   }
 
@@ -627,16 +638,16 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   // where something fires an intermediate WM_SIZE and triggers this
   // slow branch. On grow, the extra margin stays bg; on shrink, the
   // excess rows / columns of the old bitmap get clipped off.
-  HDC hdcScratch = CreateCompatibleDC(g_hdcMem);
+  HDC hdcScratch         = CreateCompatibleDC(g_hdcMem);
   HBITMAP hbmScratchPrev = static_cast<HBITMAP>(SelectObject(hdcScratch, hbmNew));
-  RECT rc = { 0, 0, cx, cy };
-  HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+  RECT rc                = {0, 0, cx, cy};
+  HBRUSH hBrush          = CreateSolidBrush(g_bkg_color);
   FillRect(hdcScratch, &rc, hBrush);
   DeleteObject(hBrush);
   if (g_hbmMem != nullptr) {
     BITMAP bmOld = {};
     if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bmOld)) {
-      const int copyW = (bmOld.bmWidth  < cx) ? bmOld.bmWidth  : cx;
+      const int copyW = (bmOld.bmWidth < cx) ? bmOld.bmWidth : cx;
       const int copyH = (bmOld.bmHeight < cy) ? bmOld.bmHeight : cy;
       BitBlt(hdcScratch, 0, 0, copyW, copyH, g_hdcMem, 0, 0, SRCCOPY);
     }
@@ -650,7 +661,9 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   // deselects the previously-selected bitmap, which then becomes safe
   // to delete.
   SelectObject(g_hdcMem, hbmNew);
-  if (g_hbmMem != nullptr) DeleteObject(g_hbmMem);
+  if (g_hbmMem != nullptr) {
+    DeleteObject(g_hbmMem);
+  }
   g_hbmMem = hbmNew;
   LeaveCriticalSection(&g_paintCS);
   return ok;
@@ -666,11 +679,12 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
 // R and B are swapped between the two representations, so we build the
 // comparison/replacement DWORDs explicitly rather than comparing COLORREFs.
 void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
-  if (oldColor == newColor) return;
+  if (oldColor == newColor) {
+    return;
+  }
 
   EnterCriticalSection(&g_paintCS);
-  if (g_hdcMem == nullptr || g_hbmMem == nullptr ||
-      cxClient <= 0 || cyClient <= 0) {
+  if (g_hdcMem == nullptr || g_hbmMem == nullptr || cxClient <= 0 || cyClient <= 0) {
     LeaveCriticalSection(&g_paintCS);
     return;
   }
@@ -679,24 +693,22 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
   const int height = cyClient;
 
   BITMAPINFOHEADER bi = {};
-  bi.biSize        = sizeof(BITMAPINFOHEADER);
-  bi.biWidth       = width;
-  bi.biHeight      = -height; // negative = top-down (simpler indexing)
-  bi.biPlanes      = 1;
-  bi.biBitCount    = 32;
-  bi.biCompression = BI_RGB;
+  bi.biSize           = sizeof(BITMAPINFOHEADER);
+  bi.biWidth          = width;
+  bi.biHeight         = -height; // negative = top-down (simpler indexing)
+  bi.biPlanes         = 1;
+  bi.biBitCount       = 32;
+  bi.biCompression    = BI_RGB;
 
   std::vector<DWORD> pixels(static_cast<size_t>(width) * height);
-  GetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(),
-            reinterpret_cast<BITMAPINFO*>(&bi), DIB_RGB_COLORS);
+  GetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
+            DIB_RGB_COLORS);
 
   // Convert the two COLORREFs to the DIB's DWORD representation.
-  const DWORD oldPix = (GetRValue(oldColor) << 16) |
-                       (GetGValue(oldColor) << 8)  |
-                        GetBValue(oldColor);
-  const DWORD newPix = (GetRValue(newColor) << 16) |
-                       (GetGValue(newColor) << 8)  |
-                        GetBValue(newColor);
+  const DWORD oldPix =
+      (GetRValue(oldColor) << 16) | (GetGValue(oldColor) << 8) | GetBValue(oldColor);
+  const DWORD newPix =
+      (GetRValue(newColor) << 16) | (GetGValue(newColor) << 8) | GetBValue(newColor);
 
   // Mask off the high (reserved/alpha) byte when comparing so any noise there
   // doesn't cause false negatives on pixels that should match.
@@ -706,17 +718,21 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
     }
   }
 
-  SetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(),
-            reinterpret_cast<BITMAPINFO*>(&bi), DIB_RGB_COLORS);
+  SetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
+            DIB_RGB_COLORS);
 
   LeaveCriticalSection(&g_paintCS);
 }
 
 bool SetNumAnts(const unsigned int num) {
-  bool ok = true;
+  bool ok              = true;
   unsigned int clamped = num;
-  if (clamped > kMaxAntThreads) clamped = kMaxAntThreads;
-  if (clamped == 0)             clamped = 1;
+  if (clamped > kMaxAntThreads) {
+    clamped = kMaxAntThreads;
+  }
+  if (clamped == 0) {
+    clamped = 1;
+  }
   g_num_ants = clamped;
   // If the pool is already running (i.e. we're past ShowAnts), resize it to
   // match. Before ShowAnts there is nothing to resize — ShowAnts will spawn
@@ -820,13 +836,19 @@ void ExitPlaceMode() {
 }
 
 bool PlaceAntAtClient(int clientX, int clientY) {
-  if (!g_place_mode) return false;
-  if (g_placed_ants_count >= kMaxAntThreads) return false;
+  if (!g_place_mode) {
+    return false;
+  }
+  if (g_placed_ants_count >= kMaxAntThreads) {
+    return false;
+  }
   // Window-client → back-buffer coords (the toolbar lives at the top of the
   // client area; the ants canvas starts below it).
   const int bx = clientX;
   const int by = clientY - g_toolbarHeight;
-  if (bx < 0 || by < 0) return false;
+  if (bx < 0 || by < 0) {
+    return false;
+  }
 
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem == nullptr || cxClient <= 0 || cyClient <= 0) {
@@ -855,19 +877,21 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   // (ants vanish into their paths, no ant-vs-ant collision); otherwise
   // pick from the magenta/cyan/yellow set so isBlocked sees the marker.
   const COLORREF sampled = GetPixel(g_hdcMem, px, py);
-  const bool onBg = (sampled == g_bkg_color);
+  const bool onBg        = (sampled == g_bkg_color);
   COLORREF antColor;
   if (g_monochrome) {
     antColor = CurrentPathColor();
   } else if (g_ant_color == kRandomAntColor) {
     static const COLORREF kAntColors[3] = {
-      RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+        RGB_MAGENTA,
+        RGB_CYAN,
+        RGB_YELLOW,
     };
     antColor = kAntColors[rand() % 3];
   } else {
     antColor = g_ant_color;
   }
-  RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+  RECT rc     = {px, py, px + CELL_PX, py + CELL_PX};
   HBRUSH hAnt = CreateSolidBrush(antColor);
   FillRect(g_hdcMem, &rc, hAnt);
   DeleteObject(hAnt);
@@ -879,8 +903,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   s_placedAnts[g_placed_ants_count].onBg  = onBg;
   g_placed_ants_count++;
 
-  RECT inval = { px, py + g_toolbarHeight,
-                 px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+  RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
   return true;
 }
@@ -906,15 +929,14 @@ bool UndoLastPlacement() {
   const int py    = cellY * CELL_PX;
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem != nullptr) {
-    RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+    RECT rc       = {px, py, px + CELL_PX, py + CELL_PX};
     HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
     FillRect(g_hdcMem, &rc, hBrush);
     DeleteObject(hBrush);
   }
   LeaveCriticalSection(&g_paintCS);
   g_placed_ants_count--;
-  RECT inval = { px, py + g_toolbarHeight,
-                 px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+  RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
   return ok;
 }
@@ -935,10 +957,10 @@ static bool ApplyPlacements() {
       ok = false;
     }
     for (int i = 0; i < g_placed_ants_count; i++) {
-      s_slots[i].placeCellX        = s_placedAnts[i].cellX;
-      s_slots[i].placeCellY        = s_placedAnts[i].cellY;
-      s_slots[i].placeColor        = s_placedAnts[i].color;
-      s_slots[i].placeOnBg         = s_placedAnts[i].onBg;
+      s_slots[i].placeCellX         = s_placedAnts[i].cellX;
+      s_slots[i].placeCellY         = s_placedAnts[i].cellY;
+      s_slots[i].placeColor         = s_placedAnts[i].color;
+      s_slots[i].placeOnBg          = s_placedAnts[i].onBg;
       s_slots[i].placementRequested = true;
     }
   }
@@ -970,8 +992,7 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
           // null terminator. ValidateCustomSeed already enforces all-digit
           // input no greater than INT_MAX.
           wchar_t buf[32] = {};
-          GetDlgItemTextW(hDlg, IDC_CUSTOMSEED, buf,
-                          sizeof(buf) / sizeof(buf[0]));
+          GetDlgItemTextW(hDlg, IDC_CUSTOMSEED, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCustomSeed(buf)) {
             ErrorBox(hDlg, L"Custom Seed Validation Error",
                      L"Invalid input — must be a positive integer.");
@@ -981,7 +1002,7 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             return TRUE;
           }
           const unsigned long lseed = wcstoul(buf, nullptr, 10);
-          const UINT seed = static_cast<unsigned int>(lseed);
+          const UINT seed           = static_cast<unsigned int>(lseed);
           CustomSeedAnts(seed);
           EndDialog(hDlg, IDOK);
           return TRUE;
