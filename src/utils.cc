@@ -376,7 +376,8 @@ static LRESULT CALLBACK ToolbarSubclassProc(HWND hWnd, UINT msg,
 // Button clicks arrive as WM_COMMAND messages to the parent, with wParam
 // low-word set to the button's idCommand. Here we map the save button to
 // IDM_SAVE_AS so it shares the existing menu handler — no duplicate code.
-void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
+bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
+  bool ok = true;
   // Styles note — we deliberately do NOT use TBSTYLE_FLAT here. Per MSDN it
   // makes the toolbar transparent, meaning the parent is responsible for
   // painting the background. With WS_CLIPCHILDREN on our main window (which
@@ -401,7 +402,8 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
       0, 0, CW_USEDEFAULT, CW_USEDEFAULT,
       hParent, nullptr, hInst, nullptr);
   if (hTB == nullptr) {
-    return;
+    LOG(ERROR) << L"CreateWindowExW for toolbar failed";
+    return false;
   }
 
   // Tell the control which TBBUTTON layout we compiled against so it can
@@ -573,6 +575,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   RECT tbRect;
   GetWindowRect(hTB, &tbRect);
   g_toolbarHeight = tbRect.bottom - tbRect.top;
+  return ok;
 }
 
 void LayoutToolbar(HWND hWnd) {

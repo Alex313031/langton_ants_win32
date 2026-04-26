@@ -70,22 +70,33 @@ void ReseedAnts(bool pulse = true);
 // so toggling mono behaves like picking a Colors entry (just swaps colors).
 void RefreshAntColors();
 
-// Use a custom seed for the ants
-void CustomSeedAnts(const unsigned int custom_seed);
+// Use a custom seed for the ants. Returns true on success, false if the
+// internal teardown + respawn couldn't bring the thread pool back up
+// (CreateThread / CreateEvent failure inside EnsureThreadCount). Also
+// returns false if no ants are currently running, so there's nothing
+// to seed.
+bool CustomSeedAnts(const unsigned int custom_seed);
 
 // Terminates all ant threads and closes their events/the timer. Called from
 // WM_DESTROY; safe to call more than once.
 void ShutdownAnts();
 
-// For handling back buffer bitmap for smooth resize
-void RecreateBackBuffer(HWND hWnd, int cx, int cy);
+// For handling back buffer bitmap for smooth resize. Returns true on
+// success (including the no-op fast path where the existing bitmap
+// already matches), false on bad inputs (cx/cy <= 0, no g_hdcMem) or
+// CreateCompatibleBitmap failure.
+bool RecreateBackBuffer(HWND hWnd, int cx, int cy);
 
 // Swaps every pixel in the back buffer that currently equals oldColor over to
 // newColor, leaving all other (ant path) pixels untouched. Used by the background
 // colour menu so the bg can change without erasing the ant paths already painted.
 void RecolorBackground(COLORREF oldColor, COLORREF newColor);
 
-void SetNumAnts(const unsigned int num);
+// Sets the active ant count (clamped to [1, kMaxAntThreads]). Returns true
+// on success; returns false if the pool was running and the resulting
+// EnsureThreadCount call couldn't grow / shrink the thread pool to the
+// requested size.
+bool SetNumAnts(const unsigned int num);
 
 // Starts drawing ant(s) path(s) on client area
 bool ShowAnts();

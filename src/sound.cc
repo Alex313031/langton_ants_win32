@@ -439,21 +439,22 @@ bool ToggleSound() {
 
 // ---------- Lifecycle -----------------------------------------------------
 
-void InitBgm() {
-  if (s_bgmInit) return;
+bool InitBgm() {
+  bool ok = true;
+  if (s_bgmInit) return true;  // already initialized — treat as success
   InitializeCriticalSection(&s_bgmCS);
   s_bgmCmdEvent  = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
   s_bgmDoneEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr); // auto-reset
   s_bgmExitEvent = CreateEventW(nullptr, TRUE,  FALSE, nullptr); // manual-reset
   s_bgmInitEvent = CreateEventW(nullptr, TRUE,  FALSE, nullptr); // manual-reset
   if (!s_bgmCmdEvent || !s_bgmDoneEvent || !s_bgmExitEvent || !s_bgmInitEvent) {
-    LOG(ERROR) << L"BGM CreateEvent failed";
-    return;
+    LOG(ERROR) << L"CreateEventW failed for one or more BGM sync events";
+    return false;
   }
   s_bgmWorker = CreateThread(nullptr, 0, BgmWorkerProc, nullptr, 0, nullptr);
   if (!s_bgmWorker) {
-    LOG(ERROR) << L"BGM CreateThread failed";
-    return;
+    LOG(ERROR) << L"CreateThread for BGM worker failed";
+    return false;
   }
   // The worker does no time-critical work (only MCI setup during the
   // ~2s loop re-issue). Drop it below normal so the ant threads and
@@ -465,7 +466,7 @@ void InitBgm() {
   // via PostBgmSync are guaranteed to have a valid s_bgmHwnd to use.
   WaitForSingleObject(s_bgmInitEvent, INFINITE);
   if (!s_bgmInitOk) {
-    LOG(ERROR) << L"BGM worker init failed";
+    LOG(ERROR) << L"BGM worker init failed (hidden notify window setup)";
     WaitForSingleObject(s_bgmWorker, INFINITE);
     CloseHandle(s_bgmWorker);    s_bgmWorker    = nullptr;
     CloseHandle(s_bgmCmdEvent);  s_bgmCmdEvent  = nullptr;
@@ -473,9 +474,10 @@ void InitBgm() {
     CloseHandle(s_bgmExitEvent); s_bgmExitEvent = nullptr;
     CloseHandle(s_bgmInitEvent); s_bgmInitEvent = nullptr;
     DeleteCriticalSection(&s_bgmCS);
-    return;
+    return false;
   }
   s_bgmInit = true;
+  return ok;
 }
 
 void ShutdownBgm() {

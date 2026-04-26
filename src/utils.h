@@ -64,7 +64,10 @@ bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message)
 // Creates the app's top toolbar as a child of hParent. Call once from
 // WM_CREATE. Stores the toolbar handle internally and measures the global
 // g_toolbarHeight so the rest of the app can offset the ants area below it.
-void CreateAppToolbar(HWND hParent, HINSTANCE hInst);
+// Returns true on success; returns false if the toolbar window itself
+// failed to create (callers can warn the user that the toolbar will be
+// missing — the rest of the app still works via the menu bar).
+bool CreateAppToolbar(HWND hParent, HINSTANCE hInst);
 
 // Re-auto-sizes the toolbar to the parent's new width and re-measures its
 // height into g_toolbarHeight. Call from WM_SIZE. No-op if the toolbar

@@ -63,8 +63,10 @@ bool SyncBgm();
 // MM_MCINOTIFY loop-back that drives looping. Main thread interacts
 // only through the public API above, which posts commands to a small
 // single-slot queue and waits for the worker to finish. Call once at
-// app startup, before any PlayWavFile.
-void InitBgm();
+// app startup, before any PlayWavFile. Returns true on success, false
+// if any of the events / worker thread / worker init failed (callers
+// can warn the user that BGM will be unavailable).
+bool InitBgm();
 
 // Signals the BGM worker to exit and joins it, releasing the worker's
 // hidden notify window and synchronization primitives. Call at app

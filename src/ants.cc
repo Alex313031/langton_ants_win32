@@ -66,8 +66,11 @@ bool             g_place_mode        = false;
 int              g_placed_ants_count = 0;
 
 // Forward-declared so TogglePaintAnts can drain pending placements into
-// thread slots before re-arming the timer.
-static void ApplyPlacements();
+// thread slots before re-arming the timer. Returns true on success;
+// returns false when the inner SetNumAnts/EnsureThreadCount couldn't
+// resize the pool to match the placed-ant count, OR when called outside
+// place mode (nothing to apply).
+static bool ApplyPlacements();
 
 // Path/ant color chosen for contrast against the current background: white
 // unless the background is white or green, in which case black. Re-read on
@@ -431,8 +434,8 @@ void ReseedAnts(bool pulse) {
   }
 }
 
-void CustomSeedAnts(const unsigned int custom_seed) {
-  
+bool CustomSeedAnts(const unsigned int custom_seed) {
+  bool ok = true;
   // The custom seed is consumed inside AntThread's startup branch (srand),
   // never inside its tick loop, so applying a new seed means tearing down
   // every live ant thread and respawning the same number with the new seed
@@ -441,7 +444,10 @@ void CustomSeedAnts(const unsigned int custom_seed) {
   // playing, the timer is re-armed and the first tick fires immediately;
   // if the user was paused, the timer stays off and the new threads sit
   // on their tick events until the user presses play.
-  if (s_activeCount <= 0) return;
+  if (s_activeCount <= 0) {
+    LOG(ERROR) << L"No ant threads active, nothing to seed";
+    return false;
+  }
   const int desiredCount         = s_activeCount;
   const bool wasRunning          = !g_paused;
   // Place mode and Custom Seed are not mutually exclusive: when both are
@@ -527,7 +533,11 @@ void CustomSeedAnts(const unsigned int custom_seed) {
     s_slots[i].reseedRequest      = false;
     s_slots[i].placementRequested = false;
   }
-  EnsureThreadCount(desiredCount);
+  if (!EnsureThreadCount(desiredCount)) {
+    LOG(ERROR) << L"EnsureThreadCount(" << desiredCount
+               << L") failed during respawn — pool may be smaller than expected!";
+    ok = false;
+  }
 
   if (mainHwnd != nullptr) {
     InvalidateRect(mainHwnd, nullptr, FALSE);
@@ -541,6 +551,7 @@ void CustomSeedAnts(const unsigned int custom_seed) {
     SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr);
     SignalAntsTick();
   }
+  return ok;
 }
 
 void ShutdownAnts() {
@@ -573,15 +584,21 @@ void ShutdownAnts() {
 //
 // A "compatible" DC/bitmap mirrors the pixel format of the real window DC so
 // that BitBlt can copy between them without color conversion overhead.
-void RecreateBackBuffer(HWND hWnd, int cx, int cy) {
-  if (cx <= 0 || cy <= 0 || g_hdcMem == nullptr) return;
+bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
+  bool ok = true;
+  if (cx <= 0 || cy <= 0 || g_hdcMem == nullptr) {
+    LOG(ERROR) << L"Invalid input (cx=" << cx
+               << L", cy=" << cy
+               << L", g_hdcMem=" << (g_hdcMem ? L"set" : L"null") << L")";
+    return false;
+  }
   // Fast path: the existing bitmap already matches — keep it, no work,
   // no state loss. Common on restore-from-minimize without a resize.
   if (g_hbmMem != nullptr) {
     BITMAP bm = {};
     if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bm) &&
         bm.bmWidth == cx && bm.bmHeight == cy) {
-      return;
+      return true;  // existing buffer is already the right size
     }
   }
   // Slow path: dimensions changed, allocate a fresh bitmap. Borrow the
@@ -589,7 +606,11 @@ void RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   HDC hdcWin = GetDC(hWnd);
   HBITMAP hbmNew = CreateCompatibleBitmap(hdcWin, cx, cy);
   ReleaseDC(hWnd, hdcWin);
-  if (hbmNew == nullptr) return;
+  if (hbmNew == nullptr) {
+    LOG(ERROR) << L"CreateCompatibleBitmap(" << cx
+               << L"x" << cy << L") failed, out of GDI resources.";
+    return false;
+  }
 
   // Hold the lock while swapping the bitmap so the ant thread cannot draw into
   // g_hdcMem while we are replacing what it points at.
@@ -626,6 +647,7 @@ void RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   if (g_hbmMem != nullptr) DeleteObject(g_hbmMem);
   g_hbmMem = hbmNew;
   LeaveCriticalSection(&g_paintCS);
+  return ok;
 }
 
 // Rewrites every pixel in the back buffer that currently equals oldColor so
@@ -684,7 +706,8 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
   LeaveCriticalSection(&g_paintCS);
 }
 
-void SetNumAnts(const unsigned int num) {
+bool SetNumAnts(const unsigned int num) {
+  bool ok = true;
   unsigned int clamped = num;
   if (clamped > kMaxAntThreads) clamped = kMaxAntThreads;
   if (clamped == 0)             clamped = 1;
@@ -693,8 +716,13 @@ void SetNumAnts(const unsigned int num) {
   // match. Before ShowAnts there is nothing to resize — ShowAnts will spawn
   // the right number of threads using g_num_ants directly.
   if (g_running) {
-    EnsureThreadCount(static_cast<int>(clamped));
+    if (!EnsureThreadCount(static_cast<int>(clamped))) {
+      LOG(ERROR) << L"EnsureThreadCount(" << clamped
+                 << L") failed (CreateThread / CreateEvent inside ant thread pool grow path)";
+      ok = false;
+    }
   }
+  return ok;
 }
 
 bool ShowAnts() {
@@ -841,13 +869,21 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   return true;
 }
 
-static void ApplyPlacements() {
-  if (!g_place_mode) return;
+static bool ApplyPlacements() {
+  bool ok = true;
+  if (!g_place_mode) {
+    LOG(ERROR) << L"ApplyPlacements called outside place mode, nothing to apply";
+    return false;
+  }
   if (g_placed_ants_count > 0) {
     // The placed count becomes the new active ant count. SetNumAnts updates
     // g_num_ants and resizes the thread pool to match — the main.cc caller
     // refreshes the IDM_CONC_N menu radio after this returns.
-    SetNumAnts(static_cast<unsigned int>(g_placed_ants_count));
+    if (!SetNumAnts(static_cast<unsigned int>(g_placed_ants_count))) {
+      LOG(ERROR) << L"SetNumAnts(" << g_placed_ants_count
+                 << L") failed — placed ants may not all have a thread to drive them";
+      ok = false;
+    }
     for (int i = 0; i < g_placed_ants_count; i++) {
       s_slots[i].placeCellX        = s_placedAnts[i].cellX;
       s_slots[i].placeCellY        = s_placedAnts[i].cellY;
@@ -858,6 +894,7 @@ static void ApplyPlacements() {
   }
   g_placed_ants_count = 0;
   g_place_mode        = false;
+  return ok;
 }
 
 INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {

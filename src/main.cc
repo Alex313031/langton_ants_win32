@@ -125,7 +125,13 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // the 2-second loop re-issue) run off the main thread. Must come
   // before any PlayWavFile call; PostMessageW(WM_APP_AUTOPLAY) from
   // InitApp fires only after the message loop starts, well after this.
-  InitBgm();
+  // BGM init failure isn't fatal — the rest of the app still works,
+  // we just warn the user that audio won't be available.
+  if (!InitBgm()) {
+    ErrorBox(nullptr, L"BGM Initialization Error",
+             L"Failed to initialize the background music subsystem. "
+             L"Audio will be unavailable.");
+  }
 
   static constexpr DWORD exStyle =
 #if _WIN32_WINNT > 0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
@@ -215,13 +221,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // bitmap; RecreateBackBuffer (called on the first WM_SIZE) replaces it
       // with a full-size bitmap matched to the window.
       g_hdcMem = CreateCompatibleDC(nullptr);
-      // Build the toolbar before InitMenuDefaults so any future toolbar-driven
-      // default reading could work, and before InitApp so cyClient computed
-      // in the first WM_SIZE already excludes the toolbar height.
-      // CreateAppToolbar (utils.cc) stores the handle internally and sets
-      // g_toolbarHeight; we don't need the handle here.
-      CreateAppToolbar(hWnd, g_hInstance);
       InitMenuDefaults(hWnd);
+      // InitApp creates the toolbar (which sets g_toolbarHeight) and
+      // starts the simulation. Toolbar creation has to happen before the
+      // first WM_SIZE so cyClient is computed against the correct
+      // toolbar offset — InitApp is still called from inside WM_CREATE
+      // here, so any subsequent SetWindowPos / ShowWindow that triggers
+      // WM_SIZE will see a valid g_toolbarHeight.
       InitApp(hWnd);
       break;
     case WM_TIMER:
@@ -911,8 +917,19 @@ void ShutDownApp() {
 }
 
 bool InitApp(HWND hWnd) {
+  bool ok = false;
   if (hWnd == nullptr) {
     return false;
+  }
+  // Build the toolbar first so g_toolbarHeight is set before the first
+  // WM_SIZE. A failure here isn't fatal — the menu bar still drives
+  // every feature — so we warn the user and keep going.
+  if (!CreateAppToolbar(hWnd, g_hInstance)) {
+    ErrorBox(hWnd, L"Toolbar Creation Error",
+             L"Failed to create application toolbar. ");
+    ok = false;
+  } else {
+    ok = true;
   }
   // All settings (number of ants, delay, background color) are already set by
   // InitMenuDefaults.
@@ -927,7 +944,7 @@ bool InitApp(HWND hWnd) {
   // false, so it's RC-driven via InitMenuDefaults' IDM_SOUND read with
   // no extra branching here.
   PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
-  return true;
+  return ok;
 }
 
 bool LaunchHelp(HWND hWnd) {
