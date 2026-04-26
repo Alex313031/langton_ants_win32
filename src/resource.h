@@ -119,6 +119,7 @@
 // Toolbar button identifier for "Colors" button with drop down menu.
 #define IDM_COLORS                  267
 
+// Not in a UI menu, just keyboard accelerator
 #define IDM_UNDO                    268
 
 // Dev menu item, test debug trap

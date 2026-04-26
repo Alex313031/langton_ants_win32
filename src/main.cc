@@ -413,7 +413,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           SetPauseButton(g_paused);
           // Audio follows the simulation automatically: TogglePaintAnts
           // calls SyncBgm, which pauses the BGM whenever ants aren't
-          // running. The next Play resumes it via the same chokepoint.
+          // running. The next Play resumes it through the same call.
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
             RECT rc = { 0, 0, cxClient, cyClient };

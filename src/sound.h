@@ -19,7 +19,7 @@ inline constexpr bool kUseEmbeddedBgm = true;
 // User preference: true if the user wants sound enabled. Toggled by the
 // IDM_SOUND menu / toolbar button (via ToggleSound). Audio actually plays
 // only when this is true AND the simulation is running (!g_paused) — see
-// SyncBgm below for the chokepoint that enforces that invariant.
+// SyncBgm below; it's the one place that starts and stops audio.
 extern volatile bool g_playsound;
 
 // Plays a .wav file. On the first call, opens the file and starts playback
@@ -48,13 +48,13 @@ bool StopPlayWav();
 // attempt failed under the hood.
 bool ToggleSound();
 
-// The single chokepoint that brings actual MCI playback in line with the
-// invariant "audio plays if g_playsound && !g_paused". Idempotent — if
-// the desired state already matches the current MCI state, this is a
-// no-op. Call after any mutation of g_playsound or g_paused (and on
-// startup once the menu defaults are loaded). Returns true on success
-// (including no-op), false if a transition couldn't be applied (MCI
-// open/play failure on the play path).
+// The one place that starts or stops audio, so playback always matches
+// the rule "audio plays when g_playsound is true AND the sim isn't
+// paused". If audio is already in the right state, this does nothing.
+// Call after any change to g_playsound or g_paused (and once at startup,
+// after the menu defaults are loaded). Returns true on success (or when
+// nothing needed to change); returns false only when starting playback
+// failed (MCI open or play error).
 bool SyncBgm();
 
 // Spins up the BGM worker thread. The worker owns the MCI device

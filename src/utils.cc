@@ -585,7 +585,7 @@ void SetPauseButton(bool paused) {
   //   not paused           → "Pause"   (running, click to pause)
   //   paused, mid-run      → "Resume"  (was playing, click to continue)
   //   paused, fresh/stopped → "Play"   (no animation yet OR after IDM_STOP)
-  // Both paused variants use the play icon since both kick off the timer.
+  // Both paused variants use the play icon since both start the timer.
   const wchar_t* label;
   if (!paused) {
     label = L"Pause";

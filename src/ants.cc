@@ -158,8 +158,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     }
     // Color-only refresh (Monochrome toggle). Re-pick antColor from the
     // current g_monochrome and overpaint the ant's current cell so the
-    // new color is visible immediately (matters when paused — otherwise
-    // the next Langton step would surface it anyway). Position, dir and
+    // new color shows up immediately (matters when paused — otherwise
+    // the next Langton step would draw it anyway). Position, dir and
     // onBg are deliberately preserved — this mirrors how the background
     // colour menu only swaps pixels and never touches ant draw state.
     // cellX < 0 means we haven't placed yet; the next needsPlacement

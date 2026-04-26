@@ -11,8 +11,8 @@ volatile bool g_playsound = false;
 
 // Tracks whether MCI is currently playing (vs paused / stopped / unopened).
 // Main-thread only — written exclusively by SyncBgm/ToggleSound after the
-// PostBgmSync call has returned, so the worker never touches it. Used to
-// keep SyncBgm idempotent: if desired matches current, do nothing.
+// PostBgmSync call has returned, so the worker never touches it. Lets
+// SyncBgm skip the work when audio is already in the right state.
 static bool s_audio_playing = false;
 
 // ==========================================================================
@@ -401,8 +401,8 @@ bool StopPlayWav() {
 
 bool SyncBgm() {
   // Single source of truth: audio plays if the user wants it AND the
-  // simulation is currently running. Idempotent — if the desired state
-  // already matches s_audio_playing, do nothing.
+  // simulation is currently running. If audio is already in the right
+  // state, do nothing.
   const bool desired = g_playsound && !g_paused;
   if (desired == s_audio_playing) return true;
   if (desired) {
