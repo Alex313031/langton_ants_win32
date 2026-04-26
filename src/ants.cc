@@ -26,9 +26,38 @@ struct AntThreadSlot {
   HANDLE        hTickEvent       = nullptr; // auto-reset; SetEvent = "go draw"
   volatile bool exitRequested    = false;   // set true to make thread exit cleanly
   volatile bool reseedRequested  = false;   // set true to reroll position / color / dir
+  // Place-mode handoff: when placementRequested is set the thread adopts
+  // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
+  // a random direction, and skips the step (the marker is already painted on
+  // the canvas by PlaceAntAtClient). Cleared by the thread once consumed.
+  volatile bool placementRequested = false;
+  int           placeCellX        = 0;
+  int           placeCellY        = 0;
+  COLORREF      placeColor        = 0;
+  bool          placeOnBg         = true;
 };
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int           s_activeCount = 0;  // only touched from the main thread
+
+// --- Place-mode state -----------------------------------------------------
+// All touched from the main (UI) thread only — set when the user enters
+// place mode, populated by PlaceAntAtClient on each click, drained by
+// ApplyPlacements when the user resumes. Per-entry onBg is sampled BEFORE
+// we paint the ant marker so the thread that adopts this position knows
+// whether it started on background (turn right) or a path (turn left).
+struct PlacedAnt {
+  int      cellX;
+  int      cellY;
+  COLORREF color;
+  bool     onBg;
+};
+static PlacedAnt s_placedAnts[kMaxAntThreads];
+bool             g_place_mode        = false;
+int              g_placed_ants_count = 0;
+
+// Forward-declared so TogglePaintAnts can drain pending placements into
+// thread slots before re-arming the timer.
+static void ApplyPlacements();
 
 // Path/ant color chosen for contrast against the current background: white
 // unless the background is white or green, in which case black. Re-read on
@@ -42,8 +71,8 @@ static COLORREF CurrentPathColor() {
   return RGB_WHITE;
 }
 
-DWORD WINAPI AntThread(LPVOID pvoid) {
-  AntThreadSlot* slot = static_cast<AntThreadSlot*>(pvoid);
+DWORD WINAPI AntThread(LPVOID pvoid_in) {
+  AntThreadSlot* slot = static_cast<AntThreadSlot*>(pvoid_in);
   if (mainHwnd == nullptr || slot == nullptr) {
     return 0x00000001;
   }
@@ -57,9 +86,11 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
   //                   reverse = +2, all mod 4.
   // rand() on Win32 uses per-thread state, so srand'ing here seeds only
   // this thread's sequence. Mixing GetTickCount() with the thread ID keeps
-  // simultaneous starts distinct — otherwise the eight ants would spawn at
-  // the same cell facing the same way.
-  srand(static_cast<unsigned>(GetTickCount() ^ GetCurrentThreadId()));
+  // simultaneous starts distinct — otherwise all kMaxAntThreads ants would
+  // spawn at the same cell facing the same way.
+  DWORD seed;
+  seed = GetTickCount() ^ GetCurrentThreadId();
+  srand(static_cast<unsigned int>(seed));
   int cellX = -1, cellY = -1;
   int dir   = 0;
   // Per-ant marker color. Picked once at placement (see needsPlacement
@@ -94,6 +125,19 @@ DWORD WINAPI AntThread(LPVOID pvoid) {
     if (slot->reseedRequested) {
       slot->reseedRequested = false;
       cellX = -1;
+    }
+    // Place-mode handoff. The main thread painted the marker on the canvas
+    // already and recorded what was under it (placeOnBg), so we just adopt
+    // the position + color and skip stepping this tick — the next tick will
+    // do a normal Langton step from here. Direction is rolled per-ant.
+    if (slot->placementRequested) {
+      slot->placementRequested = false;
+      cellX    = slot->placeCellX;
+      cellY    = slot->placeCellY;
+      antColor = slot->placeColor;
+      onBg     = slot->placeOnBg;
+      dir      = rand() & 3;
+      continue;
     }
     if (cxClient == 0 || cyClient == 0) {
       continue; // Window is minimized or has no drawable canvas; wait.
@@ -488,8 +532,110 @@ void TogglePaintAnts(HWND hWnd) {
     KillTimer(hWnd, TIMER_ANTS);
     AntPauseBgm();
   } else {
+    // Drain any pending Custom-Seed placements into the thread slots before
+    // re-arming the tick so the very first tick after resume picks up the
+    // placed positions rather than the previous (random) ones.
+    if (g_place_mode) {
+      ApplyPlacements();
+    }
     AntResumeBgm();
     SignalAntsTick();
     SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
   }
+}
+
+void EnterPlaceMode() {
+  // Reset the placement list and arm the mode flag. Caller is responsible
+  // for pausing the simulation and clearing the canvas (matching the
+  // Custom-Seed semantic of "lay out a fresh field by hand").
+  // Seed the main thread's rand() once on entry so the first session of a
+  // run doesn't always produce the same color sequence — AntThread seeds
+  // its own threads but the main thread is otherwise unseeded.
+  srand(static_cast<unsigned>(GetTickCount()));
+  g_placed_ants_count = 0;
+  g_place_mode        = true;
+}
+
+void ExitPlaceMode() {
+  // Discard pending placements without applying them. The markers we already
+  // painted on the canvas stay put — they'll be overpainted by ant trails
+  // once the simulation resumes (or wiped by the next IDM_REPAINT).
+  g_placed_ants_count = 0;
+  g_place_mode        = false;
+}
+
+bool PlaceAntAtClient(int clientX, int clientY) {
+  if (!g_place_mode) return false;
+  if (g_placed_ants_count >= kMaxAntThreads) return false;
+  // Window-client → back-buffer coords (the toolbar lives at the top of the
+  // client area; the ants canvas starts below it).
+  const int bx = clientX;
+  const int by = clientY - g_toolbarHeight;
+  if (bx < 0 || by < 0) return false;
+
+  EnterCriticalSection(&g_paintCS);
+  if (g_hdcMem == nullptr || cxClient <= 0 || cyClient <= 0) {
+    LeaveCriticalSection(&g_paintCS);
+    return false;
+  }
+  const int gridW = cxClient / CELL_PX;
+  const int gridH = cyClient / CELL_PX;
+  if (gridW < 2 || gridH < 2) {
+    LeaveCriticalSection(&g_paintCS);
+    return false;
+  }
+  const int cellX = bx / CELL_PX;
+  const int cellY = by / CELL_PX;
+  if (cellX >= gridW || cellY >= gridH) {
+    LeaveCriticalSection(&g_paintCS);
+    return false;
+  }
+
+  const int px = cellX * CELL_PX;
+  const int py = cellY * CELL_PX;
+  // Sample the cell BEFORE we paint the marker — the thread that adopts
+  // this position needs to know whether it started on background (turn
+  // right next tick) or on a path (turn left). Same color set the AntThread
+  // uses for ants, so collision detection treats placed ants identically.
+  const COLORREF sampled = GetPixel(g_hdcMem, px, py);
+  const bool onBg = (sampled == g_bkg_color);
+  static const COLORREF kAntColors[3] = {
+    RGB_MAGENTA, RGB_CYAN, RGB_YELLOW,
+  };
+  const COLORREF antColor = kAntColors[rand() % 3];
+  RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+  HBRUSH hAnt = CreateSolidBrush(antColor);
+  FillRect(g_hdcMem, &rc, hAnt);
+  DeleteObject(hAnt);
+  LeaveCriticalSection(&g_paintCS);
+
+  s_placedAnts[g_placed_ants_count].cellX = cellX;
+  s_placedAnts[g_placed_ants_count].cellY = cellY;
+  s_placedAnts[g_placed_ants_count].color = antColor;
+  s_placedAnts[g_placed_ants_count].onBg  = onBg;
+  g_placed_ants_count++;
+
+  RECT inval = { px, py + g_toolbarHeight,
+                 px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+  InvalidateRect(mainHwnd, &inval, FALSE);
+  return true;
+}
+
+static void ApplyPlacements() {
+  if (!g_place_mode) return;
+  if (g_placed_ants_count > 0) {
+    // The placed count becomes the new active ant count. SetNumAnts updates
+    // g_num_ants and resizes the thread pool to match — the main.cc caller
+    // refreshes the IDM_CONC_N menu radio after this returns.
+    SetNumAnts(static_cast<unsigned int>(g_placed_ants_count));
+    for (int i = 0; i < g_placed_ants_count; i++) {
+      s_slots[i].placeCellX        = s_placedAnts[i].cellX;
+      s_slots[i].placeCellY        = s_placedAnts[i].cellY;
+      s_slots[i].placeColor        = s_placedAnts[i].color;
+      s_slots[i].placeOnBg         = s_placedAnts[i].onBg;
+      s_slots[i].placementRequested = true;
+    }
+  }
+  g_placed_ants_count = 0;
+  g_place_mode        = false;
 }

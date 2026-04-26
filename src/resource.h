@@ -18,6 +18,7 @@
 #define IDB_MUTE_BMP                109 /* "Mute" icon for toolbar strip, overwrites Speaker icon when needed */
 #define IDB_SAVE_BMP                110 /* "Save" icon for toolbar strip, floppy disk icon */
 #define IDB_TIME_BMP                111 /* "Speed" icon for toolbar strip, timer icon */
+#define IDB_CUSTOM_BMP              112 /* "Custom" icon for toolbar strip */
 
 /* Main application resource, also used to attach menu */
 #define IDR_MAIN                    120
@@ -58,7 +59,7 @@
 // Sound settings
 #define IDM_SOUND                   221
 
-// Ant drawing threads
+// Num. Ant drawing threads menu options
 #define IDM_CONC_1                  222
 #define IDM_CONC_2                  223
 #define IDM_CONC_3                  224
@@ -67,25 +68,53 @@
 #define IDM_CONC_6                  227
 #define IDM_CONC_7                  228
 #define IDM_CONC_8                  229
+#define IDM_CONC_9                  230
+#define IDM_CONC_10                 231
+#define IDM_CONC_11                 232
+#define IDM_CONC_12                 233
+#define IDM_CONC_13                 234
+#define IDM_CONC_14                 235
+#define IDM_CONC_15                 236
+#define IDM_CONC_16                 237
+#define IDM_CONC_17                 238
+#define IDM_CONC_18                 239
+#define IDM_CONC_19                 240
+#define IDM_CONC_20                 241
+#define IDM_CONC_21                 242
+#define IDM_CONC_22                 243
+#define IDM_CONC_23                 244
+#define IDM_CONC_24                 245
+#define IDM_CONC_25                 246
+#define IDM_CONC_26                 247
+#define IDM_CONC_27                 248
+#define IDM_CONC_28                 249
+#define IDM_CONC_29                 250
+#define IDM_CONC_30                 251
+#define IDM_CONC_31                 252
+#define IDM_CONC_32                 253
 
 // Forces painting a new canvas, with whatever settings it currently has
-#define IDM_REPAINT                 230
+#define IDM_REPAINT                 260
 
 // "Single step" through ant painting, allows you to run it manually one iteration at a time
 // instead of using timer
-#define IDM_SINGLE                  231
+#define IDM_SINGLE                  261
 
 // Toolbar button identifier for "Num Ants" button with submenu.
-#define IDM_ANTS                    232
+#define IDM_ANTS                    262
 
 // Toolbar button identifier for "Speed" button with submenu.
-#define IDM_SPEED                   233
+#define IDM_SPEED                   263
+
+// Toolbar button identifier for "Custom" button with submenu.
+#define IDM_CUSTOM                  264
+#define IDM_CUSTOMSEED              265
 
 // Dev menu item, test debug trap
-#define IDM_TESTTRAP                240
+#define IDM_TESTTRAP                270
 
 // Timer ID for painting
-#define TIMER_ANTS                  400
+#define TIMER_ANTS                  300
 
 // Embedded background-music WAV. Loaded as a user-defined "WAVE" resource
 // when kUseEmbeddedBgm is true (see utils.h). The RC file binds this ID

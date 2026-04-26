@@ -29,6 +29,7 @@ static int s_idxSound  = 0;
 static int s_idxMute   = 0;
 static int s_idxAnts   = 0;
 static int s_idxSpeed  = 0;
+static int s_idxCustom = 0;
 
 // Reads the CHECKED state of every menu group at startup and sets the
 // corresponding globals. This makes all defaults entirely RC-driven: changing
@@ -74,8 +75,8 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Concurrent ants — exactly one IDM_CONC_N must be CHECKED in the RC.
-  // IDs are consecutive (IDM_CONC_1..IDM_CONC_8) so we can probe them in a loop.
-  for (UINT id = IDM_CONC_1; id <= IDM_CONC_8; ++id) {
+  // IDs are consecutive (IDM_CONC_1..IDM_CONC_32) so we can probe them in a loop.
+  for (UINT id = IDM_CONC_1; id <= IDM_CONC_32; ++id) {
     if (GetMenuState(hConc, id, MF_BYCOMMAND) & MF_CHECKED) {
       SetNumAnts((id - IDM_CONC_1) + 1);
       break;
@@ -420,6 +421,9 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbab.nID = IDB_TIME_BMP;
   s_idxSpeed = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID = IDB_CUSTOM_BMP;
+  s_idxCustom = static_cast<int>(
+      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_SOUND_BMP;
   s_idxSound = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
@@ -438,7 +442,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
   //   dwData    — app-defined extra data we don't need
   //   iString   — tooltip/label text pointer (cast through INT_PTR)
-  TBBUTTON tbButtons[12] = {};
+  TBBUTTON tbButtons[13] = {};
 
   tbButtons[0].fsStyle   = TBSTYLE_SEP;
 
@@ -458,8 +462,8 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
 
   tbButtons[4].fsStyle   = TBSTYLE_SEP;
 
-  // Num Ants and Speed are deliberately adjacent with no separator — they
-  // form a single "simulation knobs" pair.
+  // Num Ants, Speed and Custom are deliberately adjacent with no separators
+  // — they form a single "simulation knobs" group.
   tbButtons[5].iBitmap   = s_idxAnts;
   tbButtons[5].idCommand = IDM_ANTS;
   tbButtons[5].fsState   = TBSTATE_ENABLED;
@@ -472,23 +476,29 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[6].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
   tbButtons[6].iString   = reinterpret_cast<INT_PTR>(L"Speed");
 
-  tbButtons[7].fsStyle   = TBSTYLE_SEP;
+  tbButtons[7].iBitmap   = s_idxCustom;
+  tbButtons[7].idCommand = IDM_CUSTOM;
+  tbButtons[7].fsState   = TBSTATE_ENABLED;
+  tbButtons[7].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Custom");
 
-  tbButtons[8].iBitmap   = s_idxSound;
-  tbButtons[8].idCommand = IDM_SOUND;
-  tbButtons[8].fsState   = TBSTATE_ENABLED;
-  tbButtons[8].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+  tbButtons[8].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[9].fsStyle   = TBSTYLE_SEP;
+  tbButtons[9].iBitmap   = s_idxSound;
+  tbButtons[9].idCommand = IDM_SOUND;
+  tbButtons[9].fsState   = TBSTATE_ENABLED;
+  tbButtons[9].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[10].iBitmap   = idxExit;
-  tbButtons[10].idCommand = IDM_EXIT;
-  tbButtons[10].fsState   = TBSTATE_ENABLED;
-  tbButtons[10].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[10].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+  tbButtons[10].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[11].fsStyle  = TBSTYLE_SEP;
+  tbButtons[11].iBitmap   = idxExit;
+  tbButtons[11].idCommand = IDM_EXIT;
+  tbButtons[11].fsState   = TBSTATE_ENABLED;
+  tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+
+  tbButtons[12].fsStyle  = TBSTYLE_SEP;
 
   SendMessageW(hTB, TB_ADDBUTTONS,
               sizeof(tbButtons) / sizeof(tbButtons[0]),
@@ -614,6 +624,9 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       break;
     case IDM_SPEED:
       text = L"Change crawl speed";
+      break;
+    case IDM_CUSTOM:
+      text = L"Custom seed: pause and place ants by clicking";
       break;
     case IDM_PAUSED:
       text = g_paused ? L"Resume Ants" : L"Pause Ants";

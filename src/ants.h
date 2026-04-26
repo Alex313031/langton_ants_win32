@@ -9,6 +9,17 @@ extern volatile UINT g_num_ants;
 
 extern unsigned long g_delay;
 
+// True while the user is "seeding" ants by clicking on the canvas (entered
+// via Settings → Custom → Custom Seed, or the IDM_CUSTOM toolbar dropdown).
+// While set, WM_LBUTTONDOWN places an ant at the click instead of starting
+// a window drag, and the simulation is paused. Cleared either by exiting
+// place mode or by ApplyPlacements() at resume time.
+extern bool g_place_mode;
+
+// How many ants the user has placed in the current place-mode session.
+// Capped at kMaxAntThreads — once it hits the cap, further clicks no-op.
+extern int g_placed_ants_count;
+
 // Back buffer for preserving ant paths
 extern HDC g_hdcMem;
 
@@ -16,10 +27,9 @@ extern HDC g_hdcMem;
 extern HBITMAP g_hbmMem;
 
 // Hard upper bound on concurrent ant threads. 8 matches the historical
-// Windows 2000 Server / Windows XP CPU-license limit — beyond that on a
-// weak 1-core box the drawing threads would just thrash the scheduler.
-// The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_8 matching this bound.
-#define kMaxAntThreads 8
+// Windows 2000 Server/XP+ cores limit. 32 is a reasonable limit for modern machines.
+// The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_32 matching this bound.
+inline constexpr int kMaxAntThreads = static_cast<int>(32u);
 
 // Size of one logical ant "pixel" in real hardware pixels. An ant occupies
 // a CELL_PX × CELL_PX square and every path mark quantizes to the same
@@ -32,7 +42,7 @@ inline constexpr int CELL_PX = 6;
 // updates ant location once per tick. The ant-thread pool can be grown or shrunk at
 // runtime (see EnsureThreadCount) so we never have more threads alive than
 // the user asked for via the Num Ants menu.
-DWORD WINAPI AntThread(LPVOID pvoid);
+DWORD WINAPI AntThread(LPVOID pvoid_in);
 
 // Resizes the ant-thread pool to exactly `targetCount` live threads, spawning
 // new ones or terminating excess ones as needed. Clamps to [1, kMaxAntThreads].
@@ -50,6 +60,9 @@ void SignalAntsTick();
 // Also pulses the tick events so the reseed actually runs even when
 // the simulation is currently paused.
 void ReseedAnts();
+
+
+void CustomSeedAnts(const unsigned int custom_seed);
 
 // Terminates all ant threads and closes their events/the timer. Called from
 // WM_DESTROY; safe to call more than once.
@@ -70,5 +83,21 @@ bool ShowAnts();
 
 // Pauses/resumes painting, for i.e. taking a snapshot, or showing a friend the current state.
 void TogglePaintAnts(HWND hWnd);
+
+// Enters "place ants" mode: clears any pending placement list and sets
+// g_place_mode = true. Caller is responsible for ensuring the simulation
+// is paused (and clearing the canvas, if desired) before calling.
+void EnterPlaceMode();
+
+// Exits place mode without applying any pending placements. Used when the
+// user toggles Custom Seed off, or hits Repaint Now mid-placement.
+void ExitPlaceMode();
+
+// Places an ant at the given window-client coordinates if in place mode and
+// not already at kMaxAntThreads. Paints the ant marker (random pick from
+// {magenta, cyan, yellow}) into the back buffer, samples the underlying
+// pixel to record onBg, and appends to the placement list. Returns true if
+// a placement was made.
+bool PlaceAntAtClient(int clientX, int clientY);
 
 #endif // LANGTON_ANTS_ANTS_H

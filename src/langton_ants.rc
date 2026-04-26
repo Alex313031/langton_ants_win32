@@ -41,6 +41,7 @@ IDB_EXIT_BMP   BITMAP "res/exit.bmp"
 IDB_SOUND_BMP  BITMAP "res/sound.bmp"
 IDB_MUTE_BMP   BITMAP "res/nosound.bmp"
 IDB_TIME_BMP   BITMAP "res/timer.bmp"
+IDB_CUSTOM_BMP BITMAP "res/custom.bmp"
 
 // Embedded background music as a user-defined "WAVE" resource. The type
 // keyword `WAVE` is a convention (not a system RT_ id) — FindResourceW
@@ -92,27 +93,51 @@ BEGIN
     POPUP "&Settings"
     BEGIN
         MENUITEM "&Pause Ants",   IDM_PAUSED
-        MENUITEM "&Sound?",       IDM_SOUND, CHECKED
+        MENUITEM "&Sound?",       IDM_SOUND
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN
-            MENUITEM "1 Thread",  IDM_CONC_1
-            MENUITEM "2 Threads", IDM_CONC_2
-            MENUITEM "3 Threads", IDM_CONC_3, CHECKED
-            MENUITEM "4 Threads", IDM_CONC_4
-            MENUITEM "5 Threads", IDM_CONC_5
-            MENUITEM "6 Threads", IDM_CONC_6
-            MENUITEM "7 Threads", IDM_CONC_7
-            MENUITEM "8 Threads", IDM_CONC_8
+            MENUITEM "1  Thread",  IDM_CONC_1
+            MENUITEM "2  Threads", IDM_CONC_2
+            MENUITEM "3  Threads", IDM_CONC_3, CHECKED
+            MENUITEM "4  Threads", IDM_CONC_4
+            MENUITEM "5  Threads", IDM_CONC_5
+            MENUITEM "6  Threads", IDM_CONC_6
+            MENUITEM "7  Threads", IDM_CONC_7
+            MENUITEM "8  Threads", IDM_CONC_8
+            MENUITEM "9  Threads", IDM_CONC_9
+            MENUITEM "10 Threads", IDM_CONC_10
+            MENUITEM "11 Threads", IDM_CONC_11
+            MENUITEM "12 Threads", IDM_CONC_12
+            MENUITEM "13 Threads", IDM_CONC_13
+            MENUITEM "14 Threads", IDM_CONC_14
+            MENUITEM "15 Threads", IDM_CONC_15
+            MENUITEM "16 Threads", IDM_CONC_16
+            MENUITEM "17 Threads", IDM_CONC_17
+            MENUITEM "18 Threads", IDM_CONC_18
+            MENUITEM "19 Threads", IDM_CONC_19
+            MENUITEM "20 Threads", IDM_CONC_20
+            MENUITEM "21 Threads", IDM_CONC_21
+            MENUITEM "22 Threads", IDM_CONC_22
+            MENUITEM "23 Threads", IDM_CONC_23
+            MENUITEM "24 Threads", IDM_CONC_24
+            MENUITEM "25 Threads", IDM_CONC_25
+            MENUITEM "26 Threads", IDM_CONC_26
+            MENUITEM "27 Threads", IDM_CONC_27
+            MENUITEM "28 Threads", IDM_CONC_28
+            MENUITEM "29 Threads", IDM_CONC_29
+            MENUITEM "30 Threads", IDM_CONC_30
+            MENUITEM "31 Threads", IDM_CONC_31
+            MENUITEM "32 Threads", IDM_CONC_32
         END
         MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
-            MENUITEM "&Slow        (250 ms.)",  IDM_SLOW
-            MENUITEM "&Medium   (125 ms.)",     IDM_MEDIUM
+            MENUITEM "&Slow        (250 ms.)", IDM_SLOW
+            MENUITEM "&Medium   (125 ms.)",    IDM_MEDIUM
             MENUITEM "&Fast        (33 ms.)",  IDM_FAST, CHECKED
             MENUITEM "&Hyper      (16 ms.)",   IDM_HYPER
-            MENUITEM "&Realtime  (1 ms.)",      IDM_REALTIME
+            MENUITEM "&Realtime  (1 ms.)",     IDM_REALTIME
         END
         MENUITEM SEPARATOR
         MENUITEM "&Use MonoChrome", IDM_MONOCHROME
@@ -125,11 +150,15 @@ BEGIN
             MENUITEM "&Green", IDM_GREEN_BKG
             MENUITEM "&Blue",  IDM_BLUE_BKG
         END
+        POPUP "&Custom"
+        BEGIN
+            MENUITEM "Custom &Seed", IDM_CUSTOMSEED
+        END
     END
     POPUP "&Dev"
     BEGIN
         MENUITEM "&Repaint Now",         IDM_REPAINT
-        MENUITEM "&Single Step Drawing", IDM_SINGLE
+        MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
         MENUITEM "&Test Trap",           IDM_TESTTRAP
     END
     POPUP "&About"

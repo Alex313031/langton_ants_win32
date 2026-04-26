@@ -341,6 +341,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                          pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
+        if (pnmtb->iItem == IDM_CUSTOM) {
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCustom   = GetSubMenu(hSettings, 9);
+          TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN,
+                         pt.x, pt.y, 0, hWnd, nullptr);
+          return TBDDRET_DEFAULT;
+        }
       }
       break;
     }
@@ -378,6 +385,31 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
           break;
         }
+        case IDM_CUSTOM: {
+          // Button-body click on the Custom split button always re-enters
+          // place mode from a clean slate: pause if not paused, wipe the
+          // canvas, and reset the placement list — discarding any ants
+          // dropped during a prior, un-resumed placement session. The
+          // dropdown arrow still pops up the &Custom submenu via
+          // TBN_DROPDOWN above; only the button body triggers this path.
+          if (!g_paused) {
+            TogglePaintAnts(hWnd);
+            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
+            SetPauseButton(g_paused);
+          }
+          EnterCriticalSection(&g_paintCS);
+          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+            RECT rc = { 0, 0, cxClient, cyClient };
+            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+            FillRect(g_hdcMem, &rc, hBrush);
+            DeleteObject(hBrush);
+          }
+          LeaveCriticalSection(&g_paintCS);
+          EnterPlaceMode();
+          InvalidateRect(hWnd, nullptr, FALSE);
+          break;
+        }
         case IDM_SOUND: {
           if (ToggleSound()) {
             // Only update check state if toggling sound on/off succeeded.
@@ -390,6 +422,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_PAUSED: {
+          // If we're about to resume out of place mode the placements get
+          // drained inside TogglePaintAnts and g_num_ants may shrink to the
+          // placed count — track that here so we can refresh the Num Ants
+          // radio after the toggle.
+          const bool drainedPlacements = (g_paused && g_place_mode);
           TogglePaintAnts(hWnd);
           // Reflect the new paused state in the menu check mark.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
@@ -397,6 +434,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                         MF_BYCOMMAND | (g_paused ? MF_CHECKED : MF_UNCHECKED));
           // Mirror the state on the toolbar: swap icon + label.
           SetPauseButton(g_paused);
+          if (drainedPlacements && g_num_ants >= 1 && g_num_ants <= kMaxAntThreads) {
+            HMENU hConc = GetSubMenu(hSettings, 3);
+            CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32,
+                               IDM_CONC_1 + (g_num_ants - 1), MF_BYCOMMAND);
+          }
           break;
         }
         case IDM_SINGLE: {
@@ -427,7 +469,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // reseed every ant so their positions, directions, and marker
           // colors all reroll on the next tick. All user settings (speed,
           // num ants, monochrome, etc.) stay intact — only the runtime
-          // per-ant state resets.
+          // per-ant state resets. If the user was mid-placement, abandon it
+          // — REPAINT and Custom Seed are mutually exclusive intents.
+          if (g_place_mode) ExitPlaceMode();
           EnterCriticalSection(&g_paintCS);
           if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
             RECT rc = { 0, 0, cxClient, cyClient };
@@ -447,12 +491,36 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CONC_5:
         case IDM_CONC_6:
         case IDM_CONC_7:
-        case IDM_CONC_8: {
+        case IDM_CONC_8:
+        case IDM_CONC_9:
+        case IDM_CONC_10:
+        case IDM_CONC_11:
+        case IDM_CONC_12:
+        case IDM_CONC_13:
+        case IDM_CONC_14:
+        case IDM_CONC_15:
+        case IDM_CONC_16:
+        case IDM_CONC_17:
+        case IDM_CONC_18:
+        case IDM_CONC_19:
+        case IDM_CONC_20:
+        case IDM_CONC_21:
+        case IDM_CONC_22:
+        case IDM_CONC_23:
+        case IDM_CONC_24:
+        case IDM_CONC_25:
+        case IDM_CONC_26:
+        case IDM_CONC_27:
+        case IDM_CONC_28:
+        case IDM_CONC_29:
+        case IDM_CONC_30:
+        case IDM_CONC_31:
+        case IDM_CONC_32: {
           // Consecutive IDs let us derive the count directly from the command.
           SetNumAnts((command - IDM_CONC_1) + 1);
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hConc     = GetSubMenu(hSettings, 3);
-          CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_8, command, MF_BYCOMMAND);
+          CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32, command, MF_BYCOMMAND);
           break;
         }
         case IDM_MONOCHROME: {
@@ -535,12 +603,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               g_delay = g_default_speed;
               break;
           }
-          // Replace the timer with the new interval. SetTimer on an existing ID
-          // replaces it in place — the next tick will be at the new rate.
-          SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
-          // Pulse every active thread once so they stop waiting on the old
-          // interval — the next WM_TIMER tick will then fire at the new rate.
-          SignalAntsTick();
+          // Replace the timer with the new interval — but only if the
+          // simulation is currently running. If we're paused (including
+          // mid-Custom-placement before any ants are dropped) the timer
+          // is intentionally off, and re-arming it here would silently
+          // resume the simulation behind the user's back. The new
+          // g_delay is still saved above, so the next resume picks it up.
+          if (!g_paused) {
+            SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
+            // Pulse every active thread once so they stop waiting on the
+            // old interval — the next WM_TIMER tick fires at the new rate.
+            SignalAntsTick();
+          }
           break;
         }
         case IDM_TESTTRAP:
@@ -561,6 +635,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       }
     } break;
     case WM_LBUTTONDOWN:
+      // In Custom place mode the left-click drops an ant at the cursor cell
+      // (up to kMaxAntThreads total) instead of starting a window drag.
+      if (g_place_mode) {
+        PlaceAntAtClient(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        break;
+      }
       // Default behavior: left-click drag moves the window.
       ReleaseCapture();
       SendMessageW(hWnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
