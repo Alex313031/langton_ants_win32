@@ -25,6 +25,8 @@
 
 /* Dialogs */
 #define IDD_ABOUTDLG                130
+#define IDD_CUSTOMDLG               131
+#define IDC_CUSTOMSEED              132
 
 /* Menu items */
 #define IDM_ABOUT                   200
@@ -108,7 +110,8 @@
 
 // Toolbar button identifier for "Custom" button with submenu.
 #define IDM_CUSTOM                  264
-#define IDM_CUSTOMSEED              265
+#define IDM_CUSTOMPLACE             265
+#define IDM_CUSTOMSEED              266
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                270

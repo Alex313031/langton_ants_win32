@@ -7,6 +7,8 @@
 extern int cxClient;
 extern int cyClient;
 
+extern HINSTANCE g_hInstance; // This program instance, everything descends from this
+
 extern HWND mainHwnd; // Our main window handle
 
 extern volatile bool g_running; // Controlling ants threads state

@@ -24,8 +24,8 @@ unsigned long g_delay = kHyperSpeed; // Default until InitMenuDefaults reads the
 struct AntThreadSlot {
   HANDLE        hThread          = nullptr;
   HANDLE        hTickEvent       = nullptr; // auto-reset; SetEvent = "go draw"
-  volatile bool exitRequested    = false;   // set true to make thread exit cleanly
-  volatile bool reseedRequested  = false;   // set true to reroll position / color / dir
+  volatile bool exitRequest    = false;   // set true to make thread exit cleanly
+  volatile bool reseedRequest  = false;   // set true to reroll position / color / dir
   // Place-mode handoff: when placementRequested is set the thread adopts
   // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
   // a random direction, and skips the step (the marker is already painted on
@@ -35,6 +35,8 @@ struct AntThreadSlot {
   int           placeCellY        = 0;
   COLORREF      placeColor        = 0;
   bool          placeOnBg         = true;
+  volatile bool customSeedRequest = false; // Whether to use custom seed for seeding randomization
+  UINT          customSeed        = 0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
 };
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int           s_activeCount = 0;  // only touched from the main thread
@@ -89,7 +91,11 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // simultaneous starts distinct — otherwise all kMaxAntThreads ants would
   // spawn at the same cell facing the same way.
   DWORD seed;
-  seed = GetTickCount() ^ GetCurrentThreadId();
+  if (slot->customSeedRequest) {
+    seed = static_cast<DWORD>(slot->customSeed) ^ GetCurrentThreadId();
+  } else {
+    seed = GetTickCount() ^ GetCurrentThreadId();
+  }
   srand(static_cast<unsigned int>(seed));
   int cellX = -1, cellY = -1;
   int dir   = 0;
@@ -117,13 +123,13 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     }
     // Two exit paths: global shutdown OR this individual slot was asked to die
     // (EnsureThreadCount shrinking the pool).
-    if (!g_running || slot->exitRequested) break;
+    if (!g_running || slot->exitRequest) break;
     // Main thread may have requested a reseed (IDM_REPAINT). Clearing
     // cellX triggers the needsPlacement branch below, which rerolls
     // position, direction, and marker color from the current rand()
     // state — so each reseed produces a fresh layout.
-    if (slot->reseedRequested) {
-      slot->reseedRequested = false;
+    if (slot->reseedRequest) {
+      slot->reseedRequest = false;
       cellX = -1;
     }
     // Place-mode handoff. The main thread painted the marker on the canvas
@@ -280,7 +286,7 @@ bool EnsureThreadCount(int targetCount) {
   // Grow: spawn new slots up to targetCount.
   while (s_activeCount < targetCount) {
     const int i = s_activeCount;
-    s_slots[i].exitRequested = false;
+    s_slots[i].exitRequest = false;
     s_slots[i].hTickEvent    = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     if (s_slots[i].hTickEvent == nullptr) return false;
     s_slots[i].hThread = CreateThread(nullptr, 0, AntThread, &s_slots[i], 0, nullptr);
@@ -298,11 +304,11 @@ bool EnsureThreadCount(int targetCount) {
   }
 
   // Shrink: ask the highest-indexed threads to exit, one by one. The thread
-  // can only observe exitRequested after a wake, so we SetEvent to force it
+  // can only observe exitRequest after a wake, so we SetEvent to force it
   // to run the check. Then join and clean up.
   while (s_activeCount > targetCount) {
     const int i = s_activeCount - 1;
-    s_slots[i].exitRequested = true;
+    s_slots[i].exitRequest = true;
     SetEvent(s_slots[i].hTickEvent);
     WaitForSingleObject(s_slots[i].hThread, INFINITE);
     CloseHandle(s_slots[i].hThread);
@@ -331,10 +337,98 @@ void ReseedAnts() {
   // when paused — otherwise the ants would sit in their old positions
   // until the user unpaused, which defeats the "Repaint now" intent.
   for (int i = 0; i < s_activeCount; i++) {
-    s_slots[i].reseedRequested = true;
+    s_slots[i].reseedRequest = true;
+    s_slots[i].customSeedRequest = false;
     if (s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
+  }
+}
+
+void CustomSeedAnts(const unsigned int custom_seed) {
+  // The custom seed is consumed inside AntThread's startup branch (srand),
+  // never inside its tick loop, so applying a new seed means tearing down
+  // every live ant thread and respawning the same number with the new seed
+  // staged on their slots. The canvas is wiped so the new seed's output
+  // starts from a clean state. Pause state is preserved: if the user was
+  // playing, the timer is re-armed and the first tick fires immediately;
+  // if the user was paused, the timer stays off and the new threads sit
+  // on their tick events until the user presses play.
+  if (s_activeCount <= 0) return;
+  const int desiredCount         = s_activeCount;
+  const bool wasRunning          = !g_paused;
+
+  // Place mode and Custom Seed are mutually exclusive intents — abandon
+  // any pending placements so they don't smash the seed-rolled layout the
+  // moment the user resumes.
+  if (g_place_mode) {
+    ExitPlaceMode();
+  }
+
+  // Stop the timer for the duration of the respawn so no stray WM_TIMER
+  // pulses arrive between teardown and the new threads being ready.
+  if (mainHwnd != nullptr) {
+    KillTimer(mainHwnd, TIMER_ANTS);
+  }
+
+  // Tear down every live thread. Mirrors the loop in ShutdownAnts but
+  // leaves g_running = true so the freshly-spawned threads below don't
+  // immediately exit on their first tick.
+  for (int i = 0; i < s_activeCount; i++) {
+    s_slots[i].exitRequest = true;
+    if (s_slots[i].hTickEvent != nullptr) {
+      SetEvent(s_slots[i].hTickEvent);
+    }
+  }
+  for (int i = 0; i < s_activeCount; i++) {
+    if (s_slots[i].hThread != nullptr) {
+      WaitForSingleObject(s_slots[i].hThread, INFINITE);
+      CloseHandle(s_slots[i].hThread);
+      s_slots[i].hThread = nullptr;
+    }
+    if (s_slots[i].hTickEvent != nullptr) {
+      CloseHandle(s_slots[i].hTickEvent);
+      s_slots[i].hTickEvent = nullptr;
+    }
+  }
+  s_activeCount = 0;
+
+  // Wipe the back buffer to the current background color so the new seed's
+  // layout starts from a clean canvas (matching the user's expectation that
+  // changing the seed "repaints the whole thing").
+  EnterCriticalSection(&g_paintCS);
+  if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+    RECT rc = { 0, 0, cxClient, cyClient };
+    HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+    FillRect(g_hdcMem, &rc, hBrush);
+    DeleteObject(hBrush);
+  }
+  LeaveCriticalSection(&g_paintCS);
+
+  // Stage the seed on the slot scratch fields BEFORE EnsureThreadCount
+  // creates the threads — AntThread reads customSeedRequest in its
+  // startup block, picks up customSeed, and srand's its per-thread rand()
+  // from it. Reset the other request flags too so a stale placement /
+  // reseed from a prior session can't fire on the very first tick.
+  for (int i = 0; i < desiredCount; i++) {
+    s_slots[i].customSeedRequest  = true;
+    s_slots[i].customSeed         = custom_seed;
+    s_slots[i].reseedRequest      = false;
+    s_slots[i].placementRequested = false;
+  }
+  EnsureThreadCount(desiredCount);
+
+  if (mainHwnd != nullptr) {
+    InvalidateRect(mainHwnd, nullptr, FALSE);
+  }
+
+  // Restore the simulation's previous play state. If the user was running,
+  // re-arm the timer and pulse so the first tick happens immediately
+  // rather than waiting up to g_delay ms. If the user was paused, leave
+  // the timer off — the threads sit on their tick events until resume.
+  if (wasRunning && mainHwnd != nullptr) {
+    SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr);
+    SignalAntsTick();
   }
 }
 
@@ -638,4 +732,53 @@ static void ApplyPlacements() {
   }
   g_placed_ants_count = 0;
   g_place_mode        = false;
+}
+
+INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+  UNREFERENCED_PARAMETER(lParam);
+  switch (message) {
+    case WM_INITDIALOG:
+      // Set icon in titlebar of about dialog
+      static const HICON kCustomIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(IDI_SMALL));
+      SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kCustomIcon);
+      SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kCustomIcon);
+      return TRUE;
+    case WM_CLOSE:
+      EndDialog(hDlg, TRUE);
+      return TRUE;
+    case WM_COMMAND: {
+      const int cmd = LOWORD(wParam);
+      switch (cmd) {
+        case IDCANCEL:
+          EndDialog(hDlg, IDCANCEL);
+          return TRUE;
+        case IDOK: {
+          // 32 chars is plenty — UINT_MAX in decimal is 10 digits, plus
+          // null terminator. ValidateCustomSeed already enforces all-digit
+          // input no greater than INT_MAX.
+          wchar_t buf[32] = {};
+          GetDlgItemTextW(hDlg, IDC_CUSTOMSEED, buf,
+                          sizeof(buf) / sizeof(buf[0]));
+          if (!ValidateCustomSeed(buf)) {
+            ErrorBox(hDlg, L"Custom Seed Validation Error",
+                     L"Invalid input — must be a positive integer.");
+            // Re-focus the edit so the user can correct without retabbing.
+            // Dialog stays open (return TRUE without EndDialog).
+            SetFocus(GetDlgItem(hDlg, IDC_CUSTOMSEED));
+            return TRUE;
+          }
+          const unsigned long seed = wcstoul(buf, nullptr, 10);
+          CustomSeedAnts(static_cast<unsigned int>(seed));
+          EndDialog(hDlg, IDOK);
+          return TRUE;
+        }
+        case IDC_CUSTOMSEED:
+          LOG(DEBUG) << L"IDC_CUSTOMSEED interacted";
+          break;
+      }
+    } break;
+    default:
+      break;
+  }
+  return FALSE;
 }

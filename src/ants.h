@@ -61,7 +61,7 @@ void SignalAntsTick();
 // the simulation is currently paused.
 void ReseedAnts();
 
-
+// Use a custom seed for the ants
 void CustomSeedAnts(const unsigned int custom_seed);
 
 // Terminates all ant threads and closes their events/the timer. Called from
@@ -99,5 +99,8 @@ void ExitPlaceMode();
 // pixel to record onBg, and appends to the placement list. Returns true if
 // a placement was made.
 bool PlaceAntAtClient(int clientX, int clientY);
+
+// For "Custom Seed" dialog box
+INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
 #endif // LANGTON_ANTS_ANTS_H

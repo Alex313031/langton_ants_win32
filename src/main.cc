@@ -12,7 +12,7 @@
 
 HWND mainHwnd = nullptr;
 
-static HINSTANCE g_hInstance = nullptr;
+HINSTANCE g_hInstance = nullptr;
 
 int cxClient = 0;
 int cyClient = 0;
@@ -408,6 +408,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           LeaveCriticalSection(&g_paintCS);
           EnterPlaceMode();
           InvalidateRect(hWnd, nullptr, FALSE);
+          break;
+        }
+        case IDM_CUSTOMSEED: {
+          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMDLG), hWnd, CustomDlgProc);
           break;
         }
         case IDM_SOUND: {

@@ -150,9 +150,10 @@ BEGIN
             MENUITEM "&Green", IDM_GREEN_BKG
             MENUITEM "&Blue",  IDM_BLUE_BKG
         END
-        POPUP "&Custom"
+        POPUP "&Customize"
         BEGIN
-            MENUITEM "Custom &Seed", IDM_CUSTOMSEED
+            MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
+            MENUITEM "Custom &Seed",           IDM_CUSTOMSEED
         END
     END
     POPUP "&Dev"
@@ -199,11 +200,29 @@ BEGIN
     DEFPUSHBUTTON   "OK", IDOK, 50, 35, 40, 14, WS_TABSTOP
 END
 
+IDD_CUSTOMDLG DIALOGEX 7, 7, 132, 56
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_DLGFRAME
+CAPTION "Choose Custom Seed"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT         "Integer Ant Start Seed:", IDC_STATIC, 7, 7, 116, 10, SS_NOPREFIX
+    EDITTEXT      IDC_CUSTOMSEED, 7, 20, 60, 14, ES_LEFT | WS_BORDER | WS_TABSTOP | WS_HSCROLL
+    PUSHBUTTON    "OK", IDOK, 25, 35, 40, 14, WS_TABSTOP
+    DEFPUSHBUTTON "Cancel", IDCANCEL, 70, 35, 40, 14, WS_TABSTOP
+END
+
 // Dialog DESIGNINFO
 #ifdef APSTUDIO_INVOKED
 GUIDELINES DESIGNINFO
 BEGIN
     IDD_ABOUTDLG, DIALOG
+    BEGIN
+        LEFTMARGIN,   0
+        RIGHTMARGIN,  132
+        TOPMARGIN,    0
+        BOTTOMMARGIN, 56
+    END
+    IDD_CUSTOMDLG, DIALOG
     BEGIN
         LEFTMARGIN,   7
         RIGHTMARGIN,  125
@@ -231,7 +250,7 @@ BEGIN
     BEGIN
         BLOCK "040904B0" // 0x0409 = US English, 0x04B0 = Unicode (1200)
         BEGIN
-            VALUE "Comments", "https://github.com/Alex313031/langtons_ants_win32\0"
+            VALUE "Comments", "https://github.com/Alex313031/langton_ants_win32\0"
             VALUE "CompanyName", "Alex313031\0"
             VALUE "FileDescription", "Win32 Langton's Ants Demonstration\0"
             VALUE "FileVersion", VERSION_STRING

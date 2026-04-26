@@ -626,7 +626,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = L"Change crawl speed";
       break;
     case IDM_CUSTOM:
-      text = L"Custom seed: pause and place ants by clicking";
+      text = L"Customize ant placement and starting \"seed\"";
       break;
     case IDM_PAUSED:
       text = g_paused ? L"Resume Ants" : L"Pause Ants";
@@ -638,4 +638,35 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
   }
   pdi->lpszText = const_cast<LPWSTR>(text);
   return true;
+}
+
+bool ValidateCustomSeed(LPCWSTR cSeed) {
+  bool is_valid = false;
+  // nullptr check first so the *cSeed dereference below is safe.
+  if (cSeed == nullptr || *cSeed == L'\0') {
+    return false; // Early fail on null pointer or empty string.
+  }
+  // Check that all characters are digits
+  for (const wchar_t* p = cSeed; *p != L'\0'; ++p) {
+    if (*p < L'0' || *p > L'9') {
+      return false;
+    }
+  }
+  // Convert to integer. wcstol is the standard wide-string variant
+  // (wcstoi is non-standard and missing under MinGW/Clang). long is wider
+  // than int on every Windows toolchain we target, so the INT_MAX bound
+  // check below still catches the same overflow cases as before.
+  wchar_t* end;
+  const long seedValue = wcstol(cSeed, &end, 10);
+  // Check conversion was successful (end should point to null terminator)
+  if (*end != L'\0') {
+    return false;
+  }
+  if (seedValue == 0) {
+    LOG(WARN) << L"Custom seed value was 0";
+    is_valid = false;
+  } else {
+     is_valid = (seedValue > 0 && seedValue <= INT_MAX);
+  }
+  return is_valid;
 }
