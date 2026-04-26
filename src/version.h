@@ -70,7 +70,7 @@
 // Adhere to semver > semver.org
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define BUILD_VERSION 1
+#define BUILD_VERSION 2
 
 // String constants
 #define VERSION_STRING _VERSION(MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION)
@@ -81,15 +81,15 @@
 #define COMMENTS        L"https://github.com/Alex313031/langton_ants_win32" // Project GitHub URL
 #define COMPANYNAME     L"Alex313031" // My developer name
 #define FILE_DESCRIPT   L"Win32 Langton's Ants Demonstration" // File description
-#define INTERNAL_NAME   L"lang_ants" // "Internal" name, also used for .exe name
+#define INTERNAL_NAME   L"langton_ants" // "Internal" name, also used for .exe name
 #define ORIG_FILENAME   INTERNAL_NAME L".exe" // Generated .exe file name
 #define PRODUCT_NAME    APP_NAME // Product name
 #define TRADEMARKS      L"BSD-3" // License
 #define LEGAL_COPYRIGHT L"\251 2026 Alex313031" // \251 is the © symbol
 
 #define ABOUT_TITLE     L"About " APP_NAME
-#define ABOUT_VERSION   INTERNAL_NAME L" ver. " VERSION_STRING
 #define ABOUT_CONTENT   L"Langton's Ants for Win32"
+#define ABOUT_VERSION   INTERNAL_NAME L" v" VERSION_STRING
 #define ABOUT_COPYRIGHT LEGAL_COPYRIGHT
 
 #ifndef _PACKVERSION

@@ -885,6 +885,40 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   return true;
 }
 
+bool UndoLastPlacement() {
+  bool ok = true;
+  if (!g_place_mode) {
+    LOG(ERROR) << L"UndoLastPlacement: called outside place mode";
+    return false;
+  }
+  if (g_placed_ants_count <= 0) {
+    LOG(ERROR) << L"UndoLastPlacement: no placements to undo";
+    return false;
+  }
+  // Pop the last placement and erase its marker. Place mode always
+  // starts from a wiped canvas (IDM_CUSTOMPLACE handler), so every
+  // placement cell sits over background — repainting with g_bkg_color
+  // restores the cell to its pre-click state.
+  const int idx   = g_placed_ants_count - 1;
+  const int cellX = s_placedAnts[idx].cellX;
+  const int cellY = s_placedAnts[idx].cellY;
+  const int px    = cellX * CELL_PX;
+  const int py    = cellY * CELL_PX;
+  EnterCriticalSection(&g_paintCS);
+  if (g_hdcMem != nullptr) {
+    RECT rc = { px, py, px + CELL_PX, py + CELL_PX };
+    HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
+    FillRect(g_hdcMem, &rc, hBrush);
+    DeleteObject(hBrush);
+  }
+  LeaveCriticalSection(&g_paintCS);
+  g_placed_ants_count--;
+  RECT inval = { px, py + g_toolbarHeight,
+                 px + CELL_PX, py + CELL_PX + g_toolbarHeight };
+  InvalidateRect(mainHwnd, &inval, FALSE);
+  return ok;
+}
+
 static bool ApplyPlacements() {
   bool ok = true;
   if (!g_place_mode) {

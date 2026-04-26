@@ -93,7 +93,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   } else {
     // Set up our logging using mini_logger library.
     const logging::LogDest kLogSink = debug_console ? logging::LOG_TO_ALL : logging::LOG_NONE;
-    const std::wstring kLogFile(L"langton_ants.log");
+    static const std::wstring file_name = std::wstring(INTERNAL_NAME);
+    static const std::wstring file_extension = L".log";
+    const std::wstring kLogFile = file_name + file_extension;
     logging::LogInitSettings LoggingSettings;
     LoggingSettings.log_sink          = kLogSink;
     LoggingSettings.logfile_name      = kLogFile;
@@ -493,6 +495,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDM_CUSTOMSEED: {
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMDLG), hWnd, CustomDlgProc);
+          break;
+        }
+        case IDM_UNDO: {
+          // Ctrl+Z accelerator. Only does anything in place mode —
+          // pops the most recent placement off the list and erases its
+          // marker. UndoLastPlacement logs and no-ops outside place
+          // mode or when there's nothing left to undo.
+          UndoLastPlacement();
           break;
         }
         case IDM_SOUND: {

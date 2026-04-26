@@ -130,6 +130,12 @@ void ExitPlaceMode();
 // a placement was made.
 bool PlaceAntAtClient(int clientX, int clientY);
 
+// Pops the most-recently-placed ant off the list and erases its marker
+// from the back buffer. Wired to the Ctrl+Z accelerator (IDM_UNDO);
+// only does anything in place mode. Returns true if a placement was
+// undone, false when not in place mode or the list is already empty.
+bool UndoLastPlacement();
+
 // For "Custom Seed" dialog box
 INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
