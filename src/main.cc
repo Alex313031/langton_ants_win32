@@ -336,15 +336,22 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         if (pnmtb->iItem == IDM_SPEED) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hSpeed    = GetSubMenu(hSettings, 5);
+          HMENU hSpeed    = GetSubMenu(hSettings, 4);
           TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN,
                          pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_CUSTOM) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom   = GetSubMenu(hSettings, 9);
+          HMENU hCustom   = GetSubMenu(hSettings, 7);
           TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN,
+                         pt.x, pt.y, 0, hWnd, nullptr);
+          return TBDDRET_DEFAULT;
+        }
+        if (pnmtb->iItem == IDM_COLORS) {
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hBkg      = GetSubMenu(hSettings, 5);
+          TrackPopupMenu(hBkg, TPM_LEFTALIGN | TPM_TOPALIGN,
                          pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
@@ -381,7 +388,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SPEED: {
           // Button-body click on the Speed split button — mirrors IDM_ANTS.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hSpeed    = GetSubMenu(hSettings, 5);
+          HMENU hSpeed    = GetSubMenu(hSettings, 4);
           PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
           break;
         }
@@ -389,8 +396,18 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Button-body click on the Custom split button — mirrors IDM_ANTS.
           // Place-ant mode lives on its own menu item now (IDM_CUSTOMPLACE).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom   = GetSubMenu(hSettings, 9);
+          HMENU hCustom   = GetSubMenu(hSettings, 7);
           PopupUnderToolbarButton(hWnd, IDM_CUSTOM, hCustom);
+          break;
+        }
+        case IDM_COLORS: {
+          // Button-body click on the Colors split button — mirrors IDM_ANTS.
+          // The dropdown is the existing Settings → Colors submenu so the
+          // IDM_*_BKG / IDM_MONOCHROME handlers below pick up the selection
+          // unchanged.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hBkg      = GetSubMenu(hSettings, 5);
+          PopupUnderToolbarButton(hWnd, IDM_COLORS, hBkg);
           break;
         }
         case IDM_CUSTOMPLACE: {
@@ -594,7 +611,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Grey out or restore the chromatic bg options. White, black,
           // and grey all count as monochrome, so only the R/G/B entries
           // get disabled.
-          HMENU hBkgMenu = GetSubMenu(hSettings, 8);
+          HMENU hBkgMenu = GetSubMenu(hSettings, 5);
           const UINT colorState = g_monochrome ? MF_GRAYED : MF_ENABLED;
           EnableMenuItem(hBkgMenu, IDM_RED_BKG,   MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
@@ -627,7 +644,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_GREEN_BKG:
         case IDM_BLUE_BKG: {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hBkgMenu  = GetSubMenu(hSettings, 8);
+          HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
           switch (command) {
@@ -654,7 +671,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_HYPER:
         case IDM_REALTIME: {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hDelay    = GetSubMenu(hSettings, 5);
+          HMENU hDelay    = GetSubMenu(hSettings, 4);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
           switch (command) {
             case IDM_SLOW:     g_delay = kSlowSpeed;  break;

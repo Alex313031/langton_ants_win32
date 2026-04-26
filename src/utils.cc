@@ -31,6 +31,7 @@ static int s_idxMute   = 0;
 static int s_idxAnts   = 0;
 static int s_idxSpeed  = 0;
 static int s_idxCustom = 0;
+static int s_idxColors = 0;
 
 // Reads the CHECKED state of every menu group at startup and sets the
 // corresponding globals. This makes all defaults entirely RC-driven: changing
@@ -40,8 +41,8 @@ void InitMenuDefaults(HWND hWnd) {
   HMENU hMenu     = GetMenu(hWnd);
   HMENU hSettings = GetSubMenu(hMenu, 1);
   HMENU hConc     = GetSubMenu(hSettings, 3); // Num Ants submenu
-  HMENU hDelay    = GetSubMenu(hSettings, 5); // Speed menu
-  HMENU hBkgMenu  = GetSubMenu(hSettings, 8); // Background color menu
+  HMENU hDelay    = GetSubMenu(hSettings, 4); // Speed menu
+  HMENU hBkgMenu  = GetSubMenu(hSettings, 5); // Colors menu (bg colors + monochrome)
 
   // Background color
   const struct { UINT id; COLORREF color; } bkgs[] = {
@@ -433,6 +434,9 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbab.nID = IDB_CUSTOM_BMP;
   s_idxCustom = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID = IDB_COLORS_BMP;
+  s_idxColors = static_cast<int>(
+      SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_SOUND_BMP;
   s_idxSound = static_cast<int>(
       SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
@@ -451,7 +455,7 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   //   fsStyle   — TBSTYLE_BUTTON (push button) or TBSTYLE_SEP (gap)
   //   dwData    — app-defined extra data we don't need
   //   iString   — tooltip/label text pointer (cast through INT_PTR)
-  TBBUTTON tbButtons[14] = {};
+  TBBUTTON tbButtons[15] = {};
 
   tbButtons[0].fsStyle   = TBSTYLE_SEP;
 
@@ -479,8 +483,8 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
 
   tbButtons[5].fsStyle   = TBSTYLE_SEP;
 
-  // Num Ants, Speed and Custom are deliberately adjacent with no separators
-  // — they form a single "simulation knobs" group.
+  // Num Ants, Speed, Customize and Colors are deliberately adjacent with
+  // no separators — they form a single "simulation knobs" group.
   tbButtons[6].iBitmap   = s_idxAnts;
   tbButtons[6].idCommand = IDM_ANTS;
   tbButtons[6].fsState   = TBSTATE_ENABLED;
@@ -499,23 +503,29 @@ void CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[8].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
   tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Customize");
 
-  tbButtons[9].fsStyle   = TBSTYLE_SEP;
+  tbButtons[9].iBitmap   = s_idxColors;
+  tbButtons[9].idCommand = IDM_COLORS;
+  tbButtons[9].fsState   = TBSTATE_ENABLED;
+  tbButtons[9].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Colors");
 
-  tbButtons[10].iBitmap   = s_idxSound;
-  tbButtons[10].idCommand = IDM_SOUND;
-  tbButtons[10].fsState   = TBSTATE_ENABLED;
-  tbButtons[10].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[10].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+  tbButtons[10].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[11].fsStyle   = TBSTYLE_SEP;
+  tbButtons[11].iBitmap   = s_idxSound;
+  tbButtons[11].idCommand = IDM_SOUND;
+  tbButtons[11].fsState   = TBSTATE_ENABLED;
+  tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[12].iBitmap   = idxExit;
-  tbButtons[12].idCommand = IDM_EXIT;
-  tbButtons[12].fsState   = TBSTATE_ENABLED;
-  tbButtons[12].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[12].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+  tbButtons[12].fsStyle   = TBSTYLE_SEP;
 
-  tbButtons[13].fsStyle  = TBSTYLE_SEP;
+  tbButtons[13].iBitmap   = idxExit;
+  tbButtons[13].idCommand = IDM_EXIT;
+  tbButtons[13].fsState   = TBSTATE_ENABLED;
+  tbButtons[13].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[13].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+
+  tbButtons[14].fsStyle  = TBSTYLE_SEP;
 
   SendMessageW(hTB, TB_ADDBUTTONS,
               sizeof(tbButtons) / sizeof(tbButtons[0]),
@@ -657,6 +667,9 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       break;
     case IDM_CUSTOM:
       text = L"Customize ant placement and starting \"seed\"";
+      break;
+    case IDM_COLORS:
+      text = L"Choose color options";
       break;
     case IDM_PAUSED:
       // Mirror the three-state label SetPauseButton picks: "Play Ants"

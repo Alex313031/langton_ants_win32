@@ -131,7 +131,6 @@ BEGIN
             MENUITEM "31 Threads", IDM_CONC_31
             MENUITEM "32 Threads", IDM_CONC_32
         END
-        MENUITEM SEPARATOR
         POPUP "&Speed"
         BEGIN
             MENUITEM "&Slow        (250 ms.)", IDM_SLOW
@@ -140,9 +139,7 @@ BEGIN
             MENUITEM "&Hyper      (16 ms.)",   IDM_HYPER
             MENUITEM "&Realtime  (1 ms.)",     IDM_REALTIME, CHECKED
         END
-        MENUITEM SEPARATOR
-        MENUITEM "&Use MonoChrome", IDM_MONOCHROME
-        POPUP "&Background Color"
+        POPUP "&Colors"
         BEGIN
             MENUITEM "&White", IDM_WHITE_BKG
             MENUITEM "&Black", IDM_BLACK_BKG, CHECKED
@@ -150,7 +147,10 @@ BEGIN
             MENUITEM "&Red",   IDM_RED_BKG
             MENUITEM "&Green", IDM_GREEN_BKG
             MENUITEM "&Blue",  IDM_BLUE_BKG
+            MENUITEM SEPARATOR
+            MENUITEM "&Use MonoChrome", IDM_MONOCHROME
         END
+        MENUITEM SEPARATOR
         POPUP "&Customize"
         BEGIN
             MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
@@ -161,6 +161,7 @@ BEGIN
     BEGIN
         MENUITEM "&Repaint Now",         IDM_REPAINT
         MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
+        MENUITEM SEPARATOR
         MENUITEM "&Test Trap",           IDM_TESTTRAP
     END
     POPUP "&About"
