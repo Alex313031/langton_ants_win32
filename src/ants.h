@@ -128,6 +128,12 @@ void ShutdownAnts();
 // CreateCompatibleBitmap failure.
 bool RecreateBackBuffer(HWND hWnd, int cx, int cy);
 
+// Wipes the back buffer's full client rect to g_bkg_color. Takes the
+// g_paintCS lock and null-checks g_hdcMem / g_hbmMem so callers don't
+// need to repeat the lock + check + fill dance themselves. No-op if the
+// back buffer hasn't been allocated yet.
+void ClearCanvasToBackground(int cxClient, int cyClient);
+
 // Swaps every pixel in the back buffer that currently equals oldColor over to
 // newColor, leaving all other (ant path) pixels untouched. Used by the background
 // colour menu so the bg can change without erasing the ant paths already painted.

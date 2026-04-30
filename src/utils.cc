@@ -271,21 +271,33 @@ bool SaveClientBitmap(HWND hWnd) {
   return ok;
 }
 
-inline static void __KillInt3Asm() {
-#ifdef __MINGW32__
-  asm("int3\n\t"
-      "ud2");
-#else
-  __asm int 3 // Execute int3 interrupt
-      __asm {
-    UD2
-  } // Execute 0x0F, 0x0B
-#endif // __MINGW32__
+void TestTrap(const bool dcheck) {
+  static constexpr bool test_trap = true;
+  if (dcheck) {
+    DCHECK(!test_trap);
+  } else {
+    CHECK(!test_trap);
+  }
+  return;
 }
 
-void TestTrap() {
-  __KillInt3Asm();
-  return;
+bool FillRectWithColor(HDC hdc, const RECT& rc, COLORREF color) {
+  bool ok = true;
+  if (hdc == nullptr) {
+    LOG(ERROR) << L"FillRectWithColor() HDC was null!";
+    return false;
+  }
+  HBRUSH hBrush = CreateSolidBrush(color);
+  if (hBrush == nullptr) {
+    LOG(ERROR) << L"CreateSolidBrush failed";
+    return false;
+  }
+  if (!FillRect(hdc, &rc, hBrush)) {
+    LOG(ERROR) << L"FillRect returned 0!";
+    ok = false;
+  }
+  DeleteObject(hBrush);
+  return ok;
 }
 
 // MessageBoxW with MB_OK can be dismissed several ways the user considers
@@ -294,34 +306,21 @@ void TestTrap() {
 // user dismissed it" - which is what these helpers want to report as
 // success. Only a 0 return means the box failed to display in the first
 // place (bad hWnd, OOM, no desktop access, etc.); that's the real false.
+// `hWnd ? hWnd : mainHwnd` falls back to the main window when the caller
+// passed null - useful from helpers that don't have an hWnd of their own.
 bool InfoBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
-  HWND hWndTmp;
-  if (hWnd == nullptr && mainHwnd != nullptr) {
-    hWndTmp = mainHwnd;
-  } else {
-    hWndTmp = hWnd;
-  }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION) != 0);
+  return MessageBoxW(hWnd ? hWnd : mainHwnd, message.c_str(), title.c_str(),
+                     MB_OK | MB_ICONINFORMATION) != 0;
 }
 
 bool WarnBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
-  HWND hWndTmp;
-  if (hWnd == nullptr && mainHwnd != nullptr) {
-    hWndTmp = mainHwnd;
-  } else {
-    hWndTmp = hWnd;
-  }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONWARNING) != 0);
+  return MessageBoxW(hWnd ? hWnd : mainHwnd, message.c_str(), title.c_str(),
+                     MB_OK | MB_ICONWARNING) != 0;
 }
 
 bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
-  HWND hWndTmp;
-  if (hWnd == nullptr && mainHwnd != nullptr) {
-    hWndTmp = mainHwnd;
-  } else {
-    hWndTmp = hWnd;
-  }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR) != 0);
+  return MessageBoxW(hWnd ? hWnd : mainHwnd, message.c_str(), title.c_str(),
+                     MB_OK | MB_ICONERROR) != 0;
 }
 
 // ---------------------------------------------------------------------------

@@ -57,8 +57,13 @@ const std::wstring GetExeDir();
 // Save client area as a .BMP photo, capturing moment menu was clicked.
 bool SaveClientBitmap(HWND hWnd);
 
-// Test debug trap
-void TestTrap();
+// Test debug trap, choosing between DCHECK and CHECK
+void TestTrap(const bool dcheck);
+
+// Fills a rect with a solid color. Wraps the CreateSolidBrush + FillRect
+// + DeleteObject trio so call sites don't have to repeat all three (and
+// can't forget the DeleteObject and leak a GDI brush).
+bool FillRectWithColor(HDC hdc, const RECT& rc, COLORREF color);
 
 // Helper functions for MessageBoxW
 bool InfoBox(HWND hWnd, const std::wstring& title, const std::wstring& message);

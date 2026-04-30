@@ -120,6 +120,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
       return 3;
     }
   }
+  DCHECK(g_hInstance != nullptr);
+  DCHECK(kMainIcon != nullptr);
+  DCHECK(kSmallIcon != nullptr);
 
   InitializeCriticalSection(&g_paintCS);
   // Tighten the system timer resolution from the default ~15.6ms down
@@ -169,6 +172,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style, CW_USEDEFAULT, CW_USEDEFAULT,
                              CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, hInstance, nullptr);
 
+  DCHECK(mainHwnd != nullptr);
   if (mainHwnd == nullptr) {
     return 1;
   }
@@ -300,9 +304,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // pixels during resize and startup before the back buffer is ready.
       // WS_CLIPCHILDREN excludes the toolbar's rect automatically, so this
       // fill never touches the toolbar area.
-      HBRUSH hBkgBrush = CreateSolidBrush(g_bkg_color);
-      FillRect(hdc, &ps.rcPaint, hBkgBrush);
-      DeleteObject(hBkgBrush);
+      FillRectWithColor(hdc, ps.rcPaint, g_bkg_color);
       // Hold the lock so the ant thread cannot replace the back buffer
       // bitmap between our null-check and the BitBlt call.
       EnterCriticalSection(&g_paintCS);
@@ -483,14 +485,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Audio follows the simulation automatically: TogglePaintAnts
           // calls SyncBgm, which pauses the BGM whenever ants aren't
           // running. The next Play resumes it through the same call.
-          EnterCriticalSection(&g_paintCS);
-          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc       = {0, 0, cxClient, cyClient};
-            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-            FillRect(g_hdcMem, &rc, hBrush);
-            DeleteObject(hBrush);
-          }
-          LeaveCriticalSection(&g_paintCS);
+          ClearCanvasToBackground(cxClient, cyClient);
           EnterPlaceMode();
           LOG(INFO) << L"Entered manual ant placement mode.";
           InvalidateRect(hWnd, nullptr, FALSE);
@@ -570,14 +565,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // above (when called) pauses BGM via SyncBgm. The user's sound
           // preference (g_playsound) is preserved across Stop, so a later
           // Play will resume audio if it was on before.
-          EnterCriticalSection(&g_paintCS);
-          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc       = {0, 0, cxClient, cyClient};
-            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-            FillRect(g_hdcMem, &rc, hBrush);
-            DeleteObject(hBrush);
-          }
-          LeaveCriticalSection(&g_paintCS);
+          ClearCanvasToBackground(cxClient, cyClient);
           // pulse=false: just flag the reseed without waking the parked
           // threads. A pulse here would wake them despite being paused
           // and immediately re-paint fresh ant markers on the just-wiped
@@ -621,14 +609,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (g_place_mode) {
             ExitPlaceMode();
           }
-          EnterCriticalSection(&g_paintCS);
-          if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-            RECT rc       = {0, 0, cxClient, cyClient};
-            HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-            FillRect(g_hdcMem, &rc, hBrush);
-            DeleteObject(hBrush);
-          }
-          LeaveCriticalSection(&g_paintCS);
+          ClearCanvasToBackground(cxClient, cyClient);
           ReseedAnts();
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
@@ -896,7 +877,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // missing.
           PlaySoundW(MAKEINTRESOURCEW(IDR_FAHH_WAVE), g_hInstance,
                      SND_RESOURCE | SND_SYNC | SND_NODEFAULT);
-          TestTrap();
+          TestTrap(false /* Use CHECK, not DCHECK */);
           break;
         default:
           return DefWindowProcW(hWnd, message, wParam, lParam);
@@ -1074,6 +1055,7 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
       static const HICON kAboutIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(IDI_ABOUT));
       SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kAboutIcon);
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kAboutIcon);
+      LOG(INFO) << L"Showed About Dialog.";
       return TRUE;
     case WM_CLOSE:
       EndDialog(hDlg, TRUE);

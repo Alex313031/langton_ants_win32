@@ -108,7 +108,6 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   }
   LOG(DEBUG) << L"AntThread slot=" << static_cast<UINT>(slotIdx + 1u)
              << L" customSeed=" << cSeed
-             << L" fibonacci=" << logging::Hex(fibonacci)
              << L" seed=" << logging::Hex(seed);
 
   srand(static_cast<unsigned int>(seed));
@@ -194,10 +193,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
         if (g_hdcMem != nullptr) {
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
-          RECT rc      = {px, py, px + CELL_PX, py + CELL_PX};
-          HBRUSH hAnt  = CreateSolidBrush(antColor);
-          FillRect(g_hdcMem, &rc, hAnt);
-          DeleteObject(hAnt);
+          RECT rc = {px, py, px + CELL_PX, py + CELL_PX};
+          FillRectWithColor(g_hdcMem, rc, antColor);
           RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
         }
@@ -253,10 +250,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           const int py           = cellY * CELL_PX;
           const COLORREF sampled = GetPixel(g_hdcMem, px, py);
           onBg                   = (sampled == g_bkg_color);
-          RECT antRc             = {px, py, px + CELL_PX, py + CELL_PX};
-          HBRUSH hAnt            = CreateSolidBrush(antColor);
-          FillRect(g_hdcMem, &antRc, hAnt);
-          DeleteObject(hAnt);
+          RECT antRc = {px, py, px + CELL_PX, py + CELL_PX};
+          FillRectWithColor(g_hdcMem, antRc, antColor);
           RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
         } else {
@@ -272,10 +267,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // This both performs the Langton flip and removes the magenta
           // overlay, leaving a clean mark the next ant will classify
           // correctly via GetPixel.
-          RECT trailRc  = {px, py, px + CELL_PX, py + CELL_PX};
-          HBRUSH hTrail = CreateSolidBrush(trailColor);
-          FillRect(g_hdcMem, &trailRc, hTrail);
-          DeleteObject(hTrail);
+          RECT trailRc = {px, py, px + CELL_PX, py + CELL_PX};
+          FillRectWithColor(g_hdcMem, trailRc, trailColor);
 
           // Try to step forward. A target cell is "blocked" if it's out of
           // bounds (wall) or currently occupied by another ant (magenta).
@@ -320,10 +313,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
 
           // Paint the ant on the new cell using this ant's chosen marker
           // color (locked in at placement, see needsPlacement branch).
-          RECT antRc  = {npx, npy, npx + CELL_PX, npy + CELL_PX};
-          HBRUSH hAnt = CreateSolidBrush(antColor);
-          FillRect(g_hdcMem, &antRc, hAnt);
-          DeleteObject(hAnt);
+          RECT antRc = {npx, npy, npx + CELL_PX, npy + CELL_PX};
+          FillRectWithColor(g_hdcMem, antRc, antColor);
 
           // Invalidate both the trail cell and the new ant cell so
           // WM_PAINT blits both tight rects on the next paint pass.
@@ -501,27 +492,25 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // Wipe the back buffer to the current background color so the new seed's
   // layout starts from a clean canvas (matching the user's expectation that
   // changing the seed "repaints the whole thing").
+  // Held across both the wipe and the marker repaints so a paint pass
+  // can't see a cleared canvas without the placement markers on it.
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-    RECT rc       = {0, 0, cxClient, cyClient};
-    HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-    FillRect(g_hdcMem, &rc, hBrush);
-    DeleteObject(hBrush);
+    RECT rc = {0, 0, cxClient, cyClient};
+    FillRectWithColor(g_hdcMem, rc, g_bkg_color);
     // Re-paint placement markers on the freshly-wiped canvas so the user's
     // clicks are still visible while paused. Their pre-seed color stays -
     // the AntThread placementRequested handler re-rolls antColor from the
     // seeded rand() once the simulation resumes, so the moving ant may
     // briefly differ in color until the first Langton step overpaints
     // the marker with the trail color.
-    if (inPlaceMode && g_hdcMem != nullptr) {
+    if (inPlaceMode) {
       for (int i = 0; i < g_placed_ants_count; i++) {
         const PlacedAnt& a = s_placedAnts[i];
         const int px       = a.cellX * CELL_PX;
         const int py       = a.cellY * CELL_PX;
         RECT mrc           = {px, py, px + CELL_PX, py + CELL_PX};
-        HBRUSH hAnt        = CreateSolidBrush(a.color);
-        FillRect(g_hdcMem, &mrc, hAnt);
-        DeleteObject(hAnt);
+        FillRectWithColor(g_hdcMem, mrc, a.color);
       }
     }
   }
@@ -627,9 +616,7 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   HDC hdcScratch         = CreateCompatibleDC(g_hdcMem);
   HBITMAP hbmScratchPrev = static_cast<HBITMAP>(SelectObject(hdcScratch, hbmNew));
   RECT rc                = {0, 0, cx, cy};
-  HBRUSH hBrush          = CreateSolidBrush(g_bkg_color);
-  FillRect(hdcScratch, &rc, hBrush);
-  DeleteObject(hBrush);
+  FillRectWithColor(hdcScratch, rc, g_bkg_color);
   if (g_hbmMem != nullptr) {
     BITMAP bmOld = {};
     if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bmOld)) {
@@ -653,6 +640,15 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   g_hbmMem = hbmNew;
   LeaveCriticalSection(&g_paintCS);
   return ok;
+}
+
+void ClearCanvasToBackground(int cxClient, int cyClient) {
+  EnterCriticalSection(&g_paintCS);
+  if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+    RECT rc = {0, 0, cxClient, cyClient};
+    FillRectWithColor(g_hdcMem, rc, g_bkg_color);
+  }
+  LeaveCriticalSection(&g_paintCS);
 }
 
 // Rewrites every pixel in the back buffer that currently equals oldColor so
@@ -884,10 +880,8 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   } else {
     antColor = g_ant_color;
   }
-  RECT rc     = {px, py, px + CELL_PX, py + CELL_PX};
-  HBRUSH hAnt = CreateSolidBrush(antColor);
-  FillRect(g_hdcMem, &rc, hAnt);
-  DeleteObject(hAnt);
+  RECT rc = {px, py, px + CELL_PX, py + CELL_PX};
+  FillRectWithColor(g_hdcMem, rc, antColor);
   LeaveCriticalSection(&g_paintCS);
 
   s_placedAnts[g_placed_ants_count].cellX = cellX;
@@ -925,10 +919,8 @@ bool UndoLastPlacement() {
   const int py    = cellY * CELL_PX;
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem != nullptr) {
-    RECT rc       = {px, py, px + CELL_PX, py + CELL_PX};
-    HBRUSH hBrush = CreateSolidBrush(g_bkg_color);
-    FillRect(g_hdcMem, &rc, hBrush);
-    DeleteObject(hBrush);
+    RECT rc = {px, py, px + CELL_PX, py + CELL_PX};
+    FillRectWithColor(g_hdcMem, rc, g_bkg_color);
   }
   LeaveCriticalSection(&g_paintCS);
   g_placed_ants_count--;
