@@ -1,5 +1,7 @@
 #include "logging.h"
 
+#include <mutex>
+
 namespace logging {
   volatile bool dcheck_log_     = false;
   bool logging_initialized      = false;
@@ -93,19 +95,30 @@ logging::LogMessage::~LogMessage() {
   }
   full_prefix += level_prefix;
 
-  if (log_to_console_) {
-    // Levels higher than INFO go to stderr
-    if (level_ > LOG_INFO) {
-      std::wcerr << full_prefix << stream_.str() << std::endl;
-    } else {
-      std::wcout << full_prefix << stream_.str() << std::endl;
+  // Serialize the actual sink writes so concurrent threads can't interleave
+  // mid-line on stdout/stderr/file. Each `<<` on std::wcout is its own
+  // operation, and the synchronized-with-stdio guarantee is only on
+  // single-character flushes - characters from different threads can still
+  // be intermixed without a lock here. Held only across the flush so the
+  // earlier `<<` chains into stream_ stay lock-free.
+  static std::mutex sink_mutex;
+  {
+    std::lock_guard<std::mutex> lock(sink_mutex);
+    if (log_to_console_) {
+      // Levels higher than INFO go to stderr
+      if (level_ > LOG_INFO) {
+        std::wcerr << full_prefix << stream_.str() << std::endl;
+      } else {
+        std::wcout << full_prefix << stream_.str() << std::endl;
+      }
+    }
+    if (log_to_file_) {
+      AppendTextToFile(full_prefix + stream_.str());
     }
   }
-  if (log_to_file_) {
-    AppendTextToFile(full_prefix + stream_.str());
-  }
   // FATAL always crashes regardless of log destination, and after any file
-  // write so the last message is flushed before the debugger break.
+  // write so the last message is flushed before the debugger break. Done
+  // outside the lock so KillApp can't deadlock if it ends up logging.
   if (level_ == LOG_FATAL) {
     OutputDebugStringW(stream_.str().c_str());
     KillApp();
