@@ -25,7 +25,8 @@ int logging::AttachConsoleImpl() {
   }
   if (retval == 1) {
     // 1 Soft error, already attached
-    MessageBoxW(nullptr, L"Console Already Attached!", L"Console Attach Warning", MB_OK | MB_ICONWARNING);
+    MessageBoxW(nullptr, L"Console Already Attached!", L"Console Attach Warning",
+                MB_OK | MB_ICONWARNING);
   } else {
     // Allow and allocate conhost for cmd.exe logging window
     const bool attached_console = RouteStdioToConsole(true /* open cmd if none */);
@@ -35,7 +36,7 @@ int logging::AttachConsoleImpl() {
     } else {
       MessageBoxW(nullptr, L"Failed to attach console!", L"Console Attach Error",
                   MB_OK | MB_ICONERROR);
-      retval = 2; // Other error 
+      retval = 2; // Other error
     }
   }
   console_attached = retval == 0 || retval == 1;
@@ -68,9 +69,8 @@ HWND logging::GetCurrentConsole() {
 }
 
 bool logging::ShowConsole(const bool activate) {
-  const int showstate = activate ? SW_SHOW
-                                 : SW_SHOWNOACTIVATE;
-  const HWND console = GetCurrentConsole();
+  const int showstate = activate ? SW_SHOW : SW_SHOWNOACTIVATE;
+  const HWND console  = GetCurrentConsole();
   if (console == nullptr) {
     LOG(ERROR) << L"Console not attached.";
     return false;
@@ -95,15 +95,14 @@ bool logging::HideConsole() {
       return true; // Hid console
     } else {
       LOG(WARN) << L"Running SW_HIDE on console again!"; // Doesn't work on Win11 Terminal (¬_¬)
-      return ShowWindow(console, SW_HIDE); // It is sometimes necessary to call twice
+      return ShowWindow(console, SW_HIDE);               // It is sometimes necessary to call twice
     }
   }
 }
 
 bool logging::ToggleShowConsole(const bool activate) {
-  const int showstate = activate ? SW_SHOW
-                                 : SW_SHOWNOACTIVATE;
-  const HWND console = GetCurrentConsole();
+  const int showstate = activate ? SW_SHOW : SW_SHOWNOACTIVATE;
+  const HWND console  = GetCurrentConsole();
   if (console == nullptr) {
     LOG(WARN) << L"Console not attached.";
     return false;

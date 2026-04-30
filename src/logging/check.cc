@@ -10,16 +10,19 @@ void logging::KillApp() {
       "ud2");
 #else
   __asm int 3 // Execute int3 interrupt
-  __asm {
+      __asm {
     UD2
   } // Execute 0x0F, 0x0B
 #endif // __MINGW32__
 }
 
-
-void logging::CheckImpl(const char* func_sig, const int line_num, const char* condition, bool check_flag) {
+void logging::CheckImpl(const char* func_sig,
+                        const int line_num,
+                        const char* condition,
+                        bool check_flag) {
   if (check_flag) {
-    logging::LogMessage(LOG_FATAL, true, true, func_sig, line_num) << L"Check failed: " << ToWide(condition);
+    logging::LogMessage(LOG_FATAL, true, true, func_sig, line_num)
+        << L"Check failed: " << ToWide(condition);
   }
 }
 

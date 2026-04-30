@@ -34,7 +34,6 @@ namespace logging {
 
 } // namespace logging
 
-
 // Same as DCHECK, but is always on. Use when a condition should be fatal if false.
 #define CHECK(condition) logging::CheckImpl(__func__, __LINE__, STRINGIZE(condition), !(condition))
 

@@ -255,7 +255,7 @@ bool logging::InitLogging(HINSTANCE hInstance, LogInitSettings InitSettings) {
     case LOG_TO_STDERR: {
       if (!is_console_attached) {
         const int attach_code = AttachConsoleImpl();
-        success = attach_code == 0 || attach_code == 1;
+        success               = attach_code == 0 || attach_code == 1;
       } else {
         success = true;
       }
@@ -305,12 +305,13 @@ void logging::TestLogging() {
   LOG(INFO) << info3 << info4;
   LOG(INFO) << info5 << info6;
   LOG(INFO) << info7.str() << info8.str();
-  LOG(WARN) << "Test DWORD: " << testDword;
+  LOG(WARN) << "Test DWORD (hex): " << logging::Hex(testDword);
+  LOG(WARN) << "Test DWORD (decimal): " << testDword;
   LOG(WARN) << "Test float: " << testFl;
   LOG(DEBUG) << "Test unsigned long long: " << testULL;
   LOG(DEBUG) << "Test long double: " << testDb;
   LOG(ERROR) << "Test Error";
-  LOG(ERROR) << L"Test Error " << GetLastError();
+  LOG(ERROR) << L"Test Error " << logging::Hex(GetLastError());
   DLOG() << L"DLOG() Test. CW_USEDEFAULT: " << CW_USEDEFAULT;
   if (test_fatal) {
     LOG(FATAL) << L"Testing wide character FATAL logging";

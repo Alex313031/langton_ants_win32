@@ -34,6 +34,22 @@ namespace logging {
     LogLevel full_prefix_level; // What log level to show all prefixes
   } LogInitSettings;
 
+  // Tags any integer value as "format me in hex". The LogMessage stream
+  // operator picks up the wrapper regardless of the value's underlying
+  // type, so this works for DWORD, QWORD, HRESULT, bitmasks, addresses -
+  // anything where 0xDEADBEEF reads better than 3735928559. We can't
+  // overload directly on DWORD/QWORD because they're typedefs for
+  // unsigned long / unsigned long long, which already have decimal
+  // overloads, and C++ overload resolution sees through typedefs.
+  //   LOG(ERROR) << L"GetLastError: " << logging::Hex(GetLastError());
+  template <typename T>
+  struct Hex {
+    T value;
+  };
+  // Deduction guide so `Hex(x)` doesn't need its template arg spelled out.
+  template <typename T>
+  Hex(T) -> Hex<T>;
+
   class LogMessage {
    public:
     explicit LogMessage(LogLevel level,
@@ -67,8 +83,19 @@ namespace logging {
     LogMessage& operator<<(double value);
     LogMessage& operator<<(long double value);
 
-    // Other overloads
+    // Other Win32 overloads
     LogMessage& operator<<(HWND value);
+
+    // Hex-formatted integer (opt-in via the logging::Hex wrapper above).
+    // Prints with a 0x prefix and restores the stream's decimal mode after.
+    // Cast to unsigned long long so char-shaped values don't print as a
+    // single character, mirroring the HWND overload's casting style.
+    template <typename T>
+    LogMessage& operator<<(Hex<T> h) {
+      stream_ << std::showbase << std::hex << static_cast<unsigned long long>(h.value) << std::dec
+              << std::noshowbase;
+      return *this;
+    }
 
     // Generic template for streams and other types (manipulators, etc.)
     template <typename T>

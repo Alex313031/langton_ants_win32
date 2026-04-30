@@ -24,7 +24,9 @@ namespace logging {
 
   // Convert narrow string to wide string (ASCII only, suitable for __func__, __DATE__, etc.)
   inline const std::wstring ToWide(const char* s) {
-    if (!s) return L"";
+    if (!s) {
+      return L"";
+    }
     std::wstring result;
     while (*s) {
       result += static_cast<wchar_t>(*s++);
@@ -34,7 +36,9 @@ namespace logging {
 
   // wchar_t override for ease of use
   inline const std::wstring ToWide(const wchar_t* s) {
-    if (!s) return L"";
+    if (!s) {
+      return L"";
+    }
     std::wstring result;
     while (*s) {
       result += *s++;
