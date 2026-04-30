@@ -977,12 +977,14 @@ INT_PTR CALLBACK CustomSeedDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
       return TRUE;
     case WM_CLOSE:
+      LOG(INFO) << L"Custom Seed dialog cancelled by user";
       EndDialog(hDlg, TRUE);
       return TRUE;
     case WM_COMMAND: {
       const int cmd = LOWORD(wParam);
       switch (cmd) {
         case IDCANCEL:
+          LOG(INFO) << L"Custom Seed dialog cancelled by user";
           EndDialog(hDlg, IDCANCEL);
           return TRUE;
         case IDOK: {
@@ -1026,12 +1028,14 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
       return TRUE;
     case WM_CLOSE:
+      LOG(INFO) << L"Custom Num dialog cancelled by user";
       EndDialog(hDlg, TRUE);
       return TRUE;
     case WM_COMMAND: {
       const int cmd = LOWORD(wParam);
       switch (cmd) {
         case IDCANCEL:
+          LOG(INFO) << L"Custom Num dialog cancelled by user";
           EndDialog(hDlg, IDCANCEL);
           return TRUE;
         case IDOK: {

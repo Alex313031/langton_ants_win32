@@ -191,12 +191,13 @@ bool SaveClientBitmap(HWND hWnd) {
 
   if (!GetSaveFileNameW(&ofn)) {
     // CommDlgExtendedError() returns 0 when the user cancelled and a
-    // non-zero CDERR_* code on actual dialog failure. Cancellation is
-    // intentional and stays silent; only the failure path warns.
+    // non-zero CDERR_* code on actual dialog failure.
     const DWORD err = CommDlgExtendedError();
     if (err != 0) {
       LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << logging::Hex(err)
                 << L")";
+    } else {
+      LOG(INFO) << L"Save Bitmap dialog cancelled by user";
     }
     return false;
   }
@@ -287,6 +288,12 @@ void TestTrap() {
   return;
 }
 
+// MessageBoxW with MB_OK can be dismissed several ways the user considers
+// equivalent: clicking OK (IDOK), clicking the X close button (IDCANCEL),
+// or pressing Esc (IDCANCEL). All of those mean "the box showed and the
+// user dismissed it" - which is what these helpers want to report as
+// success. Only a 0 return means the box failed to display in the first
+// place (bad hWnd, OOM, no desktop access, etc.); that's the real false.
 bool InfoBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
   HWND hWndTmp;
   if (hWnd == nullptr && mainHwnd != nullptr) {
@@ -294,7 +301,7 @@ bool InfoBox(HWND hWnd, const std::wstring& title, const std::wstring& message) 
   } else {
     hWndTmp = hWnd;
   }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION) == IDOK);
+  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONINFORMATION) != 0);
 }
 
 bool WarnBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
@@ -304,7 +311,7 @@ bool WarnBox(HWND hWnd, const std::wstring& title, const std::wstring& message) 
   } else {
     hWndTmp = hWnd;
   }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONWARNING) == IDOK);
+  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONWARNING) != 0);
 }
 
 bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message) {
@@ -314,7 +321,7 @@ bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message)
   } else {
     hWndTmp = hWnd;
   }
-  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR) == IDOK);
+  return (MessageBoxW(hWndTmp, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR) != 0);
 }
 
 // ---------------------------------------------------------------------------

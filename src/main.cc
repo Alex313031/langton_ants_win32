@@ -565,7 +565,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // and the label would otherwise stay at the old "Resume".
           g_stopped = true;
           SetPauseButton(g_paused);
-          LOG(INFO) << L"Ants stopped by user.";
+          LOG(INFO) << L"Stopped Ants.";
           // Audio follows the simulation automatically: TogglePaintAnts
           // above (when called) pauses BGM via SyncBgm. The user's sound
           // preference (g_playsound) is preserved across Stop, so a later
