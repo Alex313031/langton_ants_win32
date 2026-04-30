@@ -195,7 +195,8 @@ bool SaveClientBitmap(HWND hWnd) {
     // intentional and stays silent; only the failure path warns.
     const DWORD err = CommDlgExtendedError();
     if (err != 0) {
-      LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << err << L")";
+      LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << logging::Hex(err)
+                << L")";
     }
     return false;
   }

@@ -370,7 +370,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
         DispatchMessageW(&msg);
       }
     } else {
-      LOG(ERROR) << L"BGM worker MsgWait returned " << r;
+      LOG(ERROR) << L"BGM worker MsgWait returned " << logging::Hex(r);
       break;
     }
   }

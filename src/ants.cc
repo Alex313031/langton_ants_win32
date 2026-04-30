@@ -63,6 +63,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   if (mainHwnd == nullptr || slot == nullptr) {
     return 0x00000001;
   }
+  static constexpr DWORD fibonacci = 0x9E3779B9u;
   // Per-ant state, thread-local so no synchronization is needed for it. The
   // shared state (g_hdcMem / the back buffer bitmap) is protected by
   // g_paintCS inside the tick loop.
@@ -89,12 +90,27 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   //     intent there is "different every run", so non-determinism is
   //     a feature, not a bug.
   DWORD seed;
+  UINT cSeed          = 0;
+  const DWORD slotIdx = static_cast<DWORD>(slot - s_slots);
+  // (slotIdx + 1) so slot 0's mix constant isn't zero. With plain slotIdx
+  // the XOR for slot 0 is a no-op and the first thread's seed equals the
+  // user's raw custom seed (or raw GetCurrentThreadId() in the random
+  // branch) - identical input means identical rand() sequence, defeating
+  // the per-slot decorrelation the Fibonacci mix exists for.
+  const DWORD slotMix = (slotIdx + 1u) * fibonacci;
   if (slot->customSeedRequest) {
-    const DWORD slotIdx = static_cast<DWORD>(slot - s_slots);
-    seed                = static_cast<DWORD>(slot->customSeed) ^ (slotIdx * 0x9E3779B9u);
+    cSeed = slot->customSeed;
+    seed  = static_cast<DWORD>(cSeed) ^ slotMix;
   } else {
-    seed = GetTickCount() ^ GetCurrentThreadId();
+    cSeed = static_cast<UINT>(NULL);
+    seed = GetCurrentThreadId() ^ slotMix;
+
   }
+  LOG(DEBUG) << L"AntThread slot=" << static_cast<UINT>(slotIdx + 1u)
+             << L" customSeed=" << cSeed
+             << L" fibonacci=" << logging::Hex(fibonacci)
+             << L" seed=" << logging::Hex(seed);
+
   srand(static_cast<unsigned int>(seed));
   int cellX = -1, cellY = -1;
   int dir = 0;
