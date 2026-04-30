@@ -53,6 +53,9 @@ static COLORREF s_pre_mono_bg = RGB_BLUE;
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = is_debug;
 
+HICON kMainIcon = nullptr;
+HICON kSmallIcon = nullptr;
+
 int APIENTRY wWinMain(HINSTANCE hInstance,
                       HINSTANCE hPrevInstance,
                       LPWSTR lpCmdLine,
@@ -68,6 +71,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   static const LPCWSTR appTitle    = APP_NAME;
   static const LPCWSTR szClassName = MAIN_WNDCLASS;
 
+  kMainIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
+  kSmallIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
+
   WNDCLASSEXW wndclass;
   wndclass.cbSize      = sizeof(WNDCLASSEX);
   wndclass.style       = 0;
@@ -75,7 +81,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.cbClsExtra  = 0;
   wndclass.cbWndExtra  = 0;
   wndclass.hInstance   = hInstance;
-  wndclass.hIcon       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
+  wndclass.hIcon       = kMainIcon;
   wndclass.hCursor     = LoadCursorW(nullptr, IDC_ARROW);
   // No stock brush matches our default bg (there's only black / white /
   // grey / null), and we handle erase + paint ourselves - WM_ERASEBKGND
@@ -85,7 +91,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   wndclass.hbrBackground = nullptr;
   wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDR_MAIN);
   wndclass.lpszClassName = szClassName;
-  wndclass.hIconSm       = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
+  wndclass.hIconSm       = kSmallIcon;
 
   if (!RegisterClassExW(&wndclass)) {
     ErrorBox(nullptr, L"RegisterClassEx Error", L"This program requires Windows NT!");
@@ -190,6 +196,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   }
 
   HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
+  if (hAccel == nullptr) {
+    LOG(ERROR) << L"LoadAcceleratorsW failed - keyboard shortcuts will not work!";
+  }
 
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -483,11 +492,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           LeaveCriticalSection(&g_paintCS);
           EnterPlaceMode();
+          LOG(INFO) << L"Entered manual ant placement mode.";
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
         case IDM_CUSTOMSEED: {
-          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMDLG), hWnd, CustomDlgProc);
+          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMDLG), hWnd, CustomSeedDlgProc);
+          break;
+        }
+        case IDM_CONC_CUSTOM: {
+          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMNUM), hWnd, CustomNumDlgProc);
           break;
         }
         case IDM_UNDO: {
@@ -506,6 +520,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                           MF_BYCOMMAND | (g_playsound ? MF_CHECKED : MF_UNCHECKED));
             // Mirror the state on the toolbar: swap icon + label.
             SetSoundButton(g_playsound);
+            LOG(INFO) << L"Sound " << (g_playsound ? L"enabled" : L"disabled") << L" by user.";
           }
           break;
         }
@@ -516,16 +531,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // radio after the toggle.
           const bool drainedPlacements = (g_paused && g_place_mode);
           TogglePaintAnts(hWnd);
+          LOG(INFO) << L"Ants " << (g_paused ? L"paused" : L"resumed") << L" by user.";
           // Reflect the new paused state in the menu check mark.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           CheckMenuItem(hSettings, IDM_PAUSED,
                         MF_BYCOMMAND | (g_paused ? MF_CHECKED : MF_UNCHECKED));
           // Mirror the state on the toolbar: swap icon + label.
           SetPauseButton(g_paused);
-          if (drainedPlacements && g_num_ants >= 1 && g_num_ants <= kMaxAntThreads) {
-            HMENU hConc = GetSubMenu(hSettings, 3);
-            CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32, IDM_CONC_1 + (g_num_ants - 1),
-                               MF_BYCOMMAND);
+          if (drainedPlacements) {
+            SetNumAntsCheck(g_num_ants);
           }
           break;
         }
@@ -551,6 +565,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // and the label would otherwise stay at the old "Resume".
           g_stopped = true;
           SetPauseButton(g_paused);
+          LOG(INFO) << L"Ants stopped by user.";
           // Audio follows the simulation automatically: TogglePaintAnts
           // above (when called) pauses BGM via SyncBgm. The user's sound
           // preference (g_playsound) is preserved across Stop, so a later
@@ -633,28 +648,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CONC_13:
         case IDM_CONC_14:
         case IDM_CONC_15:
-        case IDM_CONC_16:
-        case IDM_CONC_17:
-        case IDM_CONC_18:
-        case IDM_CONC_19:
-        case IDM_CONC_20:
-        case IDM_CONC_21:
-        case IDM_CONC_22:
-        case IDM_CONC_23:
-        case IDM_CONC_24:
-        case IDM_CONC_25:
-        case IDM_CONC_26:
-        case IDM_CONC_27:
-        case IDM_CONC_28:
-        case IDM_CONC_29:
-        case IDM_CONC_30:
-        case IDM_CONC_31:
-        case IDM_CONC_32: {
+        case IDM_CONC_16: {
           // Consecutive IDs let us derive the count directly from the command.
-          SetNumAnts((command - IDM_CONC_1) + 1);
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hConc     = GetSubMenu(hSettings, 3);
-          CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_32, command, MF_BYCOMMAND);
+          const unsigned int newCount = (command - IDM_CONC_1) + 1;
+          SetNumAnts(newCount);
+          SetNumAntsCheck(newCount);
+          LOG(INFO) << L"Number of ants changed to " << newCount << L".";
           break;
         }
         case IDM_MONOCHROME: {
@@ -741,6 +740,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // even while paused.
           RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
+          LOG(INFO) << L"Monochrome mode " << (g_monochrome ? L"on." : L"off.");
           break;
         }
         case IDM_WHITE_BKG:
@@ -753,26 +753,38 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
+          const wchar_t* bgName   = L"?";
           switch (command) {
             case IDM_WHITE_BKG:
               g_bkg_color = RGB_WHITE;
+              bgName      = L"White.";
               break;
             case IDM_BLACK_BKG:
               g_bkg_color = RGB_BLACK;
+              bgName      = L"Black.";
               break;
             case IDM_GREY_BKG:
               g_bkg_color = RGB_GREY;
+              bgName      = L"Grey.";
               break;
             case IDM_RED_BKG:
               g_bkg_color = RGB_RED;
+              bgName      = L"Red.";
               break;
             case IDM_GREEN_BKG:
               g_bkg_color = RGB_GREEN;
+              bgName      = L"Green.";
+              break;
+            case IDM_BLUE_BKG:
+              g_bkg_color = RGB_BLUE;
+              bgName      = L"Blue.";
               break;
             default:
               g_bkg_color = RGB_BLUE;
+              LOG(ERROR) << L"Unknown background color!";
               break;
           }
+          LOG(INFO) << L"Background color changed to " << bgName;
           // Swap only the old background pixels over to the new color. Ant path
           // pixels are left untouched, so existing ants paths are preserved across
           // background changes.
@@ -795,22 +807,32 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT, command, MF_BYCOMMAND);
+          const wchar_t* antName = L"?";
           switch (command) {
             case IDM_CYANANT:
               g_ant_color = RGB_CYAN;
+              antName     = L"Cyan.";
               break;
             case IDM_YELLOWANT:
               g_ant_color = RGB_YELLOW;
+              antName     = L"Yellow.";
               break;
             case IDM_MAGENTAANT:
               g_ant_color = RGB_MAGENTA;
+              antName     = L"Magenta.";
+              break;
+            case IDM_ALLCOLORANT:
+              g_ant_color = kRandomAntColor;
+              antName     = L"Random.";
               break;
             default:
               g_ant_color = kRandomAntColor;
+              LOG(ERROR) << L"Unknown ant color!";
               break;
           }
           RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
+          LOG(INFO) << L"Ant colors changed to " << antName;
           break;
         }
         case IDM_SLOW:
@@ -821,27 +843,34 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hDelay    = GetSubMenu(hSettings, 4);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
+          const wchar_t* speedName = L"?";
           switch (command) {
             case IDM_SLOW:
               g_delay = kSlowSpeed;
+              speedName = L"Slow";
               break;
             case IDM_MEDIUM:
               g_delay = kMedSpeed;
+              speedName = L"Medium";
               break;
             case IDM_FAST:
               g_delay = kHighSpeed;
+              speedName = L"Fast";
               break;
             case IDM_HYPER:
               g_delay = kHyperSpeed;
+              speedName = L"Hyper";
               break;
             case IDM_REALTIME:
               g_delay = kRealTime;
+              speedName = L"Realtime";
               break;
             default:
-              LOG(ERROR) << "Unhandled speed type";
+              LOG(FATAL) << "Unhandled speed type!";
               g_delay = g_default_speed;
               break;
           }
+          LOG(INFO) << L"Speed changed to " << speedName << L" (" << g_delay << L" ms.)";
           // Replace the timer with the new interval - but only if the
           // simulation is currently running. If we're paused (including
           // mid-Custom-placement before any ants are dropped) the timer
@@ -1017,6 +1046,7 @@ bool InitApp(HWND hWnd) {
 }
 
 void ShutDownApp() {
+  LOG(DEBUG) << L"Exiting app...";
   // Stop the BGM first (sync post to the worker), THEN tear the worker
   // down. Both calls are idempotent - WM_DESTROY will call them again
   // harmlessly on the way out.

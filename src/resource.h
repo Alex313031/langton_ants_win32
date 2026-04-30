@@ -29,6 +29,8 @@
 #define IDD_ABOUTDLG                130
 #define IDD_CUSTOMDLG               131
 #define IDC_CUSTOMSEED              132
+#define IDD_CUSTOMNUM               133
+#define IDC_CUSTOMNUM               134
 
 /* Menu items */
 #define IDM_ABOUT                   200
@@ -81,22 +83,7 @@
 #define IDM_CONC_14                 236
 #define IDM_CONC_15                 237
 #define IDM_CONC_16                 238
-#define IDM_CONC_17                 239
-#define IDM_CONC_18                 240
-#define IDM_CONC_19                 241
-#define IDM_CONC_20                 242
-#define IDM_CONC_21                 243
-#define IDM_CONC_22                 244
-#define IDM_CONC_23                 245
-#define IDM_CONC_24                 246
-#define IDM_CONC_25                 247
-#define IDM_CONC_26                 248
-#define IDM_CONC_27                 249
-#define IDM_CONC_28                 250
-#define IDM_CONC_29                 251
-#define IDM_CONC_30                 252
-#define IDM_CONC_31                 253
-#define IDM_CONC_32                 254
+#define IDM_CONC_CUSTOM             255
 
 // Forces painting a new canvas, with whatever settings it currently has
 #define IDM_REPAINT                 260

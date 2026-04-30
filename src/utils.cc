@@ -38,11 +38,27 @@ static int s_idxColors = 0;
 // which item has CHECKED in langton_ants.rc is the only code change needed to
 // alter a default setting.
 void InitMenuDefaults(HWND hWnd) {
-  HMENU hMenu     = GetMenu(hWnd);
+  HMENU hMenu = GetMenu(hWnd);
+  if (hMenu == nullptr) {
+    LOG(ERROR) << L"GetMenu returned null - menu defaults skipped";
+    return;
+  }
   HMENU hSettings = GetSubMenu(hMenu, 1);
-  HMENU hConc     = GetSubMenu(hSettings, 3); // Num Ants submenu
-  HMENU hDelay    = GetSubMenu(hSettings, 4); // Speed menu
-  HMENU hBkgMenu  = GetSubMenu(hSettings, 5); // Colors menu (bg colors + monochrome)
+  if (hSettings == nullptr) {
+    LOG(ERROR) << L"GetSubMenu(Settings) returned null - menu defaults skipped";
+    return;
+  }
+  HMENU hConc    = GetSubMenu(hSettings, 3); // Num Ants submenu
+  HMENU hDelay   = GetSubMenu(hSettings, 4); // Speed menu
+  HMENU hBkgMenu = GetSubMenu(hSettings, 5); // Colors menu (bg colors + monochrome)
+  if (hConc == nullptr || hDelay == nullptr || hBkgMenu == nullptr) {
+    LOG(ERROR) << L"Missing Settings sub-submenu (RC index drift?) "
+                  L"hConc="
+               << (hConc ? L"set" : L"null")
+               << L" hDelay=" << (hDelay ? L"set" : L"null")
+               << L" hBkgMenu=" << (hBkgMenu ? L"set" : L"null");
+    return;
+  }
 
   // Background color
   const struct {
@@ -76,8 +92,8 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Concurrent ants - exactly one IDM_CONC_N must be CHECKED in the RC.
-  // IDs are consecutive (IDM_CONC_1..IDM_CONC_32) so we can probe them in a loop.
-  for (UINT id = IDM_CONC_1; id <= IDM_CONC_32; ++id) {
+  // IDs are consecutive (IDM_CONC_1..IDM_CONC_16) so we can probe them in a loop.
+  for (UINT id = IDM_CONC_1; id <= IDM_CONC_16; ++id) {
     if (GetMenuState(hConc, id, MF_BYCOMMAND) & MF_CHECKED) {
       SetNumAnts((id - IDM_CONC_1) + 1);
       break;
@@ -174,7 +190,14 @@ bool SaveClientBitmap(HWND hWnd) {
   ofn.Flags                = OFN_PATHMUSTEXIST | OFN_OVERWRITEPROMPT;
 
   if (!GetSaveFileNameW(&ofn)) {
-    return false; // user cancelled or dialog error
+    // CommDlgExtendedError() returns 0 when the user cancelled and a
+    // non-zero CDERR_* code on actual dialog failure. Cancellation is
+    // intentional and stays silent; only the failure path warns.
+    const DWORD err = CommDlgExtendedError();
+    if (err != 0) {
+      LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << err << L")";
+    }
+    return false;
   }
 
   // Hold the back buffer lock for the duration of the pixel read so the ant
@@ -228,6 +251,7 @@ bool SaveClientBitmap(HWND hWnd) {
   HANDLE hFile =
       CreateFileW(szFile, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
+    LOG(ERROR) << L"Failed to open file for writing: " << szFile;
     return false;
   }
 
@@ -237,6 +261,11 @@ bool SaveClientBitmap(HWND hWnd) {
                   WriteFile(hFile, pixels.data(), bi.biSizeImage, &written, nullptr);
 
   CloseHandle(hFile);
+  if (ok) {
+    LOG(INFO) << L"Saved canvas to " << szFile;
+  } else {
+    LOG(WARN) << L"Failed to write canvas BMP to " << szFile;
+  }
   return ok;
 }
 
@@ -615,6 +644,7 @@ void LayoutToolbar(HWND hWnd) {
 // via const_cast is safe - the control won't mutate the memory we point at.
 void SetPauseButton(bool paused) {
   if (s_hToolbar == nullptr) {
+    LOG(ERROR) << L"SetPauseButton() called before toolbar is ready";
     return;
   }
   TBBUTTONINFOW bi = {};
@@ -640,6 +670,7 @@ void SetPauseButton(bool paused) {
 
 void SetSoundButton(bool playing) {
   if (s_hToolbar == nullptr) {
+    LOG(ERROR) << L"SetSoundButton() called before toolbar is ready";
     return;
   }
   TBBUTTONINFOW bi = {};
@@ -648,6 +679,35 @@ void SetSoundButton(bool playing) {
   bi.iImage        = playing ? s_idxMute : s_idxSound;
   bi.pszText       = const_cast<LPWSTR>(playing ? L"Mute" : L"Sound");
   SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_SOUND, reinterpret_cast<LPARAM>(&bi));
+}
+
+void SetNumAntsCheck(unsigned int n) {
+  if (mainHwnd == nullptr) {
+    return;
+  }
+  HMENU hMenu = GetMenu(mainHwnd);
+  if (hMenu == nullptr) {
+    return;
+  }
+  HMENU hSettings = GetSubMenu(hMenu, 1);
+  if (hSettings == nullptr) {
+    return;
+  }
+  HMENU hConc = GetSubMenu(hSettings, 3);
+  if (hConc == nullptr) {
+    return;
+  }
+  if (n >= 1 && n <= 16) {
+    CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_16, IDM_CONC_1 + (n - 1), MF_BYCOMMAND);
+    CheckMenuItem(hConc, IDM_CONC_CUSTOM, MF_BYCOMMAND | MF_UNCHECKED);
+  } else {
+    // Out of menu range - clear every numeric radio and let the Custom Num
+    // entry carry the check mark on its own.
+    for (UINT id = IDM_CONC_1; id <= IDM_CONC_16; ++id) {
+      CheckMenuItem(hConc, id, MF_BYCOMMAND | MF_UNCHECKED);
+    }
+    CheckMenuItem(hConc, IDM_CONC_CUSTOM, MF_BYCOMMAND | MF_CHECKED);
+  }
 }
 
 bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
@@ -734,6 +794,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = g_playsound ? L"Mute Background Sounds" : L"Play Background Sounds";
       break;
     default:
+      LOG(WARN) << L"HandleToolbarTooltips(): no tooltip for command id " << idCommand;
       return false; // unknown button - let the default handling run
   }
   pdi->lpszText = const_cast<LPWSTR>(text);
@@ -763,10 +824,43 @@ bool ValidateCustomSeed(LPCWSTR cSeed) {
     return false;
   }
   if (seedValue == 0) {
-    LOG(WARN) << L"Custom seed value was 0";
+    LOG(WARN) << L"Custom seed value was 0!";
     is_valid = false;
   } else {
     is_valid = (seedValue > 0 && seedValue <= INT_MAX);
+  }
+  return is_valid;
+}
+
+bool ValidateCustomNum(LPCWSTR cNum) {
+  bool is_valid = false;
+  // nullptr check first so the *cNum dereference below is safe.
+  if (cNum == nullptr || *cNum == L'\0') {
+    return false; // Early fail on null pointer or empty string.
+  }
+  // Check that all characters are digits
+  for (const wchar_t* p = cNum; *p != L'\0'; ++p) {
+    if (*p < L'0' || *p > L'9') {
+      return false;
+    }
+  }
+  // Convert to integer. wcstol is the standard wide-string variant
+  // (wcstoi is non-standard and missing under MinGW/Clang).
+  wchar_t* end;
+  const int antNumValue = wcstol(cNum, &end, 10);
+  // Check conversion was successful (end should point to null terminator)
+  if (*end != L'\0') {
+    return false;
+  }
+  if (antNumValue == 0) {
+    LOG(WARN) << L"Custom ants value was 0!";
+    is_valid = false;
+  } else if (antNumValue > kMaxAntThreads) {
+    LOG(WARN) << L"Custom ants value higher than " << kMaxAntThreads << L"!";
+    is_valid = false;
+  } else {
+    // Check that custom num is less than hard limit
+    is_valid = (antNumValue > 0 && antNumValue <= kMaxAntThreads);
   }
   return is_valid;
 }

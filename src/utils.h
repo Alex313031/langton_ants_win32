@@ -26,6 +26,10 @@ inline constexpr unsigned long kRealTime   = 1UL;
 
 extern unsigned long g_default_speed;
 
+// Large and small main application icons
+extern HICON kMainIcon;
+extern HICON kSmallIcon;
+
 // Default desired ant canvas size (NOT the outer window size). wWinMain
 // adds the OS chrome and the toolbar's measured height on top of these
 // to compute the actual outer window size, so the user always gets a
@@ -84,6 +88,14 @@ void SetPauseButton(bool paused);
 // click to start) and "Mute" (playing, click to stop). Call after ToggleSound.
 void SetSoundButton(bool playing);
 
+// Reflects the current ant count on the Num Ants submenu. Pass the value
+// you just set g_num_ants to. Counts 1-16 light up the matching IDM_CONC_N
+// radio and clear IDM_CONC_CUSTOM; counts outside that range (17-128 from
+// the Custom Num dialog, or post-place-mode counts > 16) clear all the
+// radios and check IDM_CONC_CUSTOM instead so exactly one entry shows
+// a mark.
+void SetNumAntsCheck(unsigned int n);
+
 // Handles a TTN_GETDISPINFOW / TTN_NEEDTEXTW notification from the toolbar's
 // tooltip control by supplying a descriptive string based on the hovered
 // button's command ID (and, for state-toggling buttons, the current state).
@@ -105,6 +117,11 @@ bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu);
 // Validates that the input from "Custom Seed" dialog is valid.
 // Must be an unsigned integer, no spaces, decimals, or alphanumeric characters.
 bool ValidateCustomSeed(LPCWSTR cSeed);
+
+// Validates that the input from "Custom Num Ants" dialog is valid.
+// Must be an unsigned integer less than kMaxAntThreads, no spaces, decimals,
+// or alphanumeric characters,
+bool ValidateCustomNum(LPCWSTR cNum);
 
 // Gets version as human readable wstring.
 const std::wstring GetVersionString();

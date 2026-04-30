@@ -84,9 +84,14 @@ static const wchar_t kBgmHiddenClass[] = L"LangtonAntsBgmHidden";
 
 // Convert an MCIERROR code into a human-readable string using
 // mciGetErrorStringW, the MCI-provided lookup. Used only for logging.
+// Falls back to "unknown MCI error <num>" when MCI doesn't recognize its
+// own error code, so the calling log lines never print an empty trailer.
 static std::wstring MciErrText(MCIERROR err) {
   wchar_t buf[256] = {};
   mciGetErrorStringW(err, buf, sizeof(buf) / sizeof(buf[0]));
+  if (buf[0] == L'\0') {
+    return L"unknown MCI error " + std::to_wstring(err);
+  }
   return std::wstring(buf);
 }
 
@@ -99,7 +104,7 @@ static std::wstring MciErrText(MCIERROR err) {
 static std::wstring ExtractEmbeddedWavToTemp() {
   HRSRC hRsrc = FindResourceW(nullptr, MAKEINTRESOURCEW(IDR_BGM_WAVE), L"WAVE");
   if (hRsrc == nullptr) {
-    LOG(ERROR) << L"FindResource IDR_BGM_WAVE failed";
+    LOG(ERROR) << L"FindResourceW IDR_BGM_WAVE failed";
     return std::wstring();
   }
   HGLOBAL hGlob = LoadResource(nullptr, hRsrc);
@@ -125,7 +130,7 @@ static std::wstring ExtractEmbeddedWavToTemp() {
   HANDLE hFile = CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                              FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE) {
-    LOG(ERROR) << L"CreateFile temp failed for " << tempPath;
+    LOG(ERROR) << L"CreateFileW temp failed for " << tempPath;
     return std::wstring();
   }
   DWORD written = 0;

@@ -12,46 +12,15 @@ volatile bool g_stopped = true;  // True at startup (no animation yet) and after
 
 bool g_monochrome = false; // Whether monochrome colors only is enabled
 
-COLORREF g_ant_color =
-    kRandomAntColor; // Fixed ant marker color, or kRandomAntColor for per-ant random pick
+// Fixed ant marker color, or kRandomAntColor for per-ant random pick
+COLORREF g_ant_color = kRandomAntColor; 
 
-volatile UINT g_num_ants =
-    1; // Initialize to 1, in case something goes wrong at least we draw 1 ant
+// Initialize to 1, in case something goes wrong at least we draw 1 ant
+volatile UINT g_num_ants = 1;
 
-unsigned long g_delay = kRealTime; // Default until InitMenuDefaults reads the RC.
+// Default until InitMenuDefaults reads the RC.
+unsigned long g_delay = kRealTime;
 
-// --- Thread pool state ----------------------------------------------------
-// Each live ant thread has its own auto-reset "tick" event and an exit flag.
-// WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of
-// these every tick, so each thread wakes once per tick and moves the ant by one space.
-// This keeps total ants-per-tick == thread count (== g_num_ants), and
-// lets us dynamically spawn/terminate individual threads when the user
-// changes the Num Ants setting.
-struct AntThreadSlot {
-  HANDLE hThread              = nullptr;
-  HANDLE hTickEvent           = nullptr; // auto-reset; SetEvent = "go draw"
-  volatile bool exitRequest   = false;   // set true to make thread exit cleanly
-  volatile bool reseedRequest = false;   // set true to reroll position / color / dir
-  // Place-mode handoff: when placementRequested is set the thread adopts
-  // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
-  // a random direction, and skips the step (the marker is already painted on
-  // the canvas by PlaceAntAtClient). Cleared by the thread once consumed.
-  volatile bool placementRequested = false;
-  int placeCellX                   = 0;
-  int placeCellY                   = 0;
-  COLORREF placeColor              = 0;
-  bool placeOnBg                   = true;
-  volatile bool customSeedRequest  = false; // Whether to use custom seed for seeding randomization
-  UINT customSeed =
-      0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
-  // Color-refresh handoff: when set, the thread re-picks antColor against
-  // the current g_monochrome and overpaints its current cell so the new
-  // color is visible immediately (even when paused). Position / dir /
-  // onBg are left alone - used by the Monochrome toggle which is meant
-  // to behave like picking a Colors entry (just swap colors, don't
-  // touch ant draw state).
-  volatile bool colorRefreshRequest = false;
-};
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int s_activeCount = 0; // only touched from the main thread
 
@@ -79,12 +48,11 @@ int g_placed_ants_count = 0;
 static bool ApplyPlacements();
 
 // Path/ant color chosen for contrast against the current background: white
-// unless the background is white or green, in which case black. Re-read on
-// every step so the ant adapts immediately if the user changes the bg
-// mid-simulation. (Existing trails are left alone - see the comment on
-// RecolorBackground.)
+// unless the background is white, in which case black. Re-read on every step
+// so the ant adapts immediately if the user changes the bg mid-simulation.
+// (Existing trails are left alone - see the comment on RecolorBackground.)
 static COLORREF CurrentPathColor() {
-  if (g_bkg_color == RGB_WHITE || g_bkg_color == RGB_GREEN) {
+  if (g_bkg_color == RGB_WHITE) {
     return RGB_BLACK;
   }
   return RGB_WHITE;
@@ -150,6 +118,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // next iteration. Any failure / spurious wake exits the thread.
     if (slot->hTickEvent == nullptr ||
         WaitForSingleObject(slot->hTickEvent, INFINITE) != WAIT_OBJECT_0) {
+      LOG(ERROR) << L"AntThread: tick event wait failed (slot "
+                 << static_cast<int>(slot - s_slots) << L") - thread exiting...";
       break;
     }
     // Two exit paths: global shutdown OR this individual slot was asked to die
@@ -465,7 +435,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // if the user was paused, the timer stays off and the new threads sit
   // on their tick events until the user presses play.
   if (s_activeCount <= 0) {
-    LOG(ERROR) << L"No ant threads active, nothing to seed";
+    LOG(WARN) << L"No ant threads active, nothing to seed.";
     return false;
   }
   const int desiredCount = s_activeCount;
@@ -553,8 +523,8 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
     s_slots[i].placementRequested = false;
   }
   if (!EnsureThreadCount(desiredCount)) {
-    LOG(ERROR) << L"EnsureThreadCount(" << desiredCount
-               << L") failed during respawn - pool may be smaller than expected!";
+    LOG(FATAL) << L"EnsureThreadCount(" << desiredCount
+               << L") failed during respawn, thread pool corrupted!";
     ok = false;
   }
 
@@ -624,7 +594,7 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
   HBITMAP hbmNew = CreateCompatibleBitmap(hdcWin, cx, cy);
   ReleaseDC(hWnd, hdcWin);
   if (hbmNew == nullptr) {
-    LOG(ERROR) << L"CreateCompatibleBitmap(" << cx << L"x" << cy
+    LOG(FATAL) << L"CreateCompatibleBitmap(" << cx << L"x" << cy
                << L") failed, out of GDI resources.";
     return false;
   }
@@ -739,8 +709,8 @@ bool SetNumAnts(const unsigned int num) {
   // the right number of threads using g_num_ants directly.
   if (g_running) {
     if (!EnsureThreadCount(static_cast<int>(clamped))) {
-      LOG(ERROR) << L"EnsureThreadCount(" << clamped
-                 << L") failed (CreateThread / CreateEvent inside ant thread pool grow path)";
+      LOG(FATAL) << L"EnsureThreadCount(" << clamped
+                 << L") failed: CreateThread / CreateEvent inside ant thread pool grow path error.";
       ok = false;
     }
   }
@@ -749,7 +719,7 @@ bool SetNumAnts(const unsigned int num) {
 
 bool ShowAnts() {
   if (g_num_ants == 0 || g_delay == 0) {
-    LOG(ERROR) << L"Number of ants or delay Out of bounds!";
+    LOG(FATAL) << L"Number of ants or delay Out Of Bounds!";
     return false;
   }
 
@@ -765,6 +735,7 @@ bool ShowAnts() {
   // Start the timer that drives drawing. WM_TIMER fires every g_delay ms
   // and, via SignalAntsTick, pulses every active thread's tick event once.
   if (!SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr)) {
+    LOG(ERROR) << L"SetTimer failed! Tearing down ant thread pool...";
     ShutdownAnts();
     return false;
   }
@@ -778,7 +749,7 @@ bool ShowAnts() {
 bool TogglePaintAnts(HWND hWnd) {
   bool ok = true;
   if (hWnd == nullptr) {
-    LOG(ERROR) << L"TogglePaintAnts: null hWnd";
+    LOG(FATAL) << L"hWnd was NULL!";
     return false;
   }
   g_paused = !g_paused;
@@ -805,9 +776,8 @@ bool TogglePaintAnts(HWND hWnd) {
     g_stopped = false;
     SignalAntsTick();
     if (SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr) == 0) {
-      LOG(ERROR) << L"TogglePaintAnts: SetTimer failed on resume - "
-                    L"simulation will sit idle until something else "
-                    L"re-arms the tick source";
+      LOG(ERROR) << L"SetTimer failed on resume: simulation will sit idle"
+                    L" until something else re-arms the tick source!";
       ok = false;
     }
   }
@@ -840,6 +810,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
     return false;
   }
   if (g_placed_ants_count >= kMaxAntThreads) {
+    LOG(WARN) << L"Place cap hit (" << kMaxAntThreads << L"): click ignored.";
     return false;
   }
   // Window-client → back-buffer coords (the toolbar lives at the top of the
@@ -847,24 +818,30 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   const int bx = clientX;
   const int by = clientY - g_toolbarHeight;
   if (bx < 0 || by < 0) {
+    LOG(DEBUG) << L"Place click ignored: click in toolbar area.";
     return false;
   }
 
   EnterCriticalSection(&g_paintCS);
   if (g_hdcMem == nullptr || cxClient <= 0 || cyClient <= 0) {
     LeaveCriticalSection(&g_paintCS);
+    LOG(ERROR) << L"Place click ignored: no canvas (minimized?)";
     return false;
   }
   const int gridW = cxClient / CELL_PX;
   const int gridH = cyClient / CELL_PX;
   if (gridW < 2 || gridH < 2) {
     LeaveCriticalSection(&g_paintCS);
+    LOG(WARN) << L"Place click ignored: grid too small (" << gridW
+              << L"x" << gridH << L")...";
     return false;
   }
   const int cellX = bx / CELL_PX;
   const int cellY = by / CELL_PX;
   if (cellX >= gridW || cellY >= gridH) {
     LeaveCriticalSection(&g_paintCS);
+    LOG(WARN) << L"Place click ignored: cell (" << cellX << L"," << cellY
+              << L") outside grid (" << gridW << L"x" << gridH << L")!";
     return false;
   }
 
@@ -905,17 +882,20 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
+  LOG(INFO) << L"Ant placed at cell (" << cellX << L"," << cellY
+            << L"). " << g_placed_ants_count << L" of " << kMaxAntThreads
+            << L" threads remain.";
   return true;
 }
 
 bool UndoLastPlacement() {
   bool ok = true;
   if (!g_place_mode) {
-    LOG(ERROR) << L"UndoLastPlacement: called outside place mode";
+    LOG(ERROR) << L"UndoLastPlacement() called outside place mode!";
     return false;
   }
   if (g_placed_ants_count <= 0) {
-    LOG(ERROR) << L"UndoLastPlacement: no placements to undo";
+    LOG(WARN) << L"No ant placements to undo...";
     return false;
   }
   // Pop the last placement and erase its marker. Place mode always
@@ -938,13 +918,16 @@ bool UndoLastPlacement() {
   g_placed_ants_count--;
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
+  LOG(INFO) << L"Undid placement at cell (" << cellX << L"," << cellY
+            << L"). " << g_placed_ants_count << L" of " << kMaxAntThreads
+            << L" threads remain.";
   return ok;
 }
 
 static bool ApplyPlacements() {
   bool ok = true;
   if (!g_place_mode) {
-    LOG(ERROR) << L"ApplyPlacements called outside place mode, nothing to apply";
+    LOG(ERROR) << L"ApplyPlacements() called outside place mode: nothing to apply!";
     return false;
   }
   if (g_placed_ants_count > 0) {
@@ -953,7 +936,7 @@ static bool ApplyPlacements() {
     // refreshes the IDM_CONC_N menu radio after this returns.
     if (!SetNumAnts(static_cast<unsigned int>(g_placed_ants_count))) {
       LOG(ERROR) << L"SetNumAnts(" << g_placed_ants_count
-                 << L") failed - placed ants may not all have a thread to drive them";
+                 << L") failed! Placed ants may not all have a thread to drive them...";
       ok = false;
     }
     for (int i = 0; i < g_placed_ants_count; i++) {
@@ -969,14 +952,13 @@ static bool ApplyPlacements() {
   return ok;
 }
 
-INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+INT_PTR CALLBACK CustomSeedDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
   UNREFERENCED_PARAMETER(lParam);
   switch (message) {
     case WM_INITDIALOG:
       // Set icon in titlebar of about dialog
-      static const HICON kCustomIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(IDI_SMALL));
-      SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kCustomIcon);
-      SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kCustomIcon);
+      SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kSmallIcon);
+      SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
       return TRUE;
     case WM_CLOSE:
       EndDialog(hDlg, TRUE);
@@ -994,7 +976,7 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
           wchar_t buf[32] = {};
           GetDlgItemTextW(hDlg, IDC_CUSTOMSEED, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCustomSeed(buf)) {
-            ErrorBox(hDlg, L"Custom Seed Validation Error",
+            ErrorBox(hDlg, L"Custom Ant Seed Validation Error",
                      L"Invalid input - must be a positive integer.");
             // Re-focus the edit so the user can correct without retabbing.
             // Dialog stays open (return TRUE without EndDialog).
@@ -1008,6 +990,60 @@ INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
           return TRUE;
         }
         case IDC_CUSTOMSEED:
+          break;
+        default:
+          break;
+      }
+    } break;
+    default:
+      break;
+  }
+  return FALSE;
+}
+
+INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+  UNREFERENCED_PARAMETER(lParam);
+  switch (message) {
+    case WM_INITDIALOG:
+      // Set icon in titlebar of about dialog
+      SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kSmallIcon);
+      SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
+      return TRUE;
+    case WM_CLOSE:
+      EndDialog(hDlg, TRUE);
+      return TRUE;
+    case WM_COMMAND: {
+      const int cmd = LOWORD(wParam);
+      switch (cmd) {
+        case IDCANCEL:
+          EndDialog(hDlg, IDCANCEL);
+          return TRUE;
+        case IDOK: {
+          // 9 chars is plenty - 8, plus null terminator.
+          // ValidateCustomNum already enforces only 1 up to kMaxAntThreads.
+          wchar_t buf[9] = {};
+          GetDlgItemTextW(hDlg, IDC_CUSTOMNUM, buf, sizeof(buf) / sizeof(buf[0]));
+          if (!ValidateCustomNum(buf)) {
+            ErrorBox(hDlg, L"Custom Number Validation Error",
+                     L"Invalid input - must be between 1 - 128.");
+            // Re-focus the edit so the user can correct without retabbing.
+            // Dialog stays open (return TRUE without EndDialog).
+            SetFocus(GetDlgItem(hDlg, IDC_CUSTOMNUM));
+            return TRUE;
+          }
+          const unsigned long lnum = wcstoul(buf, nullptr, 10);
+          const UINT numAnts       = static_cast<unsigned int>(lnum);
+          SetNumAnts(numAnts);
+          // Reflect the new count on the menu: a typed value of 1-16 still
+          // lights up the matching IDM_CONC_N radio (so picking "5" via the
+          // dialog looks the same as picking "5" via the menu); 17-128 lands
+          // on IDM_CONC_CUSTOM with the radios cleared.
+          SetNumAntsCheck(numAnts);
+          LOG(INFO) << L"Number of ants changed to " << numAnts;
+          EndDialog(hDlg, IDOK);
+          return TRUE;
+        }
+        case IDC_CUSTOMNUM:
           break;
         default:
           break;

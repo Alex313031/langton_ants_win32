@@ -16,6 +16,39 @@ extern volatile UINT g_num_ants;
 
 extern unsigned long g_delay;
 
+// --- Thread pool state ----------------------------------------------------
+// Each live ant thread has its own auto-reset "tick" event and an exit flag.
+// WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of
+// these every tick, so each thread wakes once per tick and moves the ant by one space.
+// This keeps total ants-per-tick == thread count (== g_num_ants), and
+// lets us dynamically spawn/terminate individual threads when the user
+// changes the Num Ants setting.
+struct AntThreadSlot {
+  HANDLE hThread              = nullptr;
+  HANDLE hTickEvent           = nullptr; // auto-reset; SetEvent = "go draw"
+  volatile bool exitRequest   = false;   // set true to make thread exit cleanly
+  volatile bool reseedRequest = false;   // set true to reroll position / color / dir
+  // Place-mode handoff: when placementRequested is set the thread adopts
+  // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
+  // a random direction, and skips the step (the marker is already painted on
+  // the canvas by PlaceAntAtClient). Cleared by the thread once consumed.
+  volatile bool placementRequested = false;
+  int placeCellX                   = 0;
+  int placeCellY                   = 0;
+  COLORREF placeColor              = 0;
+  bool placeOnBg                   = true;
+  volatile bool customSeedRequest  = false; // Whether to use custom seed for seeding randomization
+  UINT customSeed =
+      0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
+  // Color-refresh handoff: when set, the thread re-picks antColor against
+  // the current g_monochrome and overpaints its current cell so the new
+  // color is visible immediately (even when paused). Position / dir /
+  // onBg are left alone - used by the Monochrome toggle which is meant
+  // to behave like picking a Colors entry (just swap colors, don't
+  // touch ant draw state).
+  volatile bool colorRefreshRequest = false;
+};
+
 // True while the user is "seeding" ants by clicking on the canvas (entered
 // via Settings → Custom → Custom Seed, or the IDM_CUSTOM toolbar dropdown).
 // While set, WM_LBUTTONDOWN places an ant at the click instead of starting
@@ -34,9 +67,10 @@ extern HDC g_hdcMem;
 extern HBITMAP g_hbmMem;
 
 // Hard upper bound on concurrent ant threads. 8 matches the historical
-// Windows 2000 Server/XP+ cores limit. 32 is a reasonable limit for modern machines.
-// The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_32 matching this bound.
-inline constexpr int kMaxAntThreads = static_cast<int>(32u);
+// Windows 2000 Server/XP+ cores limit. 128 is max for modern machines.
+// The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_16; the "Custom Num"
+// dialog (IDM_CONC_CUSTOM) lets the user reach the rest up to this cap.
+inline constexpr int kMaxAntThreads = static_cast<int>(128u);
 
 // Size of one logical ant "pixel" in real hardware pixels. An ant occupies
 // a CELL_PX × CELL_PX square and every path mark quantizes to the same
@@ -137,6 +171,9 @@ bool PlaceAntAtClient(int clientX, int clientY);
 bool UndoLastPlacement();
 
 // For "Custom Seed" dialog box
-INT_PTR CALLBACK CustomDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK CustomSeedDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+// For "Custom Num" dialog box
+INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
 #endif // LANGTON_ANTS_ANTS_H

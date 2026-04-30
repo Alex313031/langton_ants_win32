@@ -114,22 +114,8 @@ BEGIN
             MENUITEM "14 Threads", IDM_CONC_14
             MENUITEM "15 Threads", IDM_CONC_15
             MENUITEM "16 Threads", IDM_CONC_16
-            MENUITEM "17 Threads", IDM_CONC_17
-            MENUITEM "18 Threads", IDM_CONC_18
-            MENUITEM "19 Threads", IDM_CONC_19
-            MENUITEM "20 Threads", IDM_CONC_20
-            MENUITEM "21 Threads", IDM_CONC_21
-            MENUITEM "22 Threads", IDM_CONC_22
-            MENUITEM "23 Threads", IDM_CONC_23
-            MENUITEM "24 Threads", IDM_CONC_24
-            MENUITEM "25 Threads", IDM_CONC_25
-            MENUITEM "26 Threads", IDM_CONC_26
-            MENUITEM "27 Threads", IDM_CONC_27
-            MENUITEM "28 Threads", IDM_CONC_28
-            MENUITEM "29 Threads", IDM_CONC_29
-            MENUITEM "30 Threads", IDM_CONC_30
-            MENUITEM "31 Threads", IDM_CONC_31
-            MENUITEM "32 Threads", IDM_CONC_32
+            MENUITEM SEPARATOR
+            MENUITEM "Custom Num", IDM_CONC_CUSTOM
         END
         POPUP "&Speed"
         BEGIN
@@ -170,7 +156,7 @@ BEGIN
         MENUITEM "&Repaint Now",         IDM_REPAINT
         MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
         MENUITEM SEPARATOR
-        MENUITEM "&Test Trap",           IDM_TESTTRAP
+        MENUITEM "&Test Trap (Crashes app)",           IDM_TESTTRAP
     END
     POPUP "&About"
     BEGIN
@@ -224,6 +210,17 @@ BEGIN
     PUSHBUTTON    "Cancel", IDCANCEL, 70, 35, 40, 14, WS_TABSTOP
 END
 
+IDD_CUSTOMNUM DIALOGEX 7, 7, 132, 56
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_DLGFRAME
+CAPTION "Choose Custom Num Ants"
+FONT 8, "MS Shell Dlg 2"
+BEGIN
+    LTEXT         "Number of Ants (Ant Threads):", IDC_STATIC, 7, 7, 116, 10, SS_NOPREFIX
+    EDITTEXT      IDC_CUSTOMNUM, 7, 20, 80, 14, ES_LEFT | WS_BORDER | WS_TABSTOP
+    DEFPUSHBUTTON "OK", IDOK, 25, 35, 40, 14, WS_TABSTOP
+    PUSHBUTTON    "Cancel", IDCANCEL, 70, 35, 40, 14, WS_TABSTOP
+END
+
 // Dialog DESIGNINFO
 #ifdef APSTUDIO_INVOKED
 GUIDELINES DESIGNINFO
@@ -236,6 +233,13 @@ BEGIN
         BOTTOMMARGIN, 60
     END
     IDD_CUSTOMDLG, DIALOG
+    BEGIN
+        LEFTMARGIN,   7
+        RIGHTMARGIN,  125
+        TOPMARGIN,    7
+        BOTTOMMARGIN, 49
+    END
+    IDD_CUSTOMNUM, DIALOG
     BEGIN
         LEFTMARGIN,   7
         RIGHTMARGIN,  125
