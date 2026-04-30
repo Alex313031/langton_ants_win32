@@ -42,13 +42,15 @@ namespace logging {
   // unsigned long / unsigned long long, which already have decimal
   // overloads, and C++ overload resolution sees through typedefs.
   //   LOG(ERROR) << L"GetLastError: " << logging::Hex(GetLastError());
+  // The explicit constructor is what makes `Hex(value)` work under C++17
+  // (parenthesized aggregate init is C++20-only). With it, the compiler
+  // also synthesizes the deduction guide automatically, so callers don't
+  // need to spell out the template argument.
   template <typename T>
   struct Hex {
     T value;
+    explicit Hex(T v) : value(v) {}
   };
-  // Deduction guide so `Hex(x)` doesn't need its template arg spelled out.
-  template <typename T>
-  Hex(T) -> Hex<T>;
 
   class LogMessage {
    public:
