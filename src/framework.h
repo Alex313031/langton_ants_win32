@@ -16,16 +16,17 @@
 #include <string>    // std::string / std::wstring
 #include <vector>    // Storage, used for Pixel buffers, etc.
 
-#ifdef __cplusplus
- #if __cplusplus < 201103L || !defined(__cplusplus)
-  // For old compilers without constexpr or inline
-  #if !defined(constexpr) || !defined(__cpp_constexpr)
-   typedef const constexpr;
-  #endif // constexpr
-  #if !defined(inline)
-   #define inline
-  #endif // inline
- #endif
+#ifndef __cplusplus
+ #error APP_NAME requires a C++ compiler
+#endif
+#if __cplusplus < 201103L
+ // For old compilers without constexpr or inline
+ #if !defined(constexpr) || !defined(__cpp_constexpr)
+  typedef const constexpr;
+ #endif // constexpr
+ #if !defined(inline)
+  #define inline
+ #endif // inline
 #endif
 
 // clang-format on

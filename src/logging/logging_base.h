@@ -71,6 +71,12 @@
 
 #define LOGGER_VERSION_STRING _VERSION(MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION)
 
+#define _LIBNAME L"HawkLogger"
+
+#if __cplusplus < 201103L || !defined(__cplusplus)
+ #error _LIBNAME only supports C++11 and above
+#endif
+
 #include <windows.h> // Main Windows include
 #include <wincon.h>  // Console API functions
 #include <tchar.h>   // Wide/Short characters
