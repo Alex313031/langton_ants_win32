@@ -124,6 +124,9 @@
 // Toggle showing background "grid"
 #define IDM_SHOWGRID                273
 
+// Whether ants are not restricted by client area, they don't "bounce" off walls
+#define IDM_NOCLIENTBOUNDS          274
+
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280
 

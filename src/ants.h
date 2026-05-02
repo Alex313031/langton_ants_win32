@@ -36,6 +36,13 @@ extern AntAlgorithm g_algorithm;
 // it on/off doesn't cost a canvas wipe.
 extern bool g_show_grid;
 
+// Whether the canvas wraps as a torus instead of bouncing ants off its
+// edges. Toggled by IDM_NOCLIENTBOUNDS. Read by AntThread's step branch:
+// when true, a step that would leave the grid wraps around to the other
+// side; when false (the default), the existing reverse-direction "bounce"
+// rule kicks in. Ant-vs-ant collision still bounces in either mode.
+extern bool g_no_client_bounds;
+
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
 // WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of

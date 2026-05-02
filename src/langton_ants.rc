@@ -150,22 +150,23 @@ BEGIN
             MENUITEM "Sh&ow Grid Lines",       IDM_SHOWGRID
             MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
             MENUITEM "Custom &Seed",           IDM_CUSTOMSEED
+            MENUITEM "&No Canvas Bounds",      IDM_NOCLIENTBOUNDS
             MENUITEM SEPARATOR
             POPUP "&Algorithms"
             BEGIN
-                MENUITEM "Classic     (RL)",           IDM_CLASSIC, CHECKED
-                MENUITEM "Fill        (LRL)",          IDM_FILL
-                MENUITEM "Archimedes  (LRRRRLLLRRR)",  IDM_ARCHIMEDES
+                MENUITEM "Classic  (RL)",              IDM_CLASSIC, CHECKED
+                MENUITEM "Fill  (LRL)",                IDM_FILL
+                MENUITEM "Archimedes (LRRRRLLLRRR)",   IDM_ARCHIMEDES
                 MENUITEM "Logarithmic (RLLLLRRRLLLR)", IDM_LOGARITHMIC
             END
         END
     END
     POPUP "&Dev"
     BEGIN
-        MENUITEM "&Repaint Now",         IDM_REPAINT
+        MENUITEM "&Repaint Now",                    IDM_REPAINT
         MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
         MENUITEM SEPARATOR
-        MENUITEM "&Test Trap (Crashes app)",           IDM_TESTTRAP
+        MENUITEM "&Test Trap (Crashes app)",        IDM_TESTTRAP
     END
     POPUP "&About"
     BEGIN
@@ -191,7 +192,7 @@ BEGIN
     0x53,      IDM_SAVE_AS, VIRTKEY, CONTROL  // Ctrl+S Save As
     VK_SPACE,  IDM_SINGLE,  VIRTKEY, NOINVERT // Spacebar Single-step
     0x5A,      IDM_UNDO,    VIRTKEY, CONTROL  // Ctrl+Z Undo Ant Placement
-    0x43,      IDM_CUSTOMPLACE, VIRTKEY, NOINVERT // C key, customize
+    0x43,  IDM_CUSTOMPLACE, VIRTKEY, NOINVERT // C key, customize
 END
 
 // About Dialog Box

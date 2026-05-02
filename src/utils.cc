@@ -115,10 +115,11 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Algorithm - exactly one IDM_CLASSIC..IDM_LOGARITHMIC must be CHECKED.
-  // The submenu lives at Settings → Customize (index 7) → Algorithms (index 4).
-  // IDM_SHOWGRID was added at the top of Customize, shifting Algorithms by one.
+  // The submenu lives at Settings → Customize (index 7) → Algorithms (index 5).
+  // Customize layout: ShowGrid, CustomPlace, CustomSeed, NoClientBounds,
+  // separator, Algorithms popup.
   HMENU hCustom = GetSubMenu(hSettings, 7);
-  HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 4) : nullptr;
+  HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 5) : nullptr;
   if (hAlgo == nullptr) {
     LOG(ERROR) << L"Missing Customize/Algorithms submenu (RC index drift?)";
   } else {
@@ -130,10 +131,13 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Show-grid toggle. Lives directly in the Customize submenu (no nested
-  // popup), so we read it off hCustom by command ID.
+  // Show-grid + no-client-bounds toggles. Both live directly in the
+  // Customize submenu (no nested popup), so read them off hCustom by
+  // command ID.
   if (hCustom != nullptr) {
     g_show_grid = (GetMenuState(hCustom, IDM_SHOWGRID, MF_BYCOMMAND) & MF_CHECKED) != 0;
+    g_no_client_bounds =
+        (GetMenuState(hCustom, IDM_NOCLIENTBOUNDS, MF_BYCOMMAND) & MF_CHECKED) != 0;
   }
 
   // Sound - seed the user's sound preference from the IDM_SOUND menu
@@ -773,9 +777,9 @@ void SetAlgorithmCheck(AntAlgorithm algo) {
   if (hCustom == nullptr) {
     return;
   }
-  // Algorithms is the 5th item in Customize (index 4): IDM_SHOWGRID, place,
-  // custom seed, separator, then this popup.
-  HMENU hAlgo = GetSubMenu(hCustom, 4);
+  // Algorithms is the 6th item in Customize (index 5): IDM_SHOWGRID, place,
+  // custom seed, no-client-bounds, separator, then this popup.
+  HMENU hAlgo = GetSubMenu(hCustom, 5);
   if (hAlgo == nullptr) {
     return;
   }

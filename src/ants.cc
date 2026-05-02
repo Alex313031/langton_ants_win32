@@ -33,6 +33,11 @@ AntAlgorithm g_algorithm = AntAlgorithm::Classic;
 // IDM_SHOWGRID CHECKED state and may flip it on at startup.
 bool g_show_grid = false;
 
+// Toroidal canvas toggle. Default off (ants bounce off the edges); when
+// on, off-edge steps wrap to the other side. InitMenuDefaults reads the
+// RC's IDM_NOCLIENTBOUNDS CHECKED state to pick the startup value.
+bool g_no_client_bounds = false;
+
 // --- Algorithm pattern table ---------------------------------------------
 // One entry per AntAlgorithm value. Pattern is the right/left turn string
 // shown in the menu; numStates = strlen(pattern). Each cell's "state" is an
@@ -436,12 +441,29 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
             const COLORREF cc = GetPixel(g_hdcMem, xx * CELL_PX, yy * CELL_PX);
             return cc == RGB_MAGENTA || cc == RGB_CYAN || cc == RGB_YELLOW;
           };
-          int nx = cellX + kDx[dir];
-          int ny = cellY + kDy[dir];
+          // Computes the candidate next cell from (xx, yy) stepping in
+          // direction dd. With g_no_client_bounds the canvas wraps as a
+          // torus (off the right edge re-enters on the left, off the
+          // bottom re-enters at the top). Without it, OOB stays OOB and
+          // isBlocked returns true on it so the bounce rule below kicks
+          // in - same path the wall case has always taken.
+          // Modulo with negative dividends can return negative in C++,
+          // so add gridW/H first to keep the result in [0, gridW)/[0, gridH).
+          auto nextCell = [&](int xx, int yy, int dd, int& outX, int& outY) {
+            int newX = xx + kDx[dd];
+            int newY = yy + kDy[dd];
+            if (g_no_client_bounds) {
+              newX = ((newX % gridW) + gridW) % gridW;
+              newY = ((newY % gridH) + gridH) % gridH;
+            }
+            outX = newX;
+            outY = newY;
+          };
+          int nx = 0, ny = 0;
+          nextCell(cellX, cellY, dir, nx, ny);
           if (isBlocked(nx, ny)) {
             dir = (dir + 2) & 3;
-            nx  = cellX + kDx[dir];
-            ny  = cellY + kDy[dir];
+            nextCell(cellX, cellY, dir, nx, ny);
             if (isBlocked(nx, ny)) {
               nx = cellX;
               ny = cellY;

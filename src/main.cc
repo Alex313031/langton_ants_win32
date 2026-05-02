@@ -802,6 +802,25 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           break;
         }
+        case IDM_NOCLIENTBOUNDS: {
+          // Pure behavioral toggle - AntThread's step branch reads
+          // g_no_client_bounds each tick and either wraps or bounces. No
+          // canvas wipe needed; existing trails stay put. The change takes
+          // effect on the very next tick, no need to invalidate.
+          g_no_client_bounds = !g_no_client_bounds;
+          HMENU hSettings    = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCustom      = (hSettings != nullptr) ? GetSubMenu(hSettings, 7) : nullptr;
+          if (hCustom != nullptr) {
+            CheckMenuItem(hCustom, IDM_NOCLIENTBOUNDS,
+                          MF_BYCOMMAND | (g_no_client_bounds ? MF_CHECKED : MF_UNCHECKED));
+          }
+          if (g_no_client_bounds) {
+            LOG(INFO) << L"Canvas bounds turned off (ants now wrap around edges).";
+          } else {
+            LOG(INFO) << L"Canvas bounds turned on (ants now bounce off edges).";
+          }
+          break;
+        }
         case IDM_CLASSIC:
         case IDM_FILL:
         case IDM_ARCHIMEDES:
