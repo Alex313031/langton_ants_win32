@@ -120,8 +120,8 @@ static std::wstring ExtractEmbeddedWavToTemp() {
   }
 
   wchar_t tempDir[MAX_PATH] = {};
-  DWORD n                   = GetTempPathW(MAX_PATH, tempDir);
-  if (n == 0 || n > MAX_PATH) {
+  DWORD pathLen             = GetTempPathW(MAX_PATH, tempDir);
+  if (pathLen == 0 || pathLen > MAX_PATH) {
     LOG(ERROR) << L"GetTempPathW failed";
     return std::wstring();
   }
@@ -344,11 +344,11 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
 
   HANDLE handles[2] = {s_bgmExitEvent, s_bgmCmdEvent};
   while (true) {
-    DWORD r = MsgWaitForMultipleObjects(2, handles, FALSE, INFINITE, QS_ALLINPUT);
-    if (r == WAIT_OBJECT_0) {
+    DWORD waitResult = MsgWaitForMultipleObjects(2, handles, FALSE, INFINITE, QS_ALLINPUT);
+    if (waitResult == WAIT_OBJECT_0) {
       break; // exit event
     }
-    if (r == WAIT_OBJECT_0 + 1) {
+    if (waitResult == WAIT_OBJECT_0 + 1) {
       // A command from main thread. Drain the slot under the CS.
       BgmCmdSlot slot;
       EnterCriticalSection(&s_bgmCS);
@@ -362,7 +362,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
         LeaveCriticalSection(&s_bgmCS);
         SetEvent(s_bgmDoneEvent);
       }
-    } else if (r == WAIT_OBJECT_0 + 2) {
+    } else if (waitResult == WAIT_OBJECT_0 + 2) {
       // Window-message queue has something - dispatch everything pending.
       MSG msg;
       while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -370,7 +370,7 @@ static DWORD WINAPI BgmWorkerProc(LPVOID) {
         DispatchMessageW(&msg);
       }
     } else {
-      LOG(ERROR) << L"BGM worker MsgWait returned " << logging::Hex(r);
+      LOG(ERROR) << L"BGM worker MsgWait returned " << logging::Hex(waitResult);
       break;
     }
   }

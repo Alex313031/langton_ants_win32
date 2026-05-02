@@ -435,8 +435,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
             }
             // GetPixel the back buffer (not the state grid) - state-grid
             // entries don't track ant markers, only the cell's trail state.
-            const COLORREF cc = GetPixel(g_hdcMem, xx * CELL_PX, yy * CELL_PX);
-            return cc == RGB_MAGENTA || cc == RGB_CYAN || cc == RGB_YELLOW;
+            const COLORREF sampled = GetPixel(g_hdcMem, xx * CELL_PX, yy * CELL_PX);
+            return sampled == RGB_MAGENTA || sampled == RGB_CYAN || sampled == RGB_YELLOW;
           };
           // Computes the candidate next cell from (xx, yy) stepping in
           // direction dd. With g_no_client_bounds the canvas wraps as a
@@ -860,9 +860,9 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
 
   // Mask off the high (reserved/alpha) byte when comparing so any noise there
   // doesn't cause false negatives on pixels that should match.
-  for (auto& p : pixels) {
-    if ((p & 0x00FFFFFF) == oldPix) {
-      p = (p & 0xFF000000) | newPix;
+  for (auto& pixel : pixels) {
+    if ((pixel & 0x00FFFFFF) == oldPix) {
+      pixel = (pixel & 0xFF000000) | newPix;
     }
   }
 

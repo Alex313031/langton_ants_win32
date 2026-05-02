@@ -79,16 +79,16 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Background color
-  const struct {
+  static const struct {
     UINT id;
     COLORREF color;
   } bkgs[] = {
       {IDM_WHITE_BKG, RGB_WHITE}, {IDM_BLACK_BKG, RGB_BLACK}, {IDM_GREY_BKG, RGB_GREY},
       {IDM_RED_BKG, RGB_RED},     {IDM_GREEN_BKG, RGB_GREEN}, {IDM_BLUE_BKG, RGB_BLUE},
   };
-  for (const auto& b : bkgs) {
-    if (GetMenuState(hBkgMenu, b.id, MF_BYCOMMAND) & MF_CHECKED) {
-      g_bkg_color = b.color;
+  for (const auto& bkg : bkgs) {
+    if (GetMenuState(hBkgMenu, bkg.id, MF_BYCOMMAND) & MF_CHECKED) {
+      g_bkg_color = bkg.color;
       break;
     }
   }
@@ -101,10 +101,10 @@ void InitMenuDefaults(HWND hWnd) {
       {IDM_SLOW, kSlowSpeed},   {IDM_MEDIUM, kMedSpeed},   {IDM_FAST, kHighSpeed},
       {IDM_HYPER, kHyperSpeed}, {IDM_REALTIME, kRealTime},
   };
-  for (const auto& d : delays) {
-    if (GetMenuState(hDelay, d.id, MF_BYCOMMAND) & MF_CHECKED) {
-      g_delay         = d.ms;
-      g_default_speed = d.ms;
+  for (const auto& delay : delays) {
+    if (GetMenuState(hDelay, delay.id, MF_BYCOMMAND) & MF_CHECKED) {
+      g_delay         = delay.ms;
+      g_default_speed = delay.ms;
       break;
     }
   }
@@ -161,9 +161,9 @@ void InitMenuDefaults(HWND hWnd) {
       {IDM_MAGENTAANT, RGB_MAGENTA},
       {IDM_ALLCOLORANT, kRandomAntColor},
   };
-  for (const auto& a : antColors) {
-    if (GetMenuState(hSettings, a.id, MF_BYCOMMAND) & MF_CHECKED) {
-      g_ant_color = a.color;
+  for (const auto& antColor : antColors) {
+    if (GetMenuState(hSettings, antColor.id, MF_BYCOMMAND) & MF_CHECKED) {
+      g_ant_color = antColor.color;
       break;
     }
   }
