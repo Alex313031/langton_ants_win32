@@ -744,6 +744,48 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
+        case IDM_CLASSIC:
+        case IDM_FILL:
+        case IDM_ARCHIMEDES:
+        case IDM_LOGARITHMIC: {
+          // IDs are consecutive and aligned with AntAlgorithm's underlying
+          // values, so the offset gives us the new algo directly.
+          const AntAlgorithm newAlgo =
+              static_cast<AntAlgorithm>(command - IDM_CLASSIC);
+          if (newAlgo == g_algorithm) {
+            break; // user picked what was already active - no-op
+          }
+          g_algorithm = newAlgo;
+          SetAlgorithmCheck(newAlgo);
+          // Algorithm change is a clean-slate intent - the existing trails
+          // were drawn under the previous rule and would just be visual
+          // noise once the ants start following a new one. Mirror IDM_REPAINT:
+          // bail out of place mode if active, wipe the canvas, reseed, and
+          // invalidate so the new pattern starts from a fresh state.
+          if (g_place_mode) {
+            ExitPlaceMode();
+          }
+          ClearCanvasToBackground(cxClient, cyClient);
+          ReseedAnts();
+          InvalidateRect(hWnd, nullptr, FALSE);
+          const wchar_t* algoName = L"?";
+          switch (newAlgo) {
+            case AntAlgorithm::Classic:
+              algoName = L"Classic (RL)";
+              break;
+            case AntAlgorithm::Fill:
+              algoName = L"Fill (LRL)";
+              break;
+            case AntAlgorithm::Archimedes:
+              algoName = L"Archimedes (LRRRRLLLRRR)";
+              break;
+            case AntAlgorithm::Logarithmic:
+              algoName = L"Logarithmic (RLLLLRRRLLLR)";
+              break;
+          }
+          LOG(INFO) << L"Algorithm changed to " << algoName << L".";
+          break;
+        }
         case IDM_CONC_1:
         case IDM_CONC_2:
         case IDM_CONC_3:

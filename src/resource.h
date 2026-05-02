@@ -85,6 +85,12 @@
 #define IDM_CONC_16                 238
 #define IDM_CONC_CUSTOM             255
 
+// Different ant algorithms
+#define IDM_CLASSIC                 256 // Classic original Right-Left algorithm
+#define IDM_FILL                    257 // Ants tend to "fill" an area, with no highways
+#define IDM_ARCHIMEDES              258 // Creates an Archimedes spiral
+#define IDM_LOGARITHMIC             259 // Creates a logarithmic spiral
+
 // Forces painting a new canvas, with whatever settings it currently has
 #define IDM_REPAINT                 260
 

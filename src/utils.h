@@ -6,6 +6,10 @@
 #include <logging.h>
 // clang-format on
 
+// Forward-declared from ants.h so this header doesn't have to drag in the
+// full ants.h surface just to take an AntAlgorithm parameter.
+enum class AntAlgorithm : UINT;
+
 // Color constants
 #define RGB_BLACK   RGB(0, 0, 0)
 #define RGB_WHITE   RGB(255, 255, 255)
@@ -110,7 +114,13 @@ void SetSoundButton(bool playing);
 // the Custom Num dialog, or post-place-mode counts > 16) clear all the
 // radios and check IDM_CONC_CUSTOM instead so exactly one entry shows
 // a mark.
-void SetNumAntsCheck(unsigned int n);
+void SetNumAntsCheck(unsigned int num);
+
+// Reflects the current algorithm on the Settings → Customize → Algorithms
+// submenu. Pass the value you just set g_algorithm to. The IDM_CLASSIC..
+// IDM_LOGARITHMIC IDs are consecutive and aligned with AntAlgorithm's
+// underlying values, so the radio target is derived directly.
+void SetAlgorithmCheck(AntAlgorithm algo);
 
 // Handles a TTN_GETDISPINFOW / TTN_NEEDTEXTW notification from the toolbar's
 // tooltip control by supplying a descriptive string based on the hovered

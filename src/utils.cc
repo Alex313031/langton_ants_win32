@@ -114,6 +114,21 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
+  // Algorithm - exactly one IDM_CLASSIC..IDM_LOGARITHMIC must be CHECKED.
+  // The submenu lives at Settings → Customize (index 7) → Algorithms (index 3).
+  HMENU hCustom = GetSubMenu(hSettings, 7);
+  HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 3) : nullptr;
+  if (hAlgo == nullptr) {
+    LOG(ERROR) << L"Missing Customize/Algorithms submenu (RC index drift?)";
+  } else {
+    for (UINT id = IDM_CLASSIC; id <= IDM_LOGARITHMIC; ++id) {
+      if (GetMenuState(hAlgo, id, MF_BYCOMMAND) & MF_CHECKED) {
+        g_algorithm = static_cast<AntAlgorithm>(id - IDM_CLASSIC);
+        break;
+      }
+    }
+  }
+
   // Sound - seed the user's sound preference from the IDM_SOUND menu
   // check. SyncBgm later (via WM_APP_AUTOPLAY) reads this to decide
   // whether to start playback at startup.
@@ -706,7 +721,7 @@ void SetSoundButton(bool playing) {
   SendMessageW(s_hToolbar, TB_SETBUTTONINFOW, IDM_SOUND, reinterpret_cast<LPARAM>(&bi));
 }
 
-void SetNumAntsCheck(unsigned int n) {
+void SetNumAntsCheck(unsigned int num) {
   if (mainHwnd == nullptr) {
     return;
   }
@@ -722,8 +737,8 @@ void SetNumAntsCheck(unsigned int n) {
   if (hConc == nullptr) {
     return;
   }
-  if (n >= 1 && n <= 16) {
-    CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_16, IDM_CONC_1 + (n - 1), MF_BYCOMMAND);
+  if (num >= 1 && num <= 16) {
+    CheckMenuRadioItem(hConc, IDM_CONC_1, IDM_CONC_16, IDM_CONC_1 + (num - 1), MF_BYCOMMAND);
     CheckMenuItem(hConc, IDM_CONC_CUSTOM, MF_BYCOMMAND | MF_UNCHECKED);
   } else {
     // Out of menu range - clear every numeric radio and let the Custom Num
@@ -733,6 +748,32 @@ void SetNumAntsCheck(unsigned int n) {
     }
     CheckMenuItem(hConc, IDM_CONC_CUSTOM, MF_BYCOMMAND | MF_CHECKED);
   }
+}
+
+void SetAlgorithmCheck(AntAlgorithm algo) {
+  if (mainHwnd == nullptr) {
+    return;
+  }
+  HMENU hMenu = GetMenu(mainHwnd);
+  if (hMenu == nullptr) {
+    return;
+  }
+  HMENU hSettings = GetSubMenu(hMenu, 1);
+  if (hSettings == nullptr) {
+    return;
+  }
+  HMENU hCustom = GetSubMenu(hSettings, 7);
+  if (hCustom == nullptr) {
+    return;
+  }
+  HMENU hAlgo = GetSubMenu(hCustom, 3);
+  if (hAlgo == nullptr) {
+    return;
+  }
+  // IDM_CLASSIC..IDM_LOGARITHMIC are consecutive and in the same order as
+  // AntAlgorithm's underlying values, so the radio target is just the offset.
+  const UINT id = IDM_CLASSIC + static_cast<UINT>(algo);
+  CheckMenuRadioItem(hAlgo, IDM_CLASSIC, IDM_LOGARITHMIC, id, MF_BYCOMMAND);
 }
 
 bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {

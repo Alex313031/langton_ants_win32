@@ -16,6 +16,20 @@ extern volatile UINT g_num_ants;
 
 extern unsigned long g_delay;
 
+// Which Langton's ant variant the simulation runs. Drives the per-tick turn
+// rule in AntThread (Classic = the original RL; the others are multi-state
+// turmite variants whose right-left pattern is shown in their menu items).
+// Underlying values are kept consecutive and starting at 0 so the WM_COMMAND
+// dispatch can do `IDM_CLASSIC + static_cast<UINT>(g_algorithm)` and the
+// menu's CheckMenuRadioItem can derive the radio target the same way.
+enum class AntAlgorithm : UINT {
+  Classic     = 0, // RL            - original Langton (2 states)
+  Fill        = 1, // LRL           - 3 states, area-filling
+  Archimedes  = 2, // LRRRRLLLRRR   - 11 states, Archimedean spiral
+  Logarithmic = 3, // RLLLLRRRLLLR  - 12 states, logarithmic spiral
+};
+extern AntAlgorithm g_algorithm;
+
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
 // WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of

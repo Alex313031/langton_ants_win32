@@ -22,6 +22,10 @@ volatile UINT g_num_ants = 1;
 // Default until InitMenuDefaults reads the RC.
 unsigned long g_delay = kRealTime;
 
+// Default to the original 2-state Langton's ant. InitMenuDefaults overrides
+// from whichever IDM_CLASSIC..IDM_LOGARITHMIC entry is CHECKED in the RC.
+AntAlgorithm g_algorithm = AntAlgorithm::Classic;
+
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int s_activeCount = 0; // only touched from the main thread
 

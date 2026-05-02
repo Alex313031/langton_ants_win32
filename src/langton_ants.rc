@@ -149,6 +149,14 @@ BEGIN
         BEGIN
             MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
             MENUITEM "Custom &Seed",           IDM_CUSTOMSEED
+            MENUITEM SEPARATOR
+            POPUP "&Algorithms"
+            BEGIN
+                MENUITEM "Classic     (RL)",           IDM_CLASSIC, CHECKED
+                MENUITEM "Fill        (LRL)",          IDM_FILL
+                MENUITEM "Archimedes  (LRRRRLLLRRR)",  IDM_ARCHIMEDES
+                MENUITEM "Logarithmic (RLLLLRRRLLLR)", IDM_LOGARITHMIC
+            END
         END
     END
     POPUP "&Dev"
