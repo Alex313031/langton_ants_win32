@@ -367,6 +367,38 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // Back buffer coords are ants-canvas-local (0..cxClient-1, 0..cyClient-1);
         // shifting by the toolbar height places the canvas below the toolbar.
         BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient, g_hdcMem, 0, 0, SRCCOPY);
+        // Cell-grid overlay. Drawn LAST so the lines sit on top of both the
+        // bg fill and the back-buffer pixels - keeps the back buffer "pure"
+        // ant data (toggling the grid on/off doesn't need a canvas wipe).
+        // Lines that fall outside ps.rcPaint are clipped automatically by
+        // the DC's paint clip, so per-tick invalidations of one or two cells
+        // only emit the line segments that intersect those cells.
+        if (g_show_grid) {
+          // Pick a grid color that contrasts with the current bg via simple
+          // luma: dark grey on light backgrounds, light grey on dark ones.
+          // Falls back to a mid-grey on the grey monochrome bg, which makes
+          // the grid faint - acceptable corner case the user can toggle off.
+          const BYTE bgR    = GetRValue(g_bkg_color);
+          const BYTE bgG    = GetGValue(g_bkg_color);
+          const BYTE bgB    = GetBValue(g_bkg_color);
+          const int bgLuma  = (299 * bgR + 587 * bgG + 114 * bgB) / 1000;
+          const COLORREF gridColor =
+              (bgLuma > 127) ? RGB(80, 80, 80) : RGB(180, 180, 180);
+          HPEN hGridPen   = CreatePen(PS_SOLID, 1, gridColor);
+          HPEN hOldPen    = static_cast<HPEN>(SelectObject(hdc, hGridPen));
+          const int yTop  = g_toolbarHeight;
+          const int yBot  = g_toolbarHeight + cyClient;
+          for (int gridX = 0; gridX <= cxClient; gridX += CELL_PX) {
+            MoveToEx(hdc, gridX, yTop, nullptr);
+            LineTo(hdc, gridX, yBot);
+          }
+          for (int gridY = yTop; gridY <= yBot; gridY += CELL_PX) {
+            MoveToEx(hdc, 0, gridY, nullptr);
+            LineTo(hdc, cxClient, gridY);
+          }
+          SelectObject(hdc, hOldPen);
+          DeleteObject(hGridPen);
+        }
       } else {
         // No back buffer yet (very first paint, or torn down at WM_DESTROY).
         // Fall back to filling the whole dirty area so the user doesn't see
@@ -391,9 +423,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // here (lParam carries 0,0 on minimize), but that's harmless - no
         // painting happens while minimized, and the next non-minimize WM_SIZE
         // will overwrite them with the restored dimensions before any draw.
-        // The back buffer bitmap is left alone, and each ant's thread-local
-        // cellX / cellY / dir / onBg state survives untouched - so when
-        // restore fires we come back exactly where we left off, trails and all.
+        // The back buffer bitmap and the parallel state grid are left alone,
+        // and each ant's thread-local cellX / cellY / dir survives untouched
+        // - so when restore fires we come back exactly where we left off,
+        // trails and all.
         s_was_minimized = true;
         KillTimer(hWnd, TIMER_ANTS);
         KillTimer(hWnd, TIMER_CPU);
@@ -463,8 +496,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // finishes and the threads block on their wait events without entering
       // g_paintCS again. That removes the lock contention with WM_PAINT that
       // would otherwise show up as a noticeable pause when starting the drag.
-      // Per-thread cellX / cellY / dir / onBg state is untouched, so when the
-      // drag ends the simulation resumes exactly where it paused.
+      // Per-thread cellX / cellY / dir state is untouched (and so is the
+      // shared state grid), so when the drag ends the simulation resumes
+      // exactly where it paused.
       s_in_size_move = true;
       KillTimer(hWnd, TIMER_ANTS);
       break;
@@ -744,6 +778,26 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
+        case IDM_SHOWGRID: {
+          // Pure presentation toggle - the grid is drawn as an overlay in
+          // WM_PAINT after the back-buffer BitBlt, so flipping it on/off
+          // doesn't disturb the simulation. Just update the menu mark and
+          // invalidate the canvas so WM_PAINT redraws with/without lines.
+          g_show_grid     = !g_show_grid;
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCustom   = (hSettings != nullptr) ? GetSubMenu(hSettings, 7) : nullptr;
+          if (hCustom != nullptr) {
+            CheckMenuItem(hCustom, IDM_SHOWGRID,
+                          MF_BYCOMMAND | (g_show_grid ? MF_CHECKED : MF_UNCHECKED));
+          }
+          InvalidateRect(hWnd, nullptr, FALSE);
+          if (g_show_grid) {
+            LOG(INFO) << L"Grid Lines turned on.";
+          } else {
+            LOG(INFO) << L"Grid Lines turned off.";
+          }
+          break;
+        }
         case IDM_CLASSIC:
         case IDM_FILL:
         case IDM_ARCHIMEDES:
@@ -887,8 +941,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             RecolorBackground(oldBg, g_bkg_color);
           }
           // Refresh each running ant's cached antColor against the new
-          // g_monochrome - color-only, no position/dir/onBg touched, so
-          // the simulation continues exactly where it was. RefreshAntColors
+          // g_monochrome - color-only, no position / direction / per-cell
+          // state touched, so the simulation continues exactly where it
+          // was. RefreshAntColors
           // pulses the tick events so the new colors show up immediately
           // even while paused.
           RefreshAntColors();
@@ -955,8 +1010,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Update g_ant_color to whatever the user picked, refresh the
           // radio mark in the Ant Colors submenu, and signal each
           // running ant to re-roll its cached marker against the new
-          // preference (RefreshAntColors keeps position / dir / onBg
-          // intact and only swaps the visible color).
+          // preference (RefreshAntColors keeps position, direction, and
+          // per-cell state intact and only swaps the visible color).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT, command, MF_BYCOMMAND);

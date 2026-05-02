@@ -40,7 +40,7 @@ IDB_EXIT_BMP   BITMAP "res/exit.bmp"
 IDB_SOUND_BMP  BITMAP "res/sound.bmp"
 IDB_MUTE_BMP   BITMAP "res/nosound.bmp"
 IDB_TIME_BMP   BITMAP "res/timer.bmp"
-IDB_CUSTOM_BMP BITMAP "res/custom.bmp"
+IDB_CUSTOM_BMP BITMAP "res/grid.bmp"
 IDB_STOP_BMP   BITMAP "res/stop.bmp"
 IDB_COLORS_BMP BITMAP "res/colors.bmp"
 
@@ -147,6 +147,7 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Customize"
         BEGIN
+            MENUITEM "Sh&ow Grid Lines",       IDM_SHOWGRID
             MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
             MENUITEM "Custom &Seed",           IDM_CUSTOMSEED
             MENUITEM SEPARATOR

@@ -115,10 +115,14 @@
 // Not in a UI menu, just keyboard accelerator
 #define IDM_UNDO                    268
 
+// Ant color options
 #define IDM_CYANANT                 269
 #define IDM_YELLOWANT               270
 #define IDM_MAGENTAANT              271
 #define IDM_ALLCOLORANT             272
+
+// Toggle showing background "grid"
+#define IDM_SHOWGRID                273
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280

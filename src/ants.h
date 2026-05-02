@@ -30,6 +30,12 @@ enum class AntAlgorithm : UINT {
 };
 extern AntAlgorithm g_algorithm;
 
+// Whether to overlay the cell grid (one CELL_PX × CELL_PX line frame per
+// cell) on top of the canvas in WM_PAINT. Toggled by IDM_SHOWGRID. Read
+// by main.cc's WM_PAINT; the back buffer never sees the grid so toggling
+// it on/off doesn't cost a canvas wipe.
+extern bool g_show_grid;
+
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
 // WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of
@@ -43,23 +49,24 @@ struct AntThreadSlot {
   volatile bool exitRequest   = false;   // set true to make thread exit cleanly
   volatile bool reseedRequest = false;   // set true to reroll position / color / dir
   // Place-mode handoff: when placementRequested is set the thread adopts
-  // (placeCellX, placeCellY, placeColor, placeOnBg) on its next tick, picks
-  // a random direction, and skips the step (the marker is already painted on
-  // the canvas by PlaceAntAtClient). Cleared by the thread once consumed.
+  // (placeCellX, placeCellY, placeColor) on its next tick, picks a random
+  // direction, and skips the step (the marker is already painted on the
+  // canvas by PlaceAntAtClient). The starting "state" comes from the
+  // parallel state grid at that cell, no extra field needed here.
+  // Cleared by the thread once consumed.
   volatile bool placementRequested = false;
   int placeCellX                   = 0;
   int placeCellY                   = 0;
   COLORREF placeColor              = 0;
-  bool placeOnBg                   = true;
   volatile bool customSeedRequest  = false; // Whether to use custom seed for seeding randomization
   UINT customSeed =
       0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
   // Color-refresh handoff: when set, the thread re-picks antColor against
   // the current g_monochrome and overpaints its current cell so the new
-  // color is visible immediately (even when paused). Position / dir /
-  // onBg are left alone - used by the Monochrome toggle which is meant
-  // to behave like picking a Colors entry (just swap colors, don't
-  // touch ant draw state).
+  // color is visible immediately (even when paused). Position, direction
+  // and the cell's state in g_state_grid are left alone - used by the
+  // Monochrome toggle which is meant to behave like picking a Colors entry
+  // (just swap colors, don't touch ant draw state).
   volatile bool colorRefreshRequest = false;
 };
 
@@ -120,8 +127,8 @@ void ReseedAnts(bool pulse = true);
 
 // Refreshes each running ant's marker color against the current
 // g_monochrome value (mono → match the trail color, otherwise pick from
-// magenta/cyan/yellow). Position, direction and onBg are preserved so
-// the simulation continues exactly where it was - used by IDM_MONOCHROME
+// magenta/cyan/yellow). Position, direction and per-cell state are preserved
+// so the simulation continues exactly where it was - used by IDM_MONOCHROME
 // so toggling mono behaves like picking a Colors entry (just swaps colors).
 void RefreshAntColors();
 
@@ -179,9 +186,10 @@ void ExitPlaceMode();
 
 // Places an ant at the given window-client coordinates if in place mode and
 // not already at kMaxAntThreads. Paints the ant marker (random pick from
-// {magenta, cyan, yellow}) into the back buffer, samples the underlying
-// pixel to record onBg, and appends to the placement list. Returns true if
-// a placement was made.
+// {magenta, cyan, yellow}) into the back buffer and appends position+color
+// to the placement list. The starting per-cell state for the thread that
+// adopts this slot comes from g_state_grid at the chosen cell. Returns
+// true if a placement was made.
 bool PlaceAntAtClient(int clientX, int clientY);
 
 // Pops the most-recently-placed ant off the list and erases its marker

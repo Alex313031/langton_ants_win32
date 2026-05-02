@@ -1,5 +1,8 @@
 #include "ants.h"
 
+#include <cstring> // memcpy/memset for the state grid
+#include <new>     // std::nothrow
+
 #include "cpu.h"
 #include "globals.h"
 #include "resource.h"
@@ -26,20 +29,112 @@ unsigned long g_delay = kRealTime;
 // from whichever IDM_CLASSIC..IDM_LOGARITHMIC entry is CHECKED in the RC.
 AntAlgorithm g_algorithm = AntAlgorithm::Classic;
 
+// Cell grid overlay toggle. Default off; InitMenuDefaults reads the RC's
+// IDM_SHOWGRID CHECKED state and may flip it on at startup.
+bool g_show_grid = false;
+
+// --- Algorithm pattern table ---------------------------------------------
+// One entry per AntAlgorithm value. Pattern is the right/left turn string
+// shown in the menu; numStates = strlen(pattern). Each cell's "state" is an
+// index into pattern[]; the next-state cycle is (state + 1) % numStates.
+struct AlgoPattern {
+  AntAlgorithm algo;
+  const char* pattern;
+  int numStates;
+};
+static const AlgoPattern kAlgoPatterns[] = {
+    {AntAlgorithm::Classic,     "RL",            2},
+    {AntAlgorithm::Fill,        "LRL",           3},
+    {AntAlgorithm::Archimedes,  "LRRRRLLLRRR",  11},
+    {AntAlgorithm::Logarithmic, "RLLLLRRRLLLR", 12},
+};
+
+// Returns the entry matching the current g_algorithm, or Classic as a
+// defensive fallback if g_algorithm somehow holds an unknown value (would
+// only happen on a programming error - the menu only ever sets a known one).
+static const AlgoPattern& CurrentAlgoPattern() {
+  for (const auto& entry : kAlgoPatterns) {
+    if (entry.algo == g_algorithm) {
+      return entry;
+    }
+  }
+  return kAlgoPatterns[0];
+}
+
+// --- Per-cell state grid -------------------------------------------------
+// Parallel to the back buffer but one entry per ant cell (CELL_PX × CELL_PX
+// pixels). Each entry is the cell's current state index; pattern[state]
+// drives the per-tick turn rule. The back buffer only ever shows bg or path
+// color so multi-state algorithms work without modifying the color palette
+// - the state lives here, the pixels just visualize "visited or not". All
+// access is serialized by g_paintCS, same as the back buffer.
+static unsigned char* g_state_grid = nullptr;
+static int g_state_grid_width      = 0;
+static int g_state_grid_height     = 0;
+
+// Resizes (or first-time allocates) the state grid to newWidth × newHeight
+// cells. Old cells in [0..oldWidth) × [0..oldHeight) keep their state;
+// newly-introduced cells default to state 0 (= background). Returns false
+// on allocation failure - the grid is left untouched in that case so the
+// next attempt (e.g. the next WM_SIZE) can retry. Caller MUST hold g_paintCS.
+static bool ResizeStateGrid(int newWidth, int newHeight) {
+  if (newWidth <= 0 || newHeight <= 0) {
+    delete[] g_state_grid;
+    g_state_grid        = nullptr;
+    g_state_grid_width  = 0;
+    g_state_grid_height = 0;
+    return true;
+  }
+  if (newWidth == g_state_grid_width && newHeight == g_state_grid_height) {
+    return true; // same size, keep existing
+  }
+  const size_t newCount = static_cast<size_t>(newWidth) * static_cast<size_t>(newHeight);
+  unsigned char* newGrid = new (std::nothrow) unsigned char[newCount]();
+  if (newGrid == nullptr) {
+    LOG(ERROR) << L"ResizeStateGrid: allocation failed for " << newWidth << L"x" << newHeight;
+    return false;
+  }
+  if (g_state_grid != nullptr) {
+    const int copyWidth  = (g_state_grid_width < newWidth) ? g_state_grid_width : newWidth;
+    const int copyHeight = (g_state_grid_height < newHeight) ? g_state_grid_height : newHeight;
+    for (int rowIdx = 0; rowIdx < copyHeight; ++rowIdx) {
+      memcpy(newGrid + static_cast<size_t>(rowIdx) * newWidth,
+             g_state_grid + static_cast<size_t>(rowIdx) * g_state_grid_width,
+             static_cast<size_t>(copyWidth));
+    }
+    delete[] g_state_grid;
+  }
+  g_state_grid        = newGrid;
+  g_state_grid_width  = newWidth;
+  g_state_grid_height = newHeight;
+  return true;
+}
+
+// Resets every cell in the state grid to state 0 (background). Paired with
+// ClearCanvasToBackground so the visual canvas and the state grid stay
+// coherent - in particular this is what makes an algorithm change safe
+// (a stale state >= newAlgo.numStates would otherwise read past the
+// pattern string). Caller MUST hold g_paintCS.
+static void ZeroStateGrid() {
+  if (g_state_grid != nullptr && g_state_grid_width > 0 && g_state_grid_height > 0) {
+    memset(g_state_grid, 0,
+           static_cast<size_t>(g_state_grid_width) * static_cast<size_t>(g_state_grid_height));
+  }
+}
+
 static AntThreadSlot s_slots[kMaxAntThreads];
 static int s_activeCount = 0; // only touched from the main thread
 
 // --- Place-mode state -----------------------------------------------------
 // All touched from the main (UI) thread only - set when the user enters
 // place mode, populated by PlaceAntAtClient on each click, drained by
-// ApplyPlacements when the user resumes. Per-entry onBg is sampled BEFORE
-// we paint the ant marker so the thread that adopts this position knows
-// whether it started on background (turn right) or a path (turn left).
+// ApplyPlacements when the user resumes. The ant's starting "state" comes
+// from the parallel state grid each tick, so the placement record itself
+// only carries position + marker color.
 struct PlacedAnt {
   int cellX;
   int cellY;
   COLORREF color;
-  bool onBg;
 };
 static PlacedAnt s_placedAnts[kMaxAntThreads];
 bool g_place_mode       = false;
@@ -61,6 +156,43 @@ static COLORREF CurrentPathColor() {
     return RGB_BLACK;
   }
   return RGB_WHITE;
+}
+
+// Color the back buffer should show for cell state `state`. The longest
+// algorithm pattern (Logarithmic) has 12 states, so the table covers
+// states 2..11 explicitly; state 0 is bg and state 1 reuses the existing
+// CurrentPathColor() so Classic + 2-state behavior is visually unchanged.
+//
+// Palette constraints (don't change a color without re-checking these):
+//   - Avoid magenta / cyan / yellow exactly - those are ant marker colors
+//     and isBlocked() keys off them for ant-vs-ant collision detection.
+//   - Avoid the six selectable bg colors exactly (white, black, grey,
+//     red, green, blue). RecolorBackground swaps oldBg → newBg pixel by
+//     pixel; a palette color matching one would get swept away with the bg.
+//   - Mid-saturation hues so cells stay visible against any of the
+//     selectable backgrounds.
+static COLORREF StateColor(unsigned char state) {
+  if (state == 0) {
+    return g_bkg_color;
+  }
+  if (state == 1) {
+    return CurrentPathColor();
+  }
+  static const COLORREF kStatePalette[10] = {
+      RGB(255, 128,   0), // 2  - orange
+      RGB(255, 192,  64), // 3  - gold
+      RGB(128, 255,   0), // 4  - lime
+      RGB(  0, 255, 128), // 5  - spring
+      RGB(  0, 160, 160), // 6  - teal
+      RGB( 64, 160, 255), // 7  - sky
+      RGB( 80,   0, 192), // 8  - indigo
+      RGB(160,  64, 255), // 9  - purple
+      RGB(255, 128, 192), // 10 - pink
+      RGB(255, 128, 128), // 11 - salmon
+  };
+  // Wrap with palette length so an out-of-range state (shouldn't happen
+  // - the AntThread step branch already clamps) never reads past the array.
+  return kStatePalette[(state - 2) % 10];
 }
 
 DWORD WINAPI AntThread(LPVOID pvoid_in) {
@@ -123,11 +255,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // canvas are easy to tell apart. Collision detection treats any of
   // those three as "another ant" - see isBlocked in the step branch.
   COLORREF antColor = RGB_MAGENTA;
-  // onBg tracks whether the cell the ant is sitting on was an unvisited
-  // background cell or a path cell *before* we painted the ant marker
-  // over it. Stored semantically (bool) not as a raw COLORREF so it
-  // still interprets correctly if g_bkg_color changes mid-flight.
-  bool onBg = true;
+  // The cell's "state" is read from g_state_grid each tick - no per-thread
+  // cache is needed (see the multi-state step branch below).
   // Direction → (dx, dy) in cell units, matching the encoding above.
   static const int kDx[4] = {0, 1, 0, -1};
   static const int kDy[4] = {-1, 0, 1, 0};
@@ -156,9 +285,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       cellX               = -1;
     }
     // Place-mode handoff. The main thread painted the marker on the canvas
-    // already and recorded what was under it (placeOnBg), so we adopt the
-    // user-clicked position + the marker's color and skip stepping this
-    // tick - the next tick will do a normal Langton step from here. The
+    // already, so we adopt the user-clicked position + the marker's color
+    // and skip stepping this tick - the next tick will do a normal Langton
+    // step from here, reading the cell's state from g_state_grid. The
     // direction is rolled from rand() (which may have been seeded by a
     // custom seed at thread startup), so a custom seed only varies the
     // direction in place mode; position and color stay user-controlled.
@@ -167,16 +296,16 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
       cellX                    = slot->placeCellX;
       cellY                    = slot->placeCellY;
       antColor                 = slot->placeColor;
-      onBg                     = slot->placeOnBg;
       dir                      = rand() & 3;
       continue;
     }
     // Color-only refresh (Monochrome toggle). Re-pick antColor from the
     // current g_monochrome and overpaint the ant's current cell so the
     // new color shows up immediately (matters when paused - otherwise
-    // the next Langton step would draw it anyway). Position, dir and
-    // onBg are deliberately preserved - this mirrors how the background
-    // colour menu only swaps pixels and never touches ant draw state.
+    // the next Langton step would draw it anyway). Position and direction
+    // are deliberately preserved - this mirrors how the background color
+    // menu only swaps pixels and never touches ant draw state. The cell's
+    // state in g_state_grid is also untouched.
     // cellX < 0 means we haven't placed yet; the next needsPlacement
     // branch will pick a color naturally, so we skip the paint.
     if (slot->colorRefreshRequest) {
@@ -226,10 +355,12 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
         const bool needsPlacement = (cellX < 0 || cellY < 0 || cellX >= gridW || cellY >= gridH);
         if (needsPlacement) {
           // First-tick placement, or recovery after a resize that shrank
-          // the grid below our old cell. Sample the cell to decide onBg
-          // (could be bg or a stale trail), roll this ant's marker color,
-          // then overpaint. No Langton step this tick - next tick starts
-          // stepping normally.
+          // the grid below our old cell. Roll this ant's marker color,
+          // then overpaint. The starting "state" is whatever the state
+          // grid already holds at the chosen cell (could be 0 if pristine,
+          // or non-zero if a previous ant left a trail there) - the next
+          // tick's step branch reads it from the grid directly. No Langton
+          // step this tick - next tick starts stepping normally.
           cellX = rand() % gridW;
           cellY = rand() % gridH;
           dir   = rand() % 4;
@@ -251,47 +382,59 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           } else {
             antColor = g_ant_color;
           }
-          const int px           = cellX * CELL_PX;
-          const int py           = cellY * CELL_PX;
-          const COLORREF sampled = GetPixel(g_hdcMem, px, py);
-          onBg                   = (sampled == g_bkg_color);
-          RECT antRc = {px, py, px + CELL_PX, py + CELL_PX};
+          const int px = cellX * CELL_PX;
+          const int py = cellY * CELL_PX;
+          RECT antRc   = {px, py, px + CELL_PX, py + CELL_PX};
           FillRectWithColor(g_hdcMem, antRc, antColor);
           RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
         } else {
-          // Classic Langton's step. We can't GetPixel the cell under the
-          // ant - it's magenta - so we use the cached onBg from when the
-          // ant arrived. On bg cell turn right, on path cell turn left,
-          // flip the cell's color, then step forward one cell.
-          dir                       = onBg ? (dir + 1) & 3 : (dir + 3) & 3;
-          const COLORREF trailColor = onBg ? CurrentPathColor() : g_bkg_color;
+          // Multi-state Langton step driven by g_algorithm. The cell's
+          // state index is in g_state_grid (the back buffer only shows
+          // bg vs. path so we can't recover state from the pixel under the
+          // ant marker - and even without the marker, multi-state algos
+          // would need more colors than we want to introduce). Pattern
+          // [state] picks the turn (R or L), state advances by 1 mod
+          // numStates, the cell is repainted bg if the new state is 0
+          // and path color otherwise.
+          const AlgoPattern& algo  = CurrentAlgoPattern();
+          const int cellIdx        = cellY * g_state_grid_width + cellX;
+          const unsigned char prev = g_state_grid[cellIdx];
+          // Defensive clamp: if the grid somehow contains a stale state
+          // larger than the current algorithm's pattern (e.g. a missed
+          // wipe between an algorithm change and the next tick), treat
+          // it as state 0. ZeroStateGrid in ClearCanvasToBackground means
+          // this should never trigger in practice.
+          const unsigned char state =
+              (prev < static_cast<unsigned char>(algo.numStates)) ? prev : 0;
+          const char turn = algo.pattern[state];
+          dir             = (turn == 'R') ? (dir + 1) & 3 : (dir + 3) & 3;
+          const unsigned char nextState =
+              static_cast<unsigned char>((state + 1) % algo.numStates);
+          g_state_grid[cellIdx] = nextState;
+
+          const COLORREF trailColor = StateColor(nextState);
           const int px              = cellX * CELL_PX;
           const int py              = cellY * CELL_PX;
-          // Overpaint the vacating cell with the flipped trail color.
-          // This both performs the Langton flip and removes the magenta
-          // overlay, leaving a clean mark the next ant will classify
-          // correctly via GetPixel.
+          // Overpaint the vacating cell with the new state's color.
+          // Removes the ant marker and shows the cell's updated trail.
           RECT trailRc = {px, py, px + CELL_PX, py + CELL_PX};
           FillRectWithColor(g_hdcMem, trailRc, trailColor);
 
           // Try to step forward. A target cell is "blocked" if it's out of
-          // bounds (wall) or currently occupied by another ant (magenta).
-          // On block, reverse direction 180° and try the other way - the
-          // same "bounce" rule covers both walls and ant-vs-ant collisions.
-          // If the reversed cell is also blocked, stay put for this tick;
-          // the subsequent sample-at-new-cell step still works because it
-          // reads the trail color we just painted on the vacating cell.
-          auto isBlocked = [&](int x, int y) -> bool {
-            if (x < 0 || x >= gridW || y < 0 || y >= gridH) {
+          // bounds (wall) or currently occupied by another ant (magenta /
+          // cyan / yellow marker). On block, reverse direction 180° and
+          // try the other way - the same "bounce" rule covers both walls
+          // and ant-vs-ant collisions. If the reversed cell is also
+          // blocked, stay put for this tick.
+          auto isBlocked = [&](int xx, int yy) -> bool {
+            if (xx < 0 || xx >= gridW || yy < 0 || yy >= gridH) {
               return true;
             }
-            // Treat any of the three ant marker colors as "occupied by
-            // another ant" - this ant might be magenta, the neighbor
-            // might be cyan, etc. A trail pixel is always black/white,
-            // so the false-positive surface here is small.
-            const COLORREF c = GetPixel(g_hdcMem, x * CELL_PX, y * CELL_PX);
-            return c == RGB_MAGENTA || c == RGB_CYAN || c == RGB_YELLOW;
+            // GetPixel the back buffer (not the state grid) - state-grid
+            // entries don't track ant markers, only the cell's trail state.
+            const COLORREF cc = GetPixel(g_hdcMem, xx * CELL_PX, yy * CELL_PX);
+            return cc == RGB_MAGENTA || cc == RGB_CYAN || cc == RGB_YELLOW;
           };
           int nx = cellX + kDx[dir];
           int ny = cellY + kDy[dir];
@@ -307,18 +450,13 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           cellX = nx;
           cellY = ny;
 
-          // Sample the new cell to learn bg vs. path for the next tick's
-          // turn decision. Anything matching the current bg counts as
-          // "unvisited"; anything else (including stale trails from
-          // before a bg change) counts as path.
-          const int npx          = cellX * CELL_PX;
-          const int npy          = cellY * CELL_PX;
-          const COLORREF sampled = GetPixel(g_hdcMem, npx, npy);
-          onBg                   = (sampled == g_bkg_color);
-
           // Paint the ant on the new cell using this ant's chosen marker
           // color (locked in at placement, see needsPlacement branch).
-          RECT antRc = {npx, npy, npx + CELL_PX, npy + CELL_PX};
+          // No need to sample anything - the state for next tick will be
+          // re-read from g_state_grid at the top of that tick's step branch.
+          const int npx = cellX * CELL_PX;
+          const int npy = cellY * CELL_PX;
+          RECT antRc    = {npx, npy, npx + CELL_PX, npy + CELL_PX};
           FillRectWithColor(g_hdcMem, antRc, antColor);
 
           // Invalidate both the trail cell and the new ant cell so
@@ -410,8 +548,9 @@ void RefreshAntColors() {
   // Flag every active slot for a color-only refresh, then pulse so the
   // change shows up immediately even while paused. The thread re-picks
   // antColor against the current g_monochrome and overpaints its current
-  // cell - position / direction / onBg stay untouched, so the simulation
-  // continues exactly where it was, just dressed in the new color scheme.
+  // cell - position, direction, and per-cell state stay untouched, so the
+  // simulation continues exactly where it was, just dressed in the new
+  // color scheme.
   for (int i = 0; i < s_activeCount; i++) {
     s_slots[i].colorRefreshRequest = true;
     if (s_slots[i].hTickEvent != nullptr) {
@@ -574,6 +713,11 @@ void ShutdownAnts() {
     }
   }
   s_activeCount = 0;
+  // No live threads can race us at this point; safe to free without the lock.
+  delete[] g_state_grid;
+  g_state_grid        = nullptr;
+  g_state_grid_width  = 0;
+  g_state_grid_height = 0;
 }
 
 // Creates or replaces the off-screen back buffer to match the current client
@@ -643,6 +787,10 @@ bool RecreateBackBuffer(HWND hWnd, int cx, int cy) {
     DeleteObject(g_hbmMem);
   }
   g_hbmMem = hbmNew;
+  // Resize the parallel state grid to match the new cell-quantized canvas.
+  // Same preserve-old-cells semantics as the bitmap above: existing trails
+  // and their states stay aligned across the resize.
+  ResizeStateGrid(cx / CELL_PX, cy / CELL_PX);
   LeaveCriticalSection(&g_paintCS);
   return ok;
 }
@@ -653,6 +801,10 @@ void ClearCanvasToBackground(int cxClient, int cyClient) {
     RECT rc = {0, 0, cxClient, cyClient};
     FillRectWithColor(g_hdcMem, rc, g_bkg_color);
   }
+  // Wipe the state grid in lockstep with the visual wipe so an algorithm
+  // change never sees stale state >= newAlgo.numStates (which would index
+  // past the pattern string in the AntThread tick).
+  ZeroStateGrid();
   LeaveCriticalSection(&g_paintCS);
 }
 
@@ -864,14 +1016,12 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   const int px = cellX * CELL_PX;
   const int py = cellY * CELL_PX;
-  // Sample the cell BEFORE we paint the marker - the thread that adopts
-  // this position needs to know whether it started on background (turn
-  // right next tick) or on a path (turn left). The color picker mirrors
-  // AntThread's needsPlacement branch: monochrome → match the trail color
-  // (ants vanish into their paths, no ant-vs-ant collision); otherwise
-  // pick from the magenta/cyan/yellow set so isBlocked sees the marker.
-  const COLORREF sampled = GetPixel(g_hdcMem, px, py);
-  const bool onBg        = (sampled == g_bkg_color);
+  // Color picker mirrors AntThread's needsPlacement branch: monochrome →
+  // match the trail color (ants vanish into their paths, no ant-vs-ant
+  // collision); otherwise pick from the magenta/cyan/yellow set so
+  // isBlocked sees the marker. The starting "state" the thread reads on
+  // its first step comes from g_state_grid at this cell, no extra field
+  // recorded here.
   COLORREF antColor;
   if (g_monochrome) {
     antColor = CurrentPathColor();
@@ -892,7 +1042,6 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   s_placedAnts[g_placed_ants_count].cellX = cellX;
   s_placedAnts[g_placed_ants_count].cellY = cellY;
   s_placedAnts[g_placed_ants_count].color = antColor;
-  s_placedAnts[g_placed_ants_count].onBg  = onBg;
   g_placed_ants_count++;
 
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
@@ -956,7 +1105,6 @@ static bool ApplyPlacements() {
       s_slots[i].placeCellX         = s_placedAnts[i].cellX;
       s_slots[i].placeCellY         = s_placedAnts[i].cellY;
       s_slots[i].placeColor         = s_placedAnts[i].color;
-      s_slots[i].placeOnBg          = s_placedAnts[i].onBg;
       s_slots[i].placementRequested = true;
     }
   }
