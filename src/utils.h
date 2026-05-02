@@ -55,6 +55,9 @@ inline constexpr INT CPU_STATUS_WIDTH = 120;
 // Child window style
 inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 
+// Delay in ms. before resetting status bar text to kDefaultCpuBubbleText.
+inline constexpr unsigned long kStatusBarResetDelay = 5000ul; // 5 second delay
+
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
                             // below it.
 

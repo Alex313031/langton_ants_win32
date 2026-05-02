@@ -8,7 +8,6 @@
 #include "cpu.h"
 #include "resource.h"
 #include "sound.h"
-#include "utils.h"
 #include "version.h"
 
 HWND mainHwnd = nullptr;
@@ -280,10 +279,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // the main thread free to process input and paint messages.
       // TIMER_CPU samples GetCPUPercent and pushes the formatted string to
       // the second status-bar part - cheap, runs at g_perf_delay ms.
+      // TIMER_STATUS_RESET is a one-shot armed by UserMessage to revert
+      // the first status-bar part back to kDefaultStatusText after a delay.
       if (wParam == TIMER_ANTS) {
         SignalAntsTick();
       } else if (wParam == TIMER_CPU) {
         UpdateCpuUsage();
+      } else if (wParam == TIMER_STATUS_RESET) {
+        KillTimer(hWnd, TIMER_STATUS_RESET);
+        UpdateStatusBar(0, kDefaultStatusText);
       }
       break;
     case WM_APP_AUTOPLAY: {
@@ -1324,10 +1328,8 @@ bool InitStatusBar(HWND hWnd) {
   }
   const int kStatusParts[2]               = {kStatusSplit, -1};
   SendMessageW(hStatusBar, SB_SETPARTS, 2, (LPARAM)kStatusParts);
-  static const std::wstring status_text   = GetAppName() + L" Version " + GetVersionString();
-  static const std::wstring status_bubble = L"CPU Usage: NaN";
-  UpdateStatusBar(0, status_text);
-  UpdateStatusBar(1, status_bubble);
+  UpdateStatusBar(0, kDefaultStatusText);
+  UpdateStatusBar(1, kDefaultCpuBubbleText);
 
   // Build a separate tooltip control owned by the main window. The OS forces
   // WS_POPUP + WS_EX_TOOLWINDOW for TOOLTIPS_CLASS regardless of what we pass,

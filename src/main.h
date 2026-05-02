@@ -3,6 +3,13 @@
 
 #include "ants.h"
 #include "globals.h"
+#include "utils.h"
+
+// Default status bar 1st part text: print version
+static const std::wstring kDefaultStatusText = GetAppName() + L" Version " + GetVersionString();
+
+// Default status bar 2nd part "cpu bubble" text
+static const std::wstring kDefaultCpuBubbleText = L"CPU Usage: NaN";
 
 // Main window procedure
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

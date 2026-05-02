@@ -133,6 +133,9 @@
 // Timers
 #define TIMER_ANTS                  300 // Timer ID for painting
 #define TIMER_CPU                   301 // Timer ID for CPU monitoring
+#define TIMER_STATUS_RESET          302 // One-shot timer that reverts status bar
+                                        // part 0 to kDefaultStatusText after
+                                        // kStatusBarResetDelay ms of inactivity
 
 // Embedded background-music WAV. Loaded as a user-defined "WAVE" resource
 // when kUseEmbeddedBgm is true (see utils.h). The RC file binds this ID

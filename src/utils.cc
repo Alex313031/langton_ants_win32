@@ -973,6 +973,15 @@ void UserMessage(const std::wstring& message) {
   LOG(INFO) << message;
   if (hStatusBar != nullptr) {
     UpdateStatusBar(0, message);
+    // Re-arm the auto-revert timer. SetTimer with the same ID REPLACES the
+    // existing timer (per MSDN), restarting the countdown - so a flurry of
+    // UserMessages keeps the most recent visible for the full delay rather
+    // than letting an old timer revert it early. WM_TIMER for
+    // TIMER_STATUS_RESET kills the timer (one-shot) and restores
+    // kDefaultStatusText to part 0.
+    if (mainHwnd != nullptr) {
+      SetTimer(mainHwnd, TIMER_STATUS_RESET, kStatusBarResetDelay, nullptr);
+    }
   }
 }
 
