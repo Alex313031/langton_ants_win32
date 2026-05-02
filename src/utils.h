@@ -152,6 +152,9 @@ bool ValidateCustomNum(LPCWSTR cNum);
 // Updates text in a specified part of the status bar.
 void UpdateStatusBar(const unsigned int part, const std::wstring& text);
 
+// Logs to console at INFO level, and updates status bar 1st part.
+void UserMessage(const std::wstring& message);
+
 // Gets version as human readable wstring.
 const std::wstring GetVersionString();
 

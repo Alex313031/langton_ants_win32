@@ -304,7 +304,7 @@ bool SaveClientBitmap(HWND hWnd) {
 
   CloseHandle(hFile);
   if (ok) {
-    LOG(INFO) << L"Saved canvas to " << szFile;
+    UserMessage(std::wstring(L"Saved canvas to ") + szFile);
   } else {
     LOG(WARN) << L"Failed to write canvas BMP to " << szFile;
   }
@@ -967,6 +967,13 @@ void UpdateStatusBar(const unsigned int part, const std::wstring& text) {
   }
   const std::wstring out = L" " + text;
   SendMessageW(hStatusBar, SB_SETTEXT, static_cast<WPARAM>(part), (LPARAM)out.c_str());
+}
+
+void UserMessage(const std::wstring& message) {
+  LOG(INFO) << message;
+  if (hStatusBar != nullptr) {
+    UpdateStatusBar(0, message);
+  }
 }
 
 const std::wstring GetVersionString() {

@@ -621,10 +621,11 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   const bool inPlaceMode = g_place_mode && g_placed_ants_count > 0;
 
   if (inPlaceMode) {
-    LOG(INFO) << L"Using custom seed '" << custom_seed << L"' for ant direction";
+    UserMessage(std::wstring(L"Using custom seed '") + std::to_wstring(custom_seed) +
+                L"' for ant direction.");
   } else {
-    LOG(INFO) << L"Using custom seed '" << custom_seed
-              << L"' for ant placement, direction, and color.";
+    UserMessage(std::wstring(L"Using custom seed '") + std::to_wstring(custom_seed) +
+                L"' for ant placement, direction, and color.");
   }
 
   // Stop the timer for the duration of the respawn so no stray WM_TIMER
@@ -1057,9 +1058,9 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
-  LOG(INFO) << L"Ant placed at cell (" << cellX << L"," << cellY
-            << L"). " << g_placed_ants_count << L" of " << kMaxAntThreads
-            << L" threads remain.";
+  UserMessage(std::wstring(L"Ant placed at cell (") + std::to_wstring(cellX) + L"," +
+              std::to_wstring(cellY) + L"). " + std::to_wstring(g_placed_ants_count) + L" of " +
+              std::to_wstring(kMaxAntThreads) + L" threads remain.");
   return true;
 }
 
@@ -1091,9 +1092,9 @@ bool UndoLastPlacement() {
   g_placed_ants_count--;
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
   InvalidateRect(mainHwnd, &inval, FALSE);
-  LOG(INFO) << L"Undid placement at cell (" << cellX << L"," << cellY
-            << L"). " << g_placed_ants_count << L" of " << kMaxAntThreads
-            << L" threads remain.";
+  UserMessage(std::wstring(L"Undid placement at cell (") + std::to_wstring(cellX) + L"," +
+              std::to_wstring(cellY) + L"). " + std::to_wstring(g_placed_ants_count) + L" of " +
+              std::to_wstring(kMaxAntThreads) + L" threads remain.");
   return ok;
 }
 
@@ -1232,7 +1233,8 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
           // dialog looks the same as picking "5" via the menu); 17-128 lands
           // on IDM_CONC_CUSTOM with the radios cleared.
           SetNumAntsCheck(numAnts);
-          LOG(INFO) << L"Number of ants changed to " << numAnts;
+          UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(numAnts) +
+                      L".");
           EndDialog(hDlg, IDOK);
           return TRUE;
         }

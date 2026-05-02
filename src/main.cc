@@ -655,7 +655,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // running. The next Play resumes it through the same call.
           ClearCanvasToBackground(cxClient, cyClient);
           EnterPlaceMode();
-          LOG(INFO) << L"Entered manual ant placement mode.";
+          UserMessage(L"Entered manual ant placement mode.");
           InvalidateRect(hWnd, nullptr, FALSE);
           break;
         }
@@ -683,7 +683,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                           MF_BYCOMMAND | (g_playsound ? MF_CHECKED : MF_UNCHECKED));
             // Mirror the state on the toolbar: swap icon + label.
             SetSoundButton(g_playsound);
-            LOG(INFO) << L"Sound " << (g_playsound ? L"enabled" : L"disabled") << L" by user.";
+            UserMessage(g_playsound ? L"Sound enabled by user." : L"Sound disabled by user.");
           }
           break;
         }
@@ -694,7 +694,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // radio after the toggle.
           const bool drainedPlacements = (g_paused && g_place_mode);
           TogglePaintAnts(hWnd);
-          LOG(INFO) << L"Ants " << (g_paused ? L"paused" : L"resumed") << L" by user.";
+          UserMessage(g_paused ? L"Ants paused." : L"Ants resumed.");
           // Reflect the new paused state in the menu check mark.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           CheckMenuItem(hSettings, IDM_PAUSED,
@@ -728,7 +728,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // and the label would otherwise stay at the old "Resume".
           g_stopped = true;
           SetPauseButton(g_paused);
-          LOG(INFO) << L"Stopped Ants.";
+          UserMessage(L"Stopped Ants.");
           // Audio follows the simulation automatically: TogglePaintAnts
           // above (when called) pauses BGM via SyncBgm. The user's sound
           // preference (g_playsound) is preserved across Stop, so a later
@@ -780,6 +780,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           ClearCanvasToBackground(cxClient, cyClient);
           ReseedAnts();
           InvalidateRect(hWnd, nullptr, FALSE);
+          UserMessage(L"Canvas repainted.");
           break;
         }
         case IDM_SHOWGRID: {
@@ -796,9 +797,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           InvalidateRect(hWnd, nullptr, FALSE);
           if (g_show_grid) {
-            LOG(INFO) << L"Grid Lines turned on.";
+            UserMessage(L"Grid lines turned on.");
           } else {
-            LOG(INFO) << L"Grid Lines turned off.";
+            UserMessage(L"Grid lines turned off.");
           }
           break;
         }
@@ -814,11 +815,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             CheckMenuItem(hCustom, IDM_NOCLIENTBOUNDS,
                           MF_BYCOMMAND | (g_no_client_bounds ? MF_CHECKED : MF_UNCHECKED));
           }
-          if (g_no_client_bounds) {
-            LOG(INFO) << L"Canvas bounds turned off (ants now wrap around edges).";
-          } else {
-            LOG(INFO) << L"Canvas bounds turned on (ants now bounce off edges).";
-          }
+          UserMessage(g_no_client_bounds
+                          ? L"Canvas bounds turned off (ants now wrap around edges)."
+                          : L"Canvas bounds turned on (ants now bounce off edges).");
           break;
         }
         case IDM_CLASSIC:
@@ -865,7 +864,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               algoName = L"Logarithmic (RLLLLRRRLLLR)";
               break;
           }
-          LOG(INFO) << L"Algorithm changed to " << algoName << L".";
+          UserMessage(std::wstring(L"Algorithm changed to ") + algoName + L".");
           break;
         }
         case IDM_CONC_1:
@@ -888,7 +887,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           const unsigned int newCount = (command - IDM_CONC_1) + 1;
           SetNumAnts(newCount);
           SetNumAntsCheck(newCount);
-          LOG(INFO) << L"Number of ants changed to " << newCount << L".";
+          UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(newCount) +
+                      L".");
           break;
         }
         case IDM_MONOCHROME: {
@@ -976,7 +976,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // even while paused.
           RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
-          LOG(INFO) << L"Monochrome mode " << (g_monochrome ? L"on." : L"off.");
+          UserMessage(g_monochrome ? L"Monochrome mode on." : L"Monochrome mode off.");
           break;
         }
         case IDM_WHITE_BKG:
@@ -1020,7 +1020,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               LOG(ERROR) << L"Unknown background color!";
               break;
           }
-          LOG(INFO) << L"Background color changed to " << bgName;
+          UserMessage(std::wstring(L"Background color changed to ") + bgName);
           // Swap only the old background pixels over to the new color. Ant path
           // pixels are left untouched, so existing ants paths are preserved across
           // background changes.
@@ -1068,7 +1068,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           RefreshAntColors();
           InvalidateRect(hWnd, nullptr, FALSE);
-          LOG(INFO) << L"Ant colors changed to " << antName;
+          UserMessage(std::wstring(L"Ant color changed to ") + antName);
           break;
         }
         case IDM_SLOW:
@@ -1106,7 +1106,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
               g_delay = g_default_speed;
               break;
           }
-          LOG(INFO) << L"Speed changed to " << speedName << L" (" << g_delay << L" ms.)";
+          UserMessage(std::wstring(L"Speed changed to ") + speedName + L" (" +
+                      std::to_wstring(g_delay) + L" ms.)");
           // Replace the timer with the new interval - but only if the
           // simulation is currently running. If we're paused (including
           // mid-Custom-placement before any ants are dropped) the timer
