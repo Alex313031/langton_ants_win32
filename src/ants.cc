@@ -611,7 +611,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
     KillTimer(mainHwnd, TIMER_ANTS);
   }
 
-  // Tear down every live thread. Mirrors the loop in ShutdownAnts but
+  // Tear down every live thread. Mirrors the loop in ShutDownAnts but
   // leaves g_running = true so the freshly-spawned threads below don't
   // immediately exit on their first tick.
   for (int i = 0; i < s_activeCount; i++) {
@@ -680,7 +680,8 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   return ok;
 }
 
-void ShutdownAnts() {
+void ShutDownAnts() {
+  KillTimer(mainHwnd, TIMER_ANTS);
   g_running = false;
   // Wake every live thread so they can observe g_running=false and exit.
   for (int i = 0; i < s_activeCount; i++) {
@@ -885,7 +886,7 @@ bool ShowAnts() {
   // it until SignalAntsTick (driven by WM_TIMER) says "go."
   g_running = true;
   if (!EnsureThreadCount(static_cast<int>(g_num_ants))) {
-    ShutdownAnts();
+    ShutDownAnts();
     return false;
   }
 
@@ -893,7 +894,7 @@ bool ShowAnts() {
   // and, via SignalAntsTick, pulses every active thread's tick event once.
   if (!SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr)) {
     LOG(ERROR) << L"SetTimer failed! Tearing down ant thread pool...";
-    ShutdownAnts();
+    ShutDownAnts();
     return false;
   }
   // The simulation is now actually running - clear the "stopped" hint so

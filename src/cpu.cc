@@ -257,7 +257,7 @@ void InitCpuMon(HWND hWnd) {
   LOG(DEBUG) << L"Num. Logical CPU Cores: " << kNumCpus;
 }
 
-void ShutdownCpuMon() {
+void ShutDownCpuMon() {
   KillTimer(mainHwnd, TIMER_CPU); // Kill CPU perf timer
   pfnGetSystemTimes = nullptr;
 }

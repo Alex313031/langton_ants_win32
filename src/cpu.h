@@ -47,6 +47,6 @@ const PerfSnapshot& GetPerfSnapshot();
 void InitCpuMon(HWND hWnd);
 
 // Kills CPU monitoring timer, cleans up any handles.
-void ShutdownCpuMon();
+void ShutDownCpuMon();
 
 #endif // LANGTON_ANTS_CPU_H_

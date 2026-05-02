@@ -78,8 +78,12 @@ static COLORREF s_pre_mono_bg = RGB_BLUE;
 // Whether to open conhost window for debugging.
 static constexpr bool debug_console = is_debug;
 
+// Store handles to main icon since commonly used
 HICON kMainIcon = nullptr;
 HICON kSmallIcon = nullptr;
+
+// Set by ShutDownApp
+static bool clean_shutdown = false;
 
 int APIENTRY wWinMain(HINSTANCE hInstance,
                       HINSTANCE hPrevInstance,
@@ -1188,22 +1192,20 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_QUERYENDSESSION:
       return TRUE;
     case WM_DESTROY:
-      // In case these timers weren't already destroyed, i.e. WM_DESTROY called before WM_CLOSE.
-      KillTimer(hWnd, TIMER_CPU);
-      KillTimer(hWnd, TIMER_ANTS);
-      // Tear down every ant thread, signal their tick events, and close
-      // their handles in one shot.
-      ShutdownAnts();
-      // Tear down MCI here too - most shutdowns go through ShutDownApp
-      // (which calls StopPlayWav), but if the window is destroyed by any
-      // other path (external DestroyWindow, session end, etc.) we still
-      // need to close the waveform device and delete the temp BGM file.
-      // StopPlayWav must come BEFORE ShutdownBgm - it's a sync post to
-      // the worker, so the worker has to still be alive to process it.
-      // StopPlayWav is a no-op if the device was never opened;
-      // ShutdownBgm is a no-op if the worker was never started.
-      StopPlayWav();
-      ShutdownBgm();
+      // In case these weren't already torn down by ShutDownApp - i.e.
+      // WM_DESTROY was reached without going through WM_CLOSE first
+      // (external DestroyWindow, session end, etc.). The clean_shutdown
+      // flag is set by ShutDownApp before its DestroyWindow call, so the
+      // common WM_CLOSE path skips this entire block.
+      // StopPlayWav must come BEFORE ShutDownBgm - StopPlayWav is a sync
+      // post to the BGM worker, so the worker has to still be alive to
+      // process it. Both are no-ops if their subsystems never started.
+      if (!clean_shutdown) {
+        StopPlayWav();
+        ShutDownBgm();
+        ShutDownAnts();
+        ShutDownCpuMon();
+      }
       // Clean up the back buffer. Order matters: DeleteDC first deselects
       // g_hbmMem from the memory DC, after which DeleteObject can safely free
       // the bitmap. Deleting a bitmap that is still selected into a DC is
@@ -1222,6 +1224,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     case WM_NCDESTROY:
       mainHwnd = nullptr;
+      // Last message this window will receive - any errors during
+      // WM_DESTROY's back-buffer teardown made it to the log; close
+      // the file / console cleanly here, before the message loop sees
+      // the WM_QUIT that WM_DESTROY's PostQuitMessage queued.
+      logging::DeInitLogging(g_hInstance);
       break;
     default:
       return DefWindowProcW(hWnd, message, wParam, lParam);
@@ -1238,7 +1245,7 @@ bool InitApp(HWND hWnd) {
   // WM_SIZE. A failure here isn't fatal - the menu bar still drives
   // every feature, so show error but keep going.
   if (!CreateAppToolbar(hWnd, g_hInstance)) {
-    ErrorBox(hWnd, L"Toolbar Creation Error", L"Failed to create application toolbar. ");
+    ErrorBox(hWnd, L"Toolbar Creation Error", L"Failed to create application toolbar.");
     ok = false;
   } else {
     // Also keep going if status bar fails for some reason.
@@ -1354,18 +1361,22 @@ void LayoutStatusTooltips() {
 void ShutDownApp() {
   LOG(DEBUG) << L"Exiting app...";
   // Stop the BGM first (sync post to the worker), THEN tear the worker
-  // down. Both calls are idempotent - WM_DESTROY will call them again
-  // harmlessly on the way out.
+  // down. StopPlayWav has to come before ShutDownBgm - the post needs the
+  // worker still alive to process it.
   StopPlayWav();
-  ShutdownBgm();
-  // De-initialize logging, which closes any console window open
-  logging::DeInitLogging(g_hInstance); // Can't log anything more after this
-  // Stop the ants timer first so no more WM_TIMER messages are queued.
-  KillTimer(mainHwnd, TIMER_ANTS);
-  // Stop monitoring CPU usage
-  ShutdownCpuMon();
-  // WM_DESTROY will call ShutdownAnts() for us - DestroyWindow triggers that
-  // path synchronously, so we don't need to touch thread state here.
+  ShutDownBgm();
+  // Tear down every ant thread, signal their tick events, and close
+  // their handles in one shot. KillTimer for TIMER_ANTS lives inside.
+  ShutDownAnts();
+  // Stop monitoring CPU usage. KillTimer for TIMER_CPU lives inside.
+  ShutDownCpuMon();
+  // Set BEFORE DestroyWindow: WM_DESTROY runs synchronously inside
+  // DestroyWindow and reads this flag to skip the redundant calls above.
+  // Logging stays alive across DestroyWindow / WM_DESTROY so any errors
+  // surfacing during back-buffer teardown still hit the log; the actual
+  // DeInitLogging happens in WM_NCDESTROY (the last message the window
+  // receives), after WM_DESTROY's back-buffer teardown has run.
+  clean_shutdown = true;
   DestroyWindow(mainHwnd);
 }
 

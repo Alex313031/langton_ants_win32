@@ -515,7 +515,7 @@ bool InitBgm() {
   return ok;
 }
 
-void ShutdownBgm() {
+void ShutDownBgm() {
   if (!s_bgmInit) {
     return;
   }

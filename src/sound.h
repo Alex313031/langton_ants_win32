@@ -72,6 +72,6 @@ bool InitBgm();
 // hidden notify window and synchronization primitives. Call at app
 // shutdown AFTER StopPlayWav so the stop command can still be processed
 // by a live worker before teardown.
-void ShutdownBgm();
+void ShutDownBgm();
 
 #endif // LANGTON_ANTS_SOUND_H_

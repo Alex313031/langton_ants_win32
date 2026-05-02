@@ -141,7 +141,7 @@ bool CustomSeedAnts(const unsigned int custom_seed);
 
 // Terminates all ant threads and closes their events/the timer. Called from
 // WM_DESTROY; safe to call more than once.
-void ShutdownAnts();
+void ShutDownAnts();
 
 // For handling back buffer bitmap for smooth resize. Returns true on
 // success (including the no-op fast path where the existing bitmap
