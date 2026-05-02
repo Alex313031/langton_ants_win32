@@ -7,7 +7,14 @@
 
 // The toolbar child window handle. Kept file-static so nothing else can
 // accidentally mutate it - other TUs interact only via the functions below.
-static HWND s_hToolbar = nullptr;
+static HWND s_hToolbar    = nullptr;
+// Toolbar's internal tooltip control (TBSTYLE_TOOLTIPS makes the toolbar
+// create one for itself). Cached after CreateAppToolbar so HandleToolbarTooltips
+// can compare incoming TTN_NEEDTEXT's hwndFrom against it - tooltip
+// notifications from OTHER controls (notably the status bar's SBARS_TOOLTIPS
+// tooltip) bubble up to the same WM_NOTIFY handler, and without this gate
+// they fall through to the default switch arm and log a spurious WARN.
+static HWND s_hToolbarTip = nullptr;
 
 // Saved original toolbar WndProc so our subclass can chain through to it.
 static WNDPROC s_origToolbarProc = nullptr;
@@ -15,6 +22,13 @@ static WNDPROC s_origToolbarProc = nullptr;
 // Measured in pixels after TB_AUTOSIZE runs. Exposed through globals.h so
 // ants.cc / main.cc can offset the back-buffer blit and mouse coords by it.
 int g_toolbarHeight = 0;
+
+// Measured in pixels after the status bar self-sizes from a WM_SIZE on the
+// parent. Subtracted from the canvas height so ant cells don't extend under
+// the bar (the bar paints last so visually it'd cover them, but those rows
+// would be wasted back-buffer pixels and clicks/place mode would target
+// hidden cells).
+int g_statusBarHeight = 0;
 
 unsigned long g_default_speed = kHighSpeed;
 
@@ -626,6 +640,10 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // screen coords, but for a toolbar docked at the top the height component
   // is what we need regardless.
   s_hToolbar = hTB;
+  // Cache the toolbar's tooltip HWND so HandleToolbarTooltips can filter
+  // out tooltip notifications coming from other controls (e.g. the status
+  // bar's SBARS_TOOLTIPS tooltip).
+  s_hToolbarTip = reinterpret_cast<HWND>(SendMessageW(hTB, TB_GETTOOLTIPS, 0, 0));
   RECT tbRect;
   GetWindowRect(hTB, &tbRect);
   g_toolbarHeight = tbRect.bottom - tbRect.top;
@@ -756,6 +774,14 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
   if (pnmh->code != TTN_GETDISPINFOW && pnmh->code != TTN_NEEDTEXTW) {
     return false;
   }
+  // Filter by tooltip control: status bar's SBARS_TOOLTIPS notifications also
+  // bubble up here with idFrom = part index (0 / 1), which would land in our
+  // default switch arm and log "no tooltip for command id 0". s_hToolbarTip
+  // is null only if TB_GETTOOLTIPS failed at toolbar creation - in that
+  // unlikely case we fall through and the warn would be on us anyway.
+  if (s_hToolbarTip != nullptr && pnmh->hwndFrom != s_hToolbarTip) {
+    return false;
+  }
   NMTTDISPINFOW* pdi  = reinterpret_cast<NMTTDISPINFOW*>(pnmh);
   const int idCommand = static_cast<int>(pdi->hdr.idFrom);
 
@@ -872,6 +898,23 @@ bool ValidateCustomNum(LPCWSTR cNum) {
   return is_valid;
 }
 
+// Updates text in a specified part of the status bar.
+void UpdateStatusBar(const unsigned int part, const std::wstring& text) {
+  // DCHECK trips in dev builds if a caller passes an out-of-range part index.
+  // Goes BEFORE the early-return - DCHECKs only fire when the condition is
+  // false, so checking after the if (part > 1) return; would never trip.
+  DCHECK(part <= 1);
+  if (part > 1) {
+    return;
+  }
+  if (hStatusBar == nullptr) {
+    LOG(ERROR) << L"hStatusBar was null when trying to update text!";
+    return;
+  }
+  const std::wstring out = L" " + text;
+  SendMessageW(hStatusBar, SB_SETTEXT, static_cast<WPARAM>(part), (LPARAM)out.c_str());
+}
+
 const std::wstring GetVersionString() {
   // VERSION_STRING is a narrow C string literal built by stringize macros,
   // so we can't feed it straight to std::wstring. Build the wide form
@@ -880,4 +923,9 @@ const std::wstring GetVersionString() {
   // and MSVC alike.
   return std::to_wstring(MAJOR_VERSION) + L"." + std::to_wstring(MINOR_VERSION) + L"." +
          std::to_wstring(BUILD_VERSION);
+}
+
+const std::wstring GetAppName() {
+  const std::wstring app_name = std::wstring(APP_NAME);
+  return app_name;
 }

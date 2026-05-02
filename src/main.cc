@@ -5,12 +5,27 @@
 
 #include "main.h"
 
+#include "cpu.h"
 #include "resource.h"
 #include "sound.h"
 #include "utils.h"
 #include "version.h"
 
 HWND mainHwnd = nullptr;
+
+HWND hStatusBar = nullptr;
+
+// Separate tooltip control owned by the main window. We dropped SBARS_TOOLTIPS
+// because that path only shows a tooltip when the part text is truncated;
+// we want them to always appear on hover. Two tools are added in
+// InitStatusBar (one per part) and re-rect'd by LayoutStatusTooltips on
+// every WM_SIZE. TTF_SUBCLASS lets the tooltip control hook hStatusBar's
+// mouse messages internally so we don't have to pump TTM_RELAYEVENT.
+static HWND s_hStatusTip = nullptr;
+
+// Backing storage for per-part tooltip text. TTM_ADDTOOL / TTM_UPDATETIPTEXT
+// only store the pointer, so the strings have to outlive the tools.
+static std::wstring s_statusTipText[2];
 
 HINSTANCE g_hInstance = nullptr;
 
@@ -26,6 +41,16 @@ static SIZE s_resizeStartSize = {};
 // whether the just-arrived size event is "we're coming back from a
 // minimize" (restart the tick source) vs. a normal resize (no-op).
 static bool s_was_minimized = false;
+
+// True for the duration of a user-initiated modal move/size loop (titlebar
+// drag, border drag). Set by WM_ENTERSIZEMOVE, cleared by WM_EXITSIZEMOVE.
+// While set, WM_SIZE skips its body entirely - the back buffer recreate
+// (CreateCompatibleBitmap + BitBlt of old contents under g_paintCS) is
+// deferred to WM_EXITSIZEMOVE so we recreate once at the final size instead
+// of on every drag-resize tick. The tick source is also killed on enter and
+// re-armed on exit, parking ant threads so they release g_paintCS - a held
+// lock here is the cause of the visible grab-pause when starting a drag.
+static volatile bool s_in_size_move = false;
 
 HDC g_hdcMem     = nullptr;
 HBITMAP g_hbmMem = nullptr;
@@ -68,7 +93,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   icex.dwICC  = ICC_STANDARD_CLASSES | ICC_BAR_CLASSES;
   InitCommonControlsEx(&icex);
 
-  static const LPCWSTR appTitle    = APP_NAME;
+  static const std::wstring name   = GetAppName();
+  static const LPCWSTR appTitle    = name.c_str();
   static const LPCWSTR szClassName = MAIN_WNDCLASS;
 
   kMainIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
@@ -113,7 +139,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     const bool init_logging           = logging::InitLogging(g_hInstance, LoggingSettings);
     if (init_logging) {
       logging::SetIsDCheck(is_dcheck);
-      LOG(INFO) << L"---- Welcome to Langton's Ants Win32 ----";
+      LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
       LOG(INFO) << L"Version: " << GetVersionString();
     } else {
       ErrorBox(nullptr, L"Logging Initialization Failure", L"InitLogging failed!");
@@ -145,13 +171,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
              L"Audio will be unavailable.");
   }
 
-  static constexpr DWORD exStyle =
-#if _WIN32_WINNT > \
-    0x0602 // Only Windows 8.1+ handles composited correctly with the way this app works.
-      WS_EX_OVERLAPPEDWINDOW | WS_EX_COMPOSITED;
-#else
-      WS_EX_OVERLAPPEDWINDOW;
-#endif
+  // WS_EX_COMPOSITED was tried here historically but is not used: the canvas
+  // is already double-buffered via g_hdcMem/g_hbmMem (see WM_PAINT), so the
+  // OS-level offscreen composite WS_EX_COMPOSITED forces just buys latency
+  // on the modal move/size loop without buying any extra smoothness.
+  static constexpr DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
   // WS_CLIPCHILDREN keeps the parent's painting out of child windows' regions
   // (here: the toolbar). The toolbar is responsible for drawing itself; the
   // OS handles its theming (themed on XP+, classic on Win2000).
@@ -181,8 +205,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // window size. The outer window has to be larger by the OS chrome
   // (borders + titlebar + menu, computed by AdjustWindowRectEx) plus
   // the toolbar's measured height (set by CreateAppToolbar inside
-  // WM_CREATE, which has already returned by the time we get here).
-  RECT outer = {0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight};
+  // WM_CREATE) plus the status bar's measured height (set by
+  // InitStatusBar inside WM_CREATE - both have already returned by
+  // the time we get here).
+  RECT outer = {0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight + g_statusBarHeight};
   AdjustWindowRectEx(&outer, style, TRUE, exStyle);
   const int outerW = outer.right - outer.left;
   const int outerH = outer.bottom - outer.top;
@@ -245,11 +271,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       break;
     case WM_TIMER:
       // WM_TIMER fires on the main thread at the interval set by SetTimer.
-      // We signal every active ant thread's tick event rather than drawing
-      // here directly, keeping all GDI work on the ant threads and leaving
+      // TIMER_ANTS signals every active ant thread's tick event rather than
+      // drawing directly, keeping all GDI work on the ant threads and leaving
       // the main thread free to process input and paint messages.
+      // TIMER_CPU samples GetCPUPercent and pushes the formatted string to
+      // the second status-bar part - cheap, runs at g_perf_delay ms.
       if (wParam == TIMER_ANTS) {
         SignalAntsTick();
+      } else if (wParam == TIMER_CPU) {
+        UpdateCpuUsage();
       }
       break;
     case WM_APP_AUTOPLAY: {
@@ -278,16 +308,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       LPMINMAXINFO pMinMaxInfo = reinterpret_cast<LPMINMAXINFO>(lParam);
       // MINWIDTH / MINHEIGHT are the minimum desired ant CANVAS size.
       // The outer-window minimum has to be larger by the OS chrome
-      // (AdjustWindowRectEx) plus the toolbar's current height, so the
-      // canvas can't be squeezed below MINWIDTH x MINHEIGHT - and as
-      // the toolbar wraps onto extra rows at narrow widths, the min
-      // grows accordingly because g_toolbarHeight grew on the last
-      // WM_SIZE → LayoutToolbar pass.
+      // (AdjustWindowRectEx) plus the toolbar's current height plus the
+      // status bar's current height, so the canvas can't be squeezed
+      // below MINWIDTH x MINHEIGHT - and as the toolbar wraps onto extra
+      // rows at narrow widths, the min grows accordingly because
+      // g_toolbarHeight grew on the last WM_SIZE → LayoutToolbar pass.
       RECT canvasMin = {0, 0, MINWIDTH, MINHEIGHT};
       AdjustWindowRectEx(&canvasMin, static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)), TRUE,
                          static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)));
       pMinMaxInfo->ptMinTrackSize.x = canvasMin.right - canvasMin.left;
-      pMinMaxInfo->ptMinTrackSize.y = (canvasMin.bottom - canvasMin.top) + g_toolbarHeight;
+      pMinMaxInfo->ptMinTrackSize.y =
+          (canvasMin.bottom - canvasMin.top) + g_toolbarHeight + g_statusBarHeight;
       const int MAXWIDTH            = GetSystemMetrics(SM_CXMAXIMIZED);
       const int MAXHEIGHT           = GetSystemMetrics(SM_CYMAXIMIZED);
       pMinMaxInfo->ptMaxTrackSize.x = MAXWIDTH;
@@ -300,46 +331,110 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // drawn to the screen until EndPaint is called.
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hWnd, &ps);
-      // Fill the dirty region with the background color. Covers newly exposed
-      // pixels during resize and startup before the back buffer is ready.
-      // WS_CLIPCHILDREN excludes the toolbar's rect automatically, so this
-      // fill never touches the toolbar area.
-      FillRectWithColor(hdc, ps.rcPaint, g_bkg_color);
       // Hold the lock so the ant thread cannot replace the back buffer
       // bitmap between our null-check and the BitBlt call.
       EnterCriticalSection(&g_paintCS);
       if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+        if (s_in_size_move) {
+          // Drag-resize: the back buffer is held at the OLD canvas size while
+          // the user drags, so newly-exposed pixels around it have to come
+          // from us. The OS coalesces invalidations during the modal loop in
+          // ways that don't always include the new strip cleanly in
+          // ps.rcPaint - the optimized ExcludeClipRect path below would then
+          // miss pixels and the gap shows desktop / DWM transparency / leftover
+          // chrome. Filling all of ps.rcPaint with bg first guarantees the gap
+          // is covered no matter how the OS chunks its dirty region; the
+          // canvas region then gets overwritten by the BitBlt below. The brief
+          // double-paint on those canvas pixels happens inside BeginPaint /
+          // EndPaint, so no flicker.
+          FillRectWithColor(hdc, ps.rcPaint, g_bkg_color);
+        } else {
+          // Steady state: only fill the area NOT about to be overwritten by
+          // the canvas BitBlt below. Push the current clip (BeginPaint set it
+          // to ps.rcPaint), exclude the canvas rect, fill what's left, then
+          // restore so the BitBlt can paint the canvas. For the common
+          // tick-driven repaint where ps.rcPaint is fully inside the canvas,
+          // ExcludeClipRect leaves an empty clip and FillRect is a no-op -
+          // dropping the redundant double-paint we used to do every tick.
+          // WS_CLIPCHILDREN already excludes the toolbar from the parent's
+          // drawable area, so neither operation can touch it.
+          const int saved = SaveDC(hdc);
+          ExcludeClipRect(hdc, 0, g_toolbarHeight, cxClient, g_toolbarHeight + cyClient);
+          FillRectWithColor(hdc, ps.rcPaint, g_bkg_color);
+          RestoreDC(hdc, saved);
+        }
         // Blit the whole back buffer to the window at (0, g_toolbarHeight).
         // Back buffer coords are ants-canvas-local (0..cxClient-1, 0..cyClient-1);
         // shifting by the toolbar height places the canvas below the toolbar.
         BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient, g_hdcMem, 0, 0, SRCCOPY);
+      } else {
+        // No back buffer yet (very first paint, or torn down at WM_DESTROY).
+        // Fall back to filling the whole dirty area so the user doesn't see
+        // garbage in the meantime.
+        FillRectWithColor(hdc, ps.rcPaint, g_bkg_color);
       }
       LeaveCriticalSection(&g_paintCS);
       EndPaint(hWnd, &ps);
       break;
     }
     case WM_SIZE: {
+      // cxClient / cyClient represent the ants canvas area, not the parent's
+      // client area - neither the toolbar (top) nor the status bar (bottom)
+      // is drawable space. cyClient gets the status bar height subtracted
+      // below once the bar has self-sized for this WM_SIZE.
+      cxClient = LOWORD(lParam);
+      cyClient = HIWORD(lParam) - g_toolbarHeight;
       if (wParam == SIZE_MINIMIZED) {
         // Minimize freezes the simulation: we kill the tick source so the
-        // ant threads park on their wait events with zero CPU use. We
-        // deliberately don't touch cxClient / cyClient or the back buffer -
-        // the bitmap keeps holding the canvas, and each ant's thread-local
+        // ant threads park on their wait events with zero CPU use. The
+        // cxClient / cyClient just assigned will read 0 / -g_toolbarHeight
+        // here (lParam carries 0,0 on minimize), but that's harmless - no
+        // painting happens while minimized, and the next non-minimize WM_SIZE
+        // will overwrite them with the restored dimensions before any draw.
+        // The back buffer bitmap is left alone, and each ant's thread-local
         // cellX / cellY / dir / onBg state survives untouched - so when
-        // restore fires we come back exactly where we left off, trails
-        // and all.
+        // restore fires we come back exactly where we left off, trails and all.
         s_was_minimized = true;
         KillTimer(hWnd, TIMER_ANTS);
+        KillTimer(hWnd, TIMER_CPU);
+        break;
+      } else {
+        // Status bar self-sizes via WM_SIZE, always keep it in sync. After
+        // it sizes itself, GetWindowRect gives us the actual on-screen
+        // height (depends on font / DPI), which we both stash for the
+        // canvas calc and use to clamp the split.
+        if (hStatusBar) {
+          SendMessageW(hStatusBar, WM_SIZE, 0, 0);
+          RECT sbRc = {};
+          GetWindowRect(hStatusBar, &sbRc);
+          g_statusBarHeight = sbRc.bottom - sbRc.top;
+          cyClient -= g_statusBarHeight;
+          // Clamp the split width: at very narrow windows cxClient can be
+          // smaller than CPU_STATUS_WIDTH, and SB_SETPARTS does not handle
+          // a negative split coordinate gracefully.
+          int kStatusSplit = cxClient - CPU_STATUS_WIDTH;
+          if (kStatusSplit < 0) {
+            kStatusSplit = 0;
+          }
+          const int kStatusParts[2] = {kStatusSplit, -1}; // -1 means extend to right edge
+          SendMessageW(hStatusBar, SB_SETPARTS, 2, (LPARAM)kStatusParts);
+          // Slide the tooltip-tool rects to follow the new part rects -
+          // without this, hover targets stay where the parts WERE.
+          LayoutStatusTooltips();
+        }
+      }
+      if (s_in_size_move) {
+        // Mid drag-resize. Defer all the heavy work (toolbar layout, back
+        // buffer recreate) until the user lets go - WM_EXITSIZEMOVE re-
+        // derives the final size from GetClientRect and runs it once.
+        // Until then WM_PAINT keeps BitBlt'ing the existing back buffer at
+        // its old size; newly-exposed pixels around it get the bg fill.
         break;
       }
       // Let the toolbar re-fit the new parent width and re-measure its height.
       // All toolbar state lives in utils.cc; this one call updates
       // g_toolbarHeight as needed.
       LayoutToolbar(hWnd);
-      // cxClient / cyClient represent the ants canvas area, not the parent's client
-      // area - the toolbar isn't drawable space. Clamp to zero when the
-      // window is smaller than the toolbar (extreme resize).
-      cxClient = LOWORD(lParam);
-      cyClient = HIWORD(lParam) - g_toolbarHeight;
       if (cyClient < 0) {
         cyClient = 0;
       }
@@ -357,7 +452,42 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         if (!g_paused) {
           SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
         }
+        SetTimer(hWnd, TIMER_CPU, g_perf_delay, nullptr);
       }
+      break;
+    }
+    case WM_ENTERSIZEMOVE:
+      // The user just grabbed the titlebar or a resize border, putting us
+      // into the modal move/size loop. Park the simulation: KillTimer stops
+      // SignalAntsTick from waking the ant threads, so any in-flight tick
+      // finishes and the threads block on their wait events without entering
+      // g_paintCS again. That removes the lock contention with WM_PAINT that
+      // would otherwise show up as a noticeable pause when starting the drag.
+      // Per-thread cellX / cellY / dir / onBg state is untouched, so when the
+      // drag ends the simulation resumes exactly where it paused.
+      s_in_size_move = true;
+      KillTimer(hWnd, TIMER_ANTS);
+      break;
+    case WM_EXITSIZEMOVE: {
+      // Modal loop is over - the user has settled on a final window size.
+      // WM_SIZE skipped its body for every intermediate frame; do the work
+      // we deferred (toolbar layout + back buffer recreate) once now,
+      // against the final client area, then re-arm the timer if the user
+      // wasn't paused before the drag.
+      s_in_size_move = false;
+      RECT rc        = {};
+      GetClientRect(hWnd, &rc);
+      LayoutToolbar(hWnd);
+      cxClient = rc.right - rc.left;
+      cyClient = (rc.bottom - rc.top) - g_toolbarHeight - g_statusBarHeight;
+      if (cyClient < 0) {
+        cyClient = 0;
+      }
+      RecreateBackBuffer(hWnd, cxClient, cyClient);
+      if (!g_paused) {
+        SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
+      }
+      InvalidateRect(hWnd, nullptr, FALSE);
       break;
     }
     case WM_NOTIFY: {
@@ -956,7 +1086,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     case WM_QUERYENDSESSION:
       return TRUE;
     case WM_DESTROY:
-      // Stop the ants timer first so no more WM_TIMER messages are queued.
+      // In case these timers weren't already destroyed, i.e. WM_DESTROY called before WM_CLOSE.
+      KillTimer(hWnd, TIMER_CPU);
       KillTimer(hWnd, TIMER_ANTS);
       // Tear down every ant thread, signal their tick events, and close
       // their handles in one shot.
@@ -1003,13 +1134,23 @@ bool InitApp(HWND hWnd) {
   }
   // Build the toolbar first so g_toolbarHeight is set before the first
   // WM_SIZE. A failure here isn't fatal - the menu bar still drives
-  // every feature - so we warn the user and keep going.
+  // every feature, so show error but keep going.
   if (!CreateAppToolbar(hWnd, g_hInstance)) {
     ErrorBox(hWnd, L"Toolbar Creation Error", L"Failed to create application toolbar. ");
     ok = false;
   } else {
-    ok = true;
+    // Also keep going if status bar fails for some reason.
+    if (!InitStatusBar(hWnd)) {
+      LOG(ERROR) << L"Status bar initialization failed!";
+      ok = false;
+    } else {
+      ok = true;
+    }
   }
+
+  // Start CPU monitoring right before starting any ants
+  InitCpuMon(hWnd);
+
   // All settings (number of ants, delay, background color) are already set by
   // InitMenuDefaults.
   if (!ShowAnts()) {
@@ -1026,6 +1167,88 @@ bool InitApp(HWND hWnd) {
   return ok;
 }
 
+bool InitStatusBar(HWND hWnd) {
+  // Create the status bar
+  // SBARS_TOOLTIPS deliberately omitted - it only fires on text truncation.
+  // We attach a separate TOOLTIPS_CLASS control below that always shows.
+  hStatusBar =
+      CreateWindowExW(0, STATUSCLASSNAME, nullptr, dwCHILD | SBARS_SIZEGRIP,
+                      CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, hWnd, nullptr, g_hInstance, nullptr);
+  if (hStatusBar == nullptr) {
+    LOG(ERROR) << L"Status bar CreateWindowEx failed!";
+    return false;
+  }
+  // Kick the bar to self-size against the parent's current client rect, then
+  // measure its actual on-screen height so the WM_GETMINMAXINFO and the
+  // outer-window calc in wWinMain can reserve room for it before we ever
+  // see the first WM_SIZE.
+  SendMessageW(hStatusBar, WM_SIZE, 0, 0);
+  RECT sbRc = {};
+  GetWindowRect(hStatusBar, &sbRc);
+  g_statusBarHeight = sbRc.bottom - sbRc.top;
+  // Clamp the split: at the default CW_WIDTH this can't go negative, but
+  // mirroring the WM_SIZE clamp keeps the two paths in sync if CW_WIDTH or
+  // CPU_STATUS_WIDTH ever change.
+  int kStatusSplit = CW_WIDTH - CPU_STATUS_WIDTH;
+  if (kStatusSplit < 0) {
+    kStatusSplit = 0;
+  }
+  const int kStatusParts[2]               = {kStatusSplit, -1};
+  SendMessageW(hStatusBar, SB_SETPARTS, 2, (LPARAM)kStatusParts);
+  static const std::wstring status_text   = GetAppName() + L" Version " + GetVersionString();
+  static const std::wstring status_bubble = L"CPU Usage: NaN";
+  UpdateStatusBar(0, status_text);
+  UpdateStatusBar(1, status_bubble);
+
+  // Build a separate tooltip control owned by the main window. The OS forces
+  // WS_POPUP + WS_EX_TOOLWINDOW for TOOLTIPS_CLASS regardless of what we pass,
+  // and ignores the position/size args - hence the all-zeros and CW_USEDEFAULTs.
+  // Failure here isn't fatal: status bar still works without tooltips, so we
+  // warn and bail out of the tooltip setup rather than failing InitStatusBar.
+  s_hStatusTip = CreateWindowExW(0, TOOLTIPS_CLASS, nullptr, TTS_ALWAYSTIP | TTS_NOPREFIX,
+                                 CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hWnd,
+                                 nullptr, g_hInstance, nullptr);
+  if (s_hStatusTip == nullptr) {
+    LOG(WARN) << L"Status bar tooltip CreateWindowEx failed - tooltips will be unavailable.";
+    return true;
+  }
+  s_statusTipText[0] = L"Current Status.";
+  s_statusTipText[1] = L"Total CPU usage of this app.";
+  for (UINT_PTR i = 0; i < 2; ++i) {
+    RECT partRc = {};
+    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i),
+                 reinterpret_cast<LPARAM>(&partRc));
+    TOOLINFOW ti = {};
+    ti.cbSize    = sizeof(TOOLINFOW);
+    // TTF_SUBCLASS: the tooltip control hooks hStatusBar's mouse messages
+    // itself; without it we'd have to call TTM_RELAYEVENT in WM_MOUSEMOVE.
+    ti.uFlags    = TTF_SUBCLASS;
+    ti.hwnd      = hStatusBar;
+    ti.uId       = i;
+    ti.rect      = partRc;
+    ti.lpszText  = const_cast<LPWSTR>(s_statusTipText[i].c_str());
+    SendMessageW(s_hStatusTip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
+  }
+  return true;
+}
+
+void LayoutStatusTooltips() {
+  if (hStatusBar == nullptr || s_hStatusTip == nullptr) {
+    return;
+  }
+  for (UINT_PTR i = 0; i < 2; ++i) {
+    RECT partRc = {};
+    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i),
+                 reinterpret_cast<LPARAM>(&partRc));
+    TOOLINFOW ti = {};
+    ti.cbSize    = sizeof(TOOLINFOW);
+    ti.hwnd      = hStatusBar;
+    ti.uId       = i;
+    ti.rect      = partRc;
+    SendMessageW(s_hStatusTip, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&ti));
+  }
+}
+
 void ShutDownApp() {
   LOG(DEBUG) << L"Exiting app...";
   // Stop the BGM first (sync post to the worker), THEN tear the worker
@@ -1035,6 +1258,10 @@ void ShutDownApp() {
   ShutdownBgm();
   // De-initialize logging, which closes any console window open
   logging::DeInitLogging(g_hInstance); // Can't log anything more after this
+  // Stop the ants timer first so no more WM_TIMER messages are queued.
+  KillTimer(mainHwnd, TIMER_ANTS);
+  // Stop monitoring CPU usage
+  ShutdownCpuMon();
   // WM_DESTROY will call ShutdownAnts() for us - DestroyWindow triggers that
   // path synchronously, so we don't need to touch thread state here.
   DestroyWindow(mainHwnd);

@@ -1,5 +1,6 @@
 #include "ants.h"
 
+#include "cpu.h"
 #include "globals.h"
 #include "resource.h"
 #include "sound.h"

@@ -35,18 +35,29 @@ extern HICON kSmallIcon;
 // to compute the actual outer window size, so the user always gets a
 // CW_WIDTH x CW_HEIGHT ant canvas at startup regardless of how tall the
 // menu bar / toolbar end up being.
-inline constexpr INT CW_WIDTH  = 640;
-inline constexpr INT CW_HEIGHT = 640;
+inline constexpr INT CW_WIDTH  = 654;
+inline constexpr INT CW_HEIGHT = 654;
 
 // Minimum desired ant canvas size. WM_GETMINMAXINFO converts these to
 // outer-window minimums (chrome + g_toolbarHeight added) so the canvas
 // never gets squeezed below this even when the toolbar wraps onto extra
 // rows at narrow widths.
-inline constexpr INT MINWIDTH  = 256;
-inline constexpr INT MINHEIGHT = 256;
+inline constexpr INT MINWIDTH  = 252;
+inline constexpr INT MINHEIGHT = 252;
+
+// Width of CPU status area in status bar, for split
+inline constexpr INT CPU_STATUS_WIDTH = 120;
+
+// Child window style
+inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
                             // below it.
+
+extern int g_statusBarHeight; // Height of the bottom status bar in pixels; 0 if none. Ants
+                              // "canvas" ends above it. Measured by InitStatusBar after the bar
+                              // is created and re-measured on every WM_SIZE so DPI / font
+                              // changes don't leave stale rows of canvas hidden under the bar.
 
 // Gets default settings from CHECKED state of menu items
 void InitMenuDefaults(HWND hWnd);
@@ -128,7 +139,16 @@ bool ValidateCustomSeed(LPCWSTR cSeed);
 // or alphanumeric characters,
 bool ValidateCustomNum(LPCWSTR cNum);
 
+// Updates text in a specified part of the status bar.
+void UpdateStatusBar(const unsigned int part, const std::wstring& text);
+
 // Gets version as human readable wstring.
 const std::wstring GetVersionString();
+
+// Gets version as human readable wstring.
+const std::wstring GetVersionString();
+
+// Returns APP_NAME as wstring, for easier usage.
+const std::wstring GetAppName();
 
 #endif // LANGTON_ANTS_UTILS_H_

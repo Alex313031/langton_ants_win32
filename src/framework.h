@@ -12,6 +12,7 @@
 
 #include <algorithm> // std::min / std::max
 #include <iostream>  // Console output and ostringstream
+#include <limits>    // Numeric limits
 #include <random>    // Randomization functions
 #include <string>    // std::string / std::wstring
 #include <vector>    // Storage, used for Pixel buffers, etc.

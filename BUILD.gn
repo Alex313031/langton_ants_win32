@@ -10,6 +10,8 @@ executable("langton_ants") {
   sources = [
     "src/ants.cc",
     "src/ants.h",
+    "src/cpu.cc",
+    "src/cpu.h",
     "src/langton_ants.rc",
     "src/framework.h",
     "src/globals.h",

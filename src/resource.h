@@ -117,8 +117,9 @@
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280
 
-// Timer ID for painting
-#define TIMER_ANTS                  300
+// Timers
+#define TIMER_ANTS                  300 // Timer ID for painting
+#define TIMER_CPU                   301 // Timer ID for CPU monitoring
 
 // Embedded background-music WAV. Loaded as a user-defined "WAVE" resource
 // when kUseEmbeddedBgm is true (see utils.h). The RC file binds this ID

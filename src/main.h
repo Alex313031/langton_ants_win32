@@ -10,6 +10,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 // Initializes app state
 bool InitApp(HWND hWnd);
 
+// Creates status bar, and sets initial split and text
+bool InitStatusBar(HWND hWnd);
+
+// Re-positions the status bar's tooltip-tool rects against the bar's current
+// part rects. Call after every SB_SETPARTS (i.e. each WM_SIZE) so the hover
+// targets follow the parts as the window resizes. No-op until InitStatusBar
+// has run, and no-op if the tooltip control failed to create.
+void LayoutStatusTooltips();
+
 // Closes all windows and cleans up any resources.
 void ShutDownApp();
 
