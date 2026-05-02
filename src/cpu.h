@@ -34,7 +34,7 @@ namespace cpu {
   // Gets the total CPU usage percent of this app, including all it's threads
   // taking into account SMP. Updates CPU perf snapshot.
   float GetCPUPercent();
-} // namespace
+} // namespace cpu
 
 // This is called once per TIMER_CPU tick to run GetCPUPercent() and
 // update the status bar CPU status bubble.

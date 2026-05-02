@@ -66,6 +66,15 @@ extern int g_statusBarHeight; // Height of the bottom status bar in pixels; 0 if
                               // is created and re-measured on every WM_SIZE so DPI / font
                               // changes don't leave stale rows of canvas hidden under the bar.
 
+// True between a UserMessage call and the TIMER_STATUS_RESET firing - i.e.
+// "the bar is currently showing a transient user message, not the default".
+// UserMessage sets it; the WM_TIMER handler for TIMER_STATUS_RESET clears
+// it. Read by main.cc on minimize/restore so a pending revert can be
+// suspended while minimized and re-armed after restore (with a fresh
+// kStatusBarResetDelay window) - the user gets to read the message after
+// un-minimizing instead of seeing it blow away while they couldn't.
+extern bool g_status_revert_pending;
+
 // Gets default settings from CHECKED state of menu items
 void InitMenuDefaults(HWND hWnd);
 

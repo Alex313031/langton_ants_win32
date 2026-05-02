@@ -17,7 +17,7 @@ volatile bool g_stopped = true;  // True at startup (no animation yet) and after
 bool g_monochrome = false; // Whether monochrome colors only is enabled
 
 // Fixed ant marker color, or kRandomAntColor for per-ant random pick
-COLORREF g_ant_color = kRandomAntColor; 
+COLORREF g_ant_color = kRandomAntColor;
 
 // Initialize to 1, in case something goes wrong at least we draw 1 ant
 volatile UINT g_num_ants = 1;
@@ -48,9 +48,9 @@ struct AlgoPattern {
   int numStates;
 };
 static const AlgoPattern kAlgoPatterns[] = {
-    {AntAlgorithm::Classic,     "RL",            2},
-    {AntAlgorithm::Fill,        "LRL",           3},
-    {AntAlgorithm::Archimedes,  "LRRRRLLLRRR",  11},
+    {AntAlgorithm::Classic, "RL", 2},
+    {AntAlgorithm::Fill, "LRL", 3},
+    {AntAlgorithm::Archimedes, "LRRRRLLLRRR", 11},
     {AntAlgorithm::Logarithmic, "RLLLLRRRLLLR", 12},
 };
 
@@ -93,7 +93,7 @@ static bool ResizeStateGrid(int newWidth, int newHeight) {
   if (newWidth == g_state_grid_width && newHeight == g_state_grid_height) {
     return true; // same size, keep existing
   }
-  const size_t newCount = static_cast<size_t>(newWidth) * static_cast<size_t>(newHeight);
+  const size_t newCount  = static_cast<size_t>(newWidth) * static_cast<size_t>(newHeight);
   unsigned char* newGrid = new (std::nothrow) unsigned char[newCount]();
   if (newGrid == nullptr) {
     LOG(ERROR) << L"ResizeStateGrid: allocation failed for " << newWidth << L"x" << newHeight;
@@ -184,14 +184,14 @@ static COLORREF StateColor(unsigned char state) {
     return CurrentPathColor();
   }
   static const COLORREF kStatePalette[10] = {
-      RGB(255, 128,   0), // 2  - orange
-      RGB(255, 192,  64), // 3  - gold
-      RGB(128, 255,   0), // 4  - lime
-      RGB(  0, 255, 128), // 5  - spring
-      RGB(  0, 160, 160), // 6  - teal
-      RGB( 64, 160, 255), // 7  - sky
-      RGB( 80,   0, 192), // 8  - indigo
-      RGB(160,  64, 255), // 9  - purple
+      RGB(255, 128, 0),   // 2  - orange
+      RGB(255, 192, 64),  // 3  - gold
+      RGB(128, 255, 0),   // 4  - lime
+      RGB(0, 255, 128),   // 5  - spring
+      RGB(0, 160, 160),   // 6  - teal
+      RGB(64, 160, 255),  // 7  - sky
+      RGB(80, 0, 192),    // 8  - indigo
+      RGB(160, 64, 255),  // 9  - purple
       RGB(255, 128, 192), // 10 - pink
       RGB(255, 128, 128), // 11 - salmon
   };
@@ -245,11 +245,9 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     seed  = static_cast<DWORD>(cSeed) ^ slotMix;
   } else {
     cSeed = static_cast<UINT>(NULL);
-    seed = GetCurrentThreadId() ^ slotMix;
-
+    seed  = (GetCurrentThreadId() * fibonacci) ^ slotMix;
   }
-  LOG(DEBUG) << L"AntThread slot=" << static_cast<UINT>(slotIdx + 1u)
-             << L" customSeed=" << cSeed
+  LOG(DEBUG) << L"AntThread slot=" << static_cast<UINT>(slotIdx + 1u) << L" customSeed=" << cSeed
              << L" seed=" << logging::Hex(seed);
 
   srand(static_cast<unsigned int>(seed));
@@ -272,8 +270,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // next iteration. Any failure / spurious wake exits the thread.
     if (slot->hTickEvent == nullptr ||
         WaitForSingleObject(slot->hTickEvent, INFINITE) != WAIT_OBJECT_0) {
-      LOG(ERROR) << L"AntThread: tick event wait failed (slot "
-                 << static_cast<int>(slot - s_slots) << L") - thread exiting...";
+      LOG(ERROR) << L"AntThread: tick event wait failed (slot " << static_cast<int>(slot - s_slots)
+                 << L") - thread exiting...";
       break;
     }
     // Two exit paths: global shutdown OR this individual slot was asked to die
@@ -332,7 +330,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
         if (g_hdcMem != nullptr) {
           const int px = cellX * CELL_PX;
           const int py = cellY * CELL_PX;
-          RECT rc = {px, py, px + CELL_PX, py + CELL_PX};
+          RECT rc      = {px, py, px + CELL_PX, py + CELL_PX};
           FillRectWithColor(g_hdcMem, rc, antColor);
           RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
           InvalidateRect(mainHwnd, &inval, FALSE);
@@ -412,11 +410,10 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
           // this should never trigger in practice.
           const unsigned char state =
               (prev < static_cast<unsigned char>(algo.numStates)) ? prev : 0;
-          const char turn = algo.pattern[state];
-          dir             = (turn == 'R') ? (dir + 1) & 3 : (dir + 3) & 3;
-          const unsigned char nextState =
-              static_cast<unsigned char>((state + 1) % algo.numStates);
-          g_state_grid[cellIdx] = nextState;
+          const char turn               = algo.pattern[state];
+          dir                           = (turn == 'R') ? (dir + 1) & 3 : (dir + 3) & 3;
+          const unsigned char nextState = static_cast<unsigned char>((state + 1) % algo.numStates);
+          g_state_grid[cellIdx]         = nextState;
 
           const COLORREF trailColor = StateColor(nextState);
           const int px              = cellX * CELL_PX;
@@ -1013,16 +1010,15 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   const int gridH = cyClient / CELL_PX;
   if (gridW < 2 || gridH < 2) {
     LeaveCriticalSection(&g_paintCS);
-    LOG(WARN) << L"Place click ignored: grid too small (" << gridW
-              << L"x" << gridH << L")...";
+    LOG(WARN) << L"Place click ignored: grid too small (" << gridW << L"x" << gridH << L")...";
     return false;
   }
   const int cellX = bx / CELL_PX;
   const int cellY = by / CELL_PX;
   if (cellX >= gridW || cellY >= gridH) {
     LeaveCriticalSection(&g_paintCS);
-    LOG(WARN) << L"Place click ignored: cell (" << cellX << L"," << cellY
-              << L") outside grid (" << gridW << L"x" << gridH << L")!";
+    LOG(WARN) << L"Place click ignored: cell (" << cellX << L"," << cellY << L") outside grid ("
+              << gridW << L"x" << gridH << L")!";
     return false;
   }
 

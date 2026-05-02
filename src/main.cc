@@ -78,7 +78,7 @@ static COLORREF s_pre_mono_bg = RGB_BLUE;
 static constexpr bool debug_console = is_debug;
 
 // Store handles to main icon since commonly used
-HICON kMainIcon = nullptr;
+HICON kMainIcon  = nullptr;
 HICON kSmallIcon = nullptr;
 
 // Set by ShutDownApp
@@ -100,7 +100,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   static const LPCWSTR appTitle    = name.c_str();
   static const LPCWSTR szClassName = MAIN_WNDCLASS;
 
-  kMainIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
+  kMainIcon  = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
   kSmallIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
 
   WNDCLASSEXW wndclass;
@@ -287,6 +287,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         UpdateCpuUsage();
       } else if (wParam == TIMER_STATUS_RESET) {
         KillTimer(hWnd, TIMER_STATUS_RESET);
+        g_status_revert_pending = false;
         UpdateStatusBar(0, kDefaultStatusText);
       }
       break;
@@ -386,16 +387,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // luma: dark grey on light backgrounds, light grey on dark ones.
           // Falls back to a mid-grey on the grey monochrome bg, which makes
           // the grid faint - acceptable corner case the user can toggle off.
-          const BYTE bgR    = GetRValue(g_bkg_color);
-          const BYTE bgG    = GetGValue(g_bkg_color);
-          const BYTE bgB    = GetBValue(g_bkg_color);
-          const int bgLuma  = (299 * bgR + 587 * bgG + 114 * bgB) / 1000;
-          const COLORREF gridColor =
-              (bgLuma > 127) ? RGB(80, 80, 80) : RGB(180, 180, 180);
-          HPEN hGridPen   = CreatePen(PS_SOLID, 1, gridColor);
-          HPEN hOldPen    = static_cast<HPEN>(SelectObject(hdc, hGridPen));
-          const int yTop  = g_toolbarHeight;
-          const int yBot  = g_toolbarHeight + cyClient;
+          const BYTE bgR           = GetRValue(g_bkg_color);
+          const BYTE bgG           = GetGValue(g_bkg_color);
+          const BYTE bgB           = GetBValue(g_bkg_color);
+          const int bgLuma         = (299 * bgR + 587 * bgG + 114 * bgB) / 1000;
+          const COLORREF gridColor = (bgLuma > 127) ? RGB(80, 80, 80) : RGB(180, 180, 180);
+          HPEN hGridPen            = CreatePen(PS_SOLID, 1, gridColor);
+          HPEN hOldPen             = static_cast<HPEN>(SelectObject(hdc, hGridPen));
+          const int yTop           = g_toolbarHeight;
+          const int yBot           = g_toolbarHeight + cyClient;
           for (int gridX = 0; gridX <= cxClient; gridX += CELL_PX) {
             MoveToEx(hdc, gridX, yTop, nullptr);
             LineTo(hdc, gridX, yBot);
@@ -438,6 +438,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         s_was_minimized = true;
         KillTimer(hWnd, TIMER_ANTS);
         KillTimer(hWnd, TIMER_CPU);
+        // Suspend the status-bar revert without clearing g_status_revert_pending.
+        // The bar's text storage survives minimize, so when we restore we'll
+        // re-arm with a fresh kStatusBarResetDelay - the user gets time to
+        // read the message after un-minimizing instead of it blowing away
+        // while they couldn't see it.
+        KillTimer(hWnd, TIMER_STATUS_RESET);
         break;
       } else {
         // Status bar self-sizes via WM_SIZE, always keep it in sync. After
@@ -494,6 +500,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           SetTimer(hWnd, TIMER_ANTS, g_delay, nullptr);
         }
         SetTimer(hWnd, TIMER_CPU, g_perf_delay, nullptr);
+        // If a UserMessage was on the bar when we minimized, re-arm the
+        // revert with a fresh full delay so the user can read it now that
+        // the window is visible again. The bar's text was preserved by the
+        // status-bar control across minimize so no UpdateStatusBar needed.
+        if (g_status_revert_pending) {
+          SetTimer(hWnd, TIMER_STATUS_RESET, static_cast<UINT>(kStatusBarResetDelay), nullptr);
+        }
       }
       break;
     }
@@ -819,9 +832,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             CheckMenuItem(hCustom, IDM_NOCLIENTBOUNDS,
                           MF_BYCOMMAND | (g_no_client_bounds ? MF_CHECKED : MF_UNCHECKED));
           }
-          UserMessage(g_no_client_bounds
-                          ? L"Canvas bounds turned off (ants now wrap around edges)."
-                          : L"Canvas bounds turned on (ants now bounce off edges).");
+          UserMessage(g_no_client_bounds ? L"Canvas bounds turned off (ants now wrap around edges)."
+                                         : L"Canvas bounds turned on (ants now bounce off edges).");
           break;
         }
         case IDM_CLASSIC:
@@ -830,8 +842,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_LOGARITHMIC: {
           // IDs are consecutive and aligned with AntAlgorithm's underlying
           // values, so the offset gives us the new algo directly.
-          const AntAlgorithm newAlgo =
-              static_cast<AntAlgorithm>(command - IDM_CLASSIC);
+          const AntAlgorithm newAlgo = static_cast<AntAlgorithm>(command - IDM_CLASSIC);
           if (newAlgo == g_algorithm) {
             break; // user picked what was already active - no-op
           }
@@ -1086,23 +1097,23 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           const wchar_t* speedName = L"?";
           switch (command) {
             case IDM_SLOW:
-              g_delay = kSlowSpeed;
+              g_delay   = kSlowSpeed;
               speedName = L"Slow";
               break;
             case IDM_MEDIUM:
-              g_delay = kMedSpeed;
+              g_delay   = kMedSpeed;
               speedName = L"Medium";
               break;
             case IDM_FAST:
-              g_delay = kHighSpeed;
+              g_delay   = kHighSpeed;
               speedName = L"Fast";
               break;
             case IDM_HYPER:
-              g_delay = kHyperSpeed;
+              g_delay   = kHyperSpeed;
               speedName = L"Hyper";
               break;
             case IDM_REALTIME:
-              g_delay = kRealTime;
+              g_delay   = kRealTime;
               speedName = L"Realtime";
               break;
             default:
@@ -1304,9 +1315,8 @@ bool InitStatusBar(HWND hWnd) {
   // Create the status bar
   // SBARS_TOOLTIPS deliberately omitted - it only fires on text truncation.
   // We attach a separate TOOLTIPS_CLASS control below that always shows.
-  hStatusBar =
-      CreateWindowExW(0, STATUSCLASSNAME, nullptr, dwCHILD | SBARS_SIZEGRIP,
-                      CW_USEDEFAULT, CW_USEDEFAULT, 0, 0, hWnd, nullptr, g_hInstance, nullptr);
+  hStatusBar = CreateWindowExW(0, STATUSCLASSNAME, nullptr, dwCHILD | SBARS_SIZEGRIP, CW_USEDEFAULT,
+                               CW_USEDEFAULT, 0, 0, hWnd, nullptr, g_hInstance, nullptr);
   if (hStatusBar == nullptr) {
     LOG(ERROR) << L"Status bar CreateWindowEx failed!";
     return false;
@@ -1326,7 +1336,7 @@ bool InitStatusBar(HWND hWnd) {
   if (kStatusSplit < 0) {
     kStatusSplit = 0;
   }
-  const int kStatusParts[2]               = {kStatusSplit, -1};
+  const int kStatusParts[2] = {kStatusSplit, -1};
   SendMessageW(hStatusBar, SB_SETPARTS, 2, (LPARAM)kStatusParts);
   UpdateStatusBar(0, kDefaultStatusText);
   UpdateStatusBar(1, kDefaultCpuBubbleText);
@@ -1334,11 +1344,16 @@ bool InitStatusBar(HWND hWnd) {
   // Build a separate tooltip control owned by the main window. The OS forces
   // WS_POPUP + WS_EX_TOOLWINDOW for TOOLTIPS_CLASS regardless of what we pass,
   // and ignores the position/size args - hence the all-zeros and CW_USEDEFAULTs.
+  // WS_EX_NOACTIVATE keeps the popup from contending for activation when it
+  // appears - without it, hovering over a status-bar part can briefly flash
+  // the main window's titlebar inactive and steal keyboard focus from
+  // whatever control had it. The OS does NOT add this flag automatically
+  // for TOOLTIPS_CLASS, so we have to set it explicitly.
   // Failure here isn't fatal: status bar still works without tooltips, so we
   // warn and bail out of the tooltip setup rather than failing InitStatusBar.
-  s_hStatusTip = CreateWindowExW(0, TOOLTIPS_CLASS, nullptr, TTS_ALWAYSTIP | TTS_NOPREFIX,
-                                 CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hWnd,
-                                 nullptr, g_hInstance, nullptr);
+  s_hStatusTip = CreateWindowExW(WS_EX_NOACTIVATE, TOOLTIPS_CLASS, nullptr,
+                                 TTS_ALWAYSTIP | TTS_NOPREFIX, CW_USEDEFAULT, CW_USEDEFAULT,
+                                 CW_USEDEFAULT, CW_USEDEFAULT, hWnd, nullptr, g_hInstance, nullptr);
   if (s_hStatusTip == nullptr) {
     LOG(WARN) << L"Status bar tooltip CreateWindowEx failed - tooltips will be unavailable.";
     return true;
@@ -1347,17 +1362,16 @@ bool InitStatusBar(HWND hWnd) {
   s_statusTipText[1] = L"Total CPU usage of this app.";
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
-    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i),
-                 reinterpret_cast<LPARAM>(&partRc));
+    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
     TOOLINFOW ti = {};
     ti.cbSize    = sizeof(TOOLINFOW);
     // TTF_SUBCLASS: the tooltip control hooks hStatusBar's mouse messages
     // itself; without it we'd have to call TTM_RELAYEVENT in WM_MOUSEMOVE.
-    ti.uFlags    = TTF_SUBCLASS;
-    ti.hwnd      = hStatusBar;
-    ti.uId       = i;
-    ti.rect      = partRc;
-    ti.lpszText  = const_cast<LPWSTR>(s_statusTipText[i].c_str());
+    ti.uFlags   = TTF_SUBCLASS;
+    ti.hwnd     = hStatusBar;
+    ti.uId      = i;
+    ti.rect     = partRc;
+    ti.lpszText = const_cast<LPWSTR>(s_statusTipText[i].c_str());
     SendMessageW(s_hStatusTip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&ti));
   }
   return true;
@@ -1369,8 +1383,7 @@ void LayoutStatusTooltips() {
   }
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
-    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i),
-                 reinterpret_cast<LPARAM>(&partRc));
+    SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
     TOOLINFOW ti = {};
     ti.cbSize    = sizeof(TOOLINFOW);
     ti.hwnd      = hStatusBar;
@@ -1392,6 +1405,12 @@ void ShutDownApp() {
   ShutDownAnts();
   // Stop monitoring CPU usage. KillTimer for TIMER_CPU lives inside.
   ShutDownCpuMon();
+  // Cancel the status-bar revert one-shot. DestroyWindow would clean it up
+  // anyway, but explicit teardown matches the other timers and means the
+  // timer can't fire between here and DestroyWindow if anything in the
+  // shutdown sequence pumps the message loop.
+  KillTimer(mainHwnd, TIMER_STATUS_RESET);
+  g_status_revert_pending = false;
   // Set BEFORE DestroyWindow: WM_DESTROY runs synchronously inside
   // DestroyWindow and reads this flag to skip the redundant calls above.
   // Logging stays alive across DestroyWindow / WM_DESTROY so any errors
@@ -1403,10 +1422,12 @@ void ShutDownApp() {
 }
 
 bool LaunchHelp(HWND hWnd) {
+  bool success = false;
+  LOG(WARN) << L"Help launched - not implemented";
   if (InfoBox(hWnd, L"Help32", L"No help yet...")) {
-    return true;
+    success = true;
   }
-  return false;
+  return success;
 }
 
 INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {

@@ -13,7 +13,8 @@ static GetNativeSystemInfo_t pfnGetNativeSystemInfo = nullptr;
 // kernel32. NtQuerySystemInformation could fill the gap but the per-process
 // numbers are the load-bearing ones - idle on 2000 just reports 0 instead of
 // dragging in winternl + a SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION walk.
-typedef BOOL(WINAPI* GetSystemTimes_t)(LPFILETIME lpIdleTime, LPFILETIME lpKernelTime,
+typedef BOOL(WINAPI* GetSystemTimes_t)(LPFILETIME lpIdleTime,
+                                       LPFILETIME lpKernelTime,
                                        LPFILETIME lpUserTime);
 static GetSystemTimes_t pfnGetSystemTimes = nullptr;
 
@@ -74,7 +75,7 @@ DWORD cpu::GetLogicalProcessorCount() {
     LOG(DEBUG) << L"Using " << whichfunc << " for " << __FUNC__;
   }
   const DWORD num_cpus = sysInfo.dwNumberOfProcessors;
-  g_num_cpus = static_cast<int>(num_cpus);
+  g_num_cpus           = static_cast<int>(num_cpus);
   return num_cpus;
 }
 
@@ -160,10 +161,18 @@ float cpu::GetCPUPercent() {
   }
   // Clamp - rounding plus the kernel only updating GetProcessTimes
   // periodically can land just outside [0, 100] on a fast tick.
-  if (cpuPct < 0.0f) cpuPct = 0.0f;
-  if (cpuPct > 100.0f) cpuPct = 100.0f;
-  if (kernelPct < 0.0f) kernelPct = 0.0f;
-  if (kernelPct > 100.0f) kernelPct = 100.0f;
+  if (cpuPct < 0.0f) {
+    cpuPct = 0.0f;
+  }
+  if (cpuPct > 100.0f) {
+    cpuPct = 100.0f;
+  }
+  if (kernelPct < 0.0f) {
+    kernelPct = 0.0f;
+  }
+  if (kernelPct > 100.0f) {
+    kernelPct = 100.0f;
+  }
 
   float idlePct = 0.0f;
   if (haveSysTimes) {
@@ -175,11 +184,15 @@ float cpu::GetCPUPercent() {
     const ULONGLONG dSysUser = FileTimeToU64(ftSysUser) - FileTimeToU64(s_lastSysUser);
     const ULONGLONG dSysTot  = dSysKern + dSysUser;
     if (dSysTot > 0) {
-      idlePct =
-          static_cast<float>((static_cast<double>(dSysIdle) * 100.0) / static_cast<double>(dSysTot));
+      idlePct = static_cast<float>((static_cast<double>(dSysIdle) * 100.0) /
+                                   static_cast<double>(dSysTot));
     }
-    if (idlePct < 0.0f) idlePct = 0.0f;
-    if (idlePct > 100.0f) idlePct = 100.0f;
+    if (idlePct < 0.0f) {
+      idlePct = 0.0f;
+    }
+    if (idlePct > 100.0f) {
+      idlePct = 100.0f;
+    }
     s_lastSysIdle   = ftSysIdle;
     s_lastSysKernel = ftSysKernel;
     s_lastSysUser   = ftSysUser;

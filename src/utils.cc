@@ -7,7 +7,7 @@
 
 // The toolbar child window handle. Kept file-static so nothing else can
 // accidentally mutate it - other TUs interact only via the functions below.
-static HWND s_hToolbar    = nullptr;
+static HWND s_hToolbar = nullptr;
 // Toolbar's internal tooltip control (TBSTYLE_TOOLTIPS makes the toolbar
 // create one for itself). Cached after CreateAppToolbar so HandleToolbarTooltips
 // can compare incoming TTN_NEEDTEXT's hwndFrom against it - tooltip
@@ -29,6 +29,11 @@ int g_toolbarHeight = 0;
 // would be wasted back-buffer pixels and clicks/place mode would target
 // hidden cells).
 int g_statusBarHeight = 0;
+
+// True between a UserMessage call and the TIMER_STATUS_RESET firing - i.e.
+// the bar is showing a transient user message rather than the default text.
+// See utils.h for the full contract.
+bool g_status_revert_pending = false;
 
 unsigned long g_default_speed = kHighSpeed;
 
@@ -68,8 +73,7 @@ void InitMenuDefaults(HWND hWnd) {
   if (hConc == nullptr || hDelay == nullptr || hBkgMenu == nullptr) {
     LOG(ERROR) << L"Missing Settings sub-submenu (RC index drift?) "
                   L"hConc="
-               << (hConc ? L"set" : L"null")
-               << L" hDelay=" << (hDelay ? L"set" : L"null")
+               << (hConc ? L"set" : L"null") << L" hDelay=" << (hDelay ? L"set" : L"null")
                << L" hBkgMenu=" << (hBkgMenu ? L"set" : L"null");
     return;
   }
@@ -234,8 +238,7 @@ bool SaveClientBitmap(HWND hWnd) {
     // non-zero CDERR_* code on actual dialog failure.
     const DWORD err = CommDlgExtendedError();
     if (err != 0) {
-      LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << logging::Hex(err)
-                << L")";
+      LOG(WARN) << L"GetSaveFileNameW failed (CommDlgExtendedError=" << logging::Hex(err) << L")";
     } else {
       LOG(INFO) << L"Save Bitmap dialog cancelled by user";
     }
@@ -980,7 +983,10 @@ void UserMessage(const std::wstring& message) {
     // TIMER_STATUS_RESET kills the timer (one-shot) and restores
     // kDefaultStatusText to part 0.
     if (mainHwnd != nullptr) {
-      SetTimer(mainHwnd, TIMER_STATUS_RESET, kStatusBarResetDelay, nullptr);
+      SetTimer(mainHwnd, TIMER_STATUS_RESET, static_cast<UINT>(kStatusBarResetDelay), nullptr);
+      // Mark that the bar is showing a transient message so the
+      // minimize/restore path knows to suspend + re-arm the revert.
+      g_status_revert_pending = true;
     }
   }
 }
