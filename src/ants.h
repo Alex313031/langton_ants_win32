@@ -198,6 +198,14 @@ bool PlaceAntAtClient(int clientX, int clientY);
 // undone, false when not in place mode or the list is already empty.
 bool UndoLastPlacement();
 
+// Repaints every entry in the current placement list onto the back buffer
+// using its recorded marker color. Used after a canvas wipe (custom seed
+// respawn, algorithm change) so the user's pending clicks stay visible
+// through the operation - the placement list itself is untouched, so the
+// eventual resume → ApplyPlacements path still drains them into the
+// threads. No-op when the list is empty.
+void RepaintPlacementMarkers();
+
 // For "Custom Seed" dialog box
 INT_PTR CALLBACK CustomSeedDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 

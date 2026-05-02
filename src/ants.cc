@@ -635,30 +635,18 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
 
   // Wipe the back buffer to the current background color so the new seed's
   // layout starts from a clean canvas (matching the user's expectation that
-  // changing the seed "repaints the whole thing").
-  // Held across both the wipe and the marker repaints so a paint pass
-  // can't see a cleared canvas without the placement markers on it.
-  EnterCriticalSection(&g_paintCS);
-  if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
-    RECT rc = {0, 0, cxClient, cyClient};
-    FillRectWithColor(g_hdcMem, rc, g_bkg_color);
-    // Re-paint placement markers on the freshly-wiped canvas so the user's
-    // clicks are still visible while paused. Their pre-seed color stays -
-    // the AntThread placementRequested handler re-rolls antColor from the
-    // seeded rand() once the simulation resumes, so the moving ant may
-    // briefly differ in color until the first Langton step overpaints
-    // the marker with the trail color.
-    if (inPlaceMode) {
-      for (int i = 0; i < g_placed_ants_count; i++) {
-        const PlacedAnt& a = s_placedAnts[i];
-        const int px       = a.cellX * CELL_PX;
-        const int py       = a.cellY * CELL_PX;
-        RECT mrc           = {px, py, px + CELL_PX, py + CELL_PX};
-        FillRectWithColor(g_hdcMem, mrc, a.color);
-      }
-    }
+  // changing the seed "repaints the whole thing"). Splitting the wipe and
+  // marker repaint into two locked sections is safe here: every ant thread
+  // was torn down above, and we're on the main UI thread so no WM_PAINT /
+  // WM_SIZE can race in between.
+  ClearCanvasToBackground(cxClient, cyClient);
+  if (inPlaceMode) {
+    // Their pre-seed color stays - the AntThread placementRequested handler
+    // re-rolls antColor from the seeded rand() once the simulation resumes,
+    // so the moving ant may briefly differ in color until the first Langton
+    // step overpaints the marker with the trail color.
+    RepaintPlacementMarkers();
   }
-  LeaveCriticalSection(&g_paintCS);
 
   // Stage the seed on the slot scratch fields BEFORE EnsureThreadCount
   // creates the threads - AntThread reads customSeedRequest in its
@@ -1084,6 +1072,23 @@ bool UndoLastPlacement() {
             << L"). " << g_placed_ants_count << L" of " << kMaxAntThreads
             << L" threads remain.";
   return ok;
+}
+
+void RepaintPlacementMarkers() {
+  if (g_placed_ants_count <= 0) {
+    return;
+  }
+  EnterCriticalSection(&g_paintCS);
+  if (g_hdcMem != nullptr && g_hbmMem != nullptr) {
+    for (int placeIdx = 0; placeIdx < g_placed_ants_count; placeIdx++) {
+      const PlacedAnt& placed = s_placedAnts[placeIdx];
+      const int px            = placed.cellX * CELL_PX;
+      const int py            = placed.cellY * CELL_PX;
+      RECT markerRc           = {px, py, px + CELL_PX, py + CELL_PX};
+      FillRectWithColor(g_hdcMem, markerRc, placed.color);
+    }
+  }
+  LeaveCriticalSection(&g_paintCS);
 }
 
 static bool ApplyPlacements() {

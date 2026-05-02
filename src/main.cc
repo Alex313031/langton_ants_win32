@@ -811,16 +811,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           }
           g_algorithm = newAlgo;
           SetAlgorithmCheck(newAlgo);
-          // Algorithm change is a clean-slate intent - the existing trails
-          // were drawn under the previous rule and would just be visual
-          // noise once the ants start following a new one. Mirror IDM_REPAINT:
-          // bail out of place mode if active, wipe the canvas, reseed, and
-          // invalidate so the new pattern starts from a fresh state.
-          if (g_place_mode) {
-            ExitPlaceMode();
-          }
+          // Algorithm change wipes trails (drawn under the old rule), but the
+          // user-clicked starting positions in place mode are an explicit
+          // intent we preserve - the user wants "use my chosen positions
+          // with the new algorithm", not "discard my placements and re-roll".
+          // After the wipe, re-paint the markers so the user still sees
+          // them; the eventual resume → ApplyPlacements path drains them
+          // into the threads as usual. Outside place mode (regular run)
+          // we do mirror IDM_REPAINT - reseed to fresh random positions.
+          const bool preservePlacements = (g_place_mode && g_placed_ants_count > 0);
           ClearCanvasToBackground(cxClient, cyClient);
-          ReseedAnts();
+          if (preservePlacements) {
+            RepaintPlacementMarkers();
+          } else {
+            ReseedAnts();
+          }
           InvalidateRect(hWnd, nullptr, FALSE);
           const wchar_t* algoName = L"?";
           switch (newAlgo) {

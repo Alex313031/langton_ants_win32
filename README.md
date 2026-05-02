@@ -8,6 +8,8 @@
 
 A raw Win32 C++ implementation of [Langton's Ants](https://en.wikipedia.org/wiki/Langton%27s_ant).
 
+It supports multiple algorithms, colors, custom ant placement, and more! (Hover over any control for a tooltip)
+
 It is multi-threaded, and designed to be hyper-compatible - it supports Windows 2000 - 11.
 
 <img src="./assets/Windows_2000_logo.svg" height="64"> :smile_cat:
