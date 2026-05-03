@@ -21,8 +21,8 @@ static GetSystemTimes_t pfnGetSystemTimes = nullptr;
 // Set by GetLogicalProcessorCount
 int g_num_cpus = 0;
 
-// 0.5 seconds delay between each CPU performance update.
-const unsigned int g_perf_delay = 500u;
+// 1.0 second delay between each CPU performance update.
+const unsigned int g_perf_delay = 1000u;
 
 // Our global performance snapshot
 PerfSnapshot g_snapshot = {};

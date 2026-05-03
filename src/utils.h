@@ -176,4 +176,8 @@ const std::wstring GetVersionString();
 // Returns APP_NAME as wstring, for easier usage.
 const std::wstring GetAppName();
 
+// Returns true on Windows XP (5.1) or later, false on Windows 2000 (5.0)
+// or earlier. Used to gate styles / APIs that exist only on WinXP.
+const bool IsWindowsXpOrLater();
+
 #endif // LANGTON_ANTS_UTILS_H_

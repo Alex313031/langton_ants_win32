@@ -1394,7 +1394,8 @@ void LayoutStatusTooltips() {
 }
 
 void ShutDownApp() {
-  LOG(DEBUG) << L"Exiting app...";
+  LOG(INFO) << L"Exiting app...";
+  LOG(INFO) << ABOUT_CONTENT << " - Copyright " << LEGAL_COPYRIGHT;
   // Stop the BGM first (sync post to the worker), THEN tear the worker
   // down. StopPlayWav has to come before ShutDownBgm - the post needs the
   // worker still alive to process it.

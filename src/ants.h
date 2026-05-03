@@ -10,11 +10,12 @@ extern bool g_monochrome;
 // {magenta, cyan, yellow}; otherwise every ant uses this exact COLORREF.
 // Ignored entirely while g_monochrome is true.
 inline constexpr COLORREF kRandomAntColor = 0xFFFFFFFFu;
-extern COLORREF g_ant_color;
 
-extern volatile UINT g_num_ants;
+extern COLORREF g_ant_color; // Current ant color
 
-extern unsigned long g_delay;
+extern volatile UINT g_num_ants; // Number of ants to spawn
+
+extern unsigned long g_delay; // Global ant draw delay
 
 // Which Langton's ant variant the simulation runs. Drives the per-tick turn
 // rule in AntThread (Classic = the original RL; the others are multi-state
@@ -28,7 +29,8 @@ enum class AntAlgorithm : UINT {
   Archimedes  = 2, // LRRRRLLLRRR   - 11 states, Archimedean spiral
   Logarithmic = 3, // RLLLLRRRLLLR  - 12 states, logarithmic spiral
 };
-extern AntAlgorithm g_algorithm;
+
+extern AntAlgorithm g_algorithm; // Currently active algorithm
 
 // Whether to overlay the cell grid (one CELL_PX × CELL_PX line frame per
 // cell) on top of the canvas in WM_PAINT. Toggled by IDM_SHOWGRID. Read

@@ -47,6 +47,8 @@ struct AlgoPattern {
   const char* pattern;
   int numStates;
 };
+
+// Our different algorithm options
 static const AlgoPattern kAlgoPatterns[] = {
     {AntAlgorithm::Classic, "RL", 2},
     {AntAlgorithm::Fill, "LRL", 3},

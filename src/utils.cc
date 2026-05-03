@@ -1005,3 +1005,16 @@ const std::wstring GetAppName() {
   const std::wstring app_name = std::wstring(APP_NAME);
   return app_name;
 }
+
+const bool IsWindowsXpOrLater() {
+  OSVERSIONINFOW osvi      = {};
+  osvi.dwOSVersionInfoSize = sizeof(osvi);
+  if (!GetVersionExW(&osvi)) {
+    return false;
+  }
+  // Major 6+ covers Vista / 7 / 8 / 10 / 11. Major 5 splits: 5.0 = Win2000
+  // (the case we want to exclude), 5.1 = XP, 5.2 = Server 2003 / XP x64.
+  static const bool isVistaOrNewer   = osvi.dwMajorVersion >= 6;
+  static const bool isXpOrServer2003 = osvi.dwMajorVersion == 5 && osvi.dwMinorVersion >= 1;
+  return isVistaOrNewer || isXpOrServer2003;
+}
