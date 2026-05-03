@@ -6,6 +6,21 @@
 #include <logging.h>
 // clang-format on
 
+// Typedef for accessing undocumented RtlGetNtVersionNumbers in ntdll.dll
+typedef void(WINAPI* RtlGetNtVersionNumbers_t)(DWORD *pNtMajorVersion,
+                                               DWORD *pNtMinorVersion,
+                                               DWORD *pNtBuildNumber);
+
+// RtlGetVersion, in NtosKrnl.exe, uses ntdll.dll internally.
+// LPOSVERSIONINFOEXW is already a pointer typedef (OSVERSIONINFOEXW*) - no
+// extra * here, otherwise the param becomes OSVERSIONINFOEXW** which the
+// kernel would try to deref as a pointer to a pointer and corrupt memory.
+typedef NTSTATUS(WINAPI* RtlGetVersion_t)(LPOSVERSIONINFOEXW lpVersionInformation);
+
+// User mode function GetVersionExW, but in kernel32.dll. Same pointer-level
+// caveat as RtlGetVersion_t above.
+typedef BOOL(WINAPI* GetVersionExW_t)(LPOSVERSIONINFOEXW lpVersionInformation);
+
 // Forward-declared from ants.h so this header doesn't have to drag in the
 // full ants.h surface just to take an AntAlgorithm parameter.
 enum class AntAlgorithm : UINT;
@@ -194,5 +209,36 @@ bool IsCommCtrlAtLeast(const DWORD to_compare);
 // the version string is written there. Pass nullptr to skip the version
 // (just probe the bool).
 bool IsRunningOnWine(std::string* outWineVer);
+
+// Returns the *real* NT kernel version directly out of ntdll.dll, bypassing
+// the manifest-driven version shim that GetVersionExW / RtlGetVersion go through.
+//
+// Why this exists: starting with Windows 8.1, GetVersionExW reports 6.2
+// (Win8) for any process that doesn't carry a SupportedOS GUID for the
+// later OS in its manifest, regardless of the actual host OS. So an
+// unmanifested app running on Win 10 / 11 sees 6.2 from GetVersionExW even
+// though the kernel is 10.x. RtlGetNtVersionNumbers (undocumented but
+// stable since XP) is *not* shimmed - it returns whatever ntdll really is,
+// which is the truth.
+//
+// Returns false if ntdll.dll isn't loaded or RtlGetNtVersionNumbers
+// can't be resolved (Win2K, it was added in XP).
+//
+// Each out-param is individually optional - pass nullptr for the ones the
+// caller doesn't need.
+bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build);
+
+// Same as above, but uses RtlGetVersion, also kernel mode but spoofable by user mode
+// software with Admin priveleges. Exported from NtosKrnl.exe, but uses ntdll.dll.
+// `sp` (optional) receives wServicePackMajor when non-null.
+bool GetKernelNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp = nullptr);
+
+// User mode version of the above, using GetVersionExW. NOTE: On Windows 8.1+
+// unmanifested apps can report 6.2, see GetRawNtVersion comment above.
+// `sp` (optional) receives wServicePackMajor when non-null.
+bool GetUserNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp = nullptr);
+
+// Logs information about OS version (Wine, and using the above three functions).
+void LogOsInfo();
 
 #endif // LANGTON_ANTS_UTILS_H_

@@ -123,7 +123,9 @@ float cpu::GetCPUPercent() {
           reinterpret_cast<GetSystemTimes_t>(GetProcAddress(hKernel32, "GetSystemTimes"));
     }
     if (pfnGetSystemTimes == nullptr) {
-      LOG(WARN) << L"GetSystemTimes unavailable - system idle % will report 0 (Windows 2000?).";
+      if (is_debug || is_dcheck) {
+        LOG(WARN) << L"GetSystemTimes unavailable, system idle % will report 0. (Win 2000?)";
+      }
     } else {
       // Resolved this call - sample once so the next tick has a baseline.
       pfnGetSystemTimes(&ftSysIdle, &ftSysKernel, &ftSysUser);

@@ -1295,6 +1295,10 @@ bool InitApp(HWND hWnd) {
   // Start CPU monitoring right before starting any ants
   InitCpuMon(hWnd);
 
+  if (is_debug) {
+    LogOsInfo(); // Log nerdy stuff
+  }
+
   // All settings (number of ants, delay, background color) are already set by
   // InitMenuDefaults.
   if (!ShowAnts()) {
@@ -1308,10 +1312,6 @@ bool InitApp(HWND hWnd) {
   // false, so it's RC-driven via InitMenuDefaults' IDM_SOUND read with
   // no extra branching here.
   PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
-  static std::string winever;
-  if (IsRunningOnWine(&winever)) {
-    LOG(INFO) << L"Running on WINE " << winever.c_str();
-  }
   return ok;
 }
 

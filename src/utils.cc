@@ -1102,3 +1102,173 @@ bool IsRunningOnWine(std::string* outWineVer) {
   }
   return true;
 }
+
+bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
+  HMODULE hNtDll = GetModuleHandleW(L"ntdll.dll");
+  if (hNtDll == nullptr) {
+    return false;
+  }
+  const RtlGetNtVersionNumbers_t pfnRtlGetNtVersionNumbers =
+      reinterpret_cast<RtlGetNtVersionNumbers_t>(
+          GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
+  if (pfnRtlGetNtVersionNumbers == nullptr) {
+    LOG(DEBUG) << L"RtlGetNtVersionNumbers not found. (Win 2K?)";
+    return false;
+  }
+  DWORD majorVer = 0;
+  DWORD minorVer = 0;
+  DWORD buildVer = 0;
+  pfnRtlGetNtVersionNumbers(&majorVer, &minorVer, &buildVer);
+  if (majorVer == 0) {
+    return false; // Should never be zero
+  }
+  if (is_dcheck) {
+    LOG(DEBUG) << L"Raw NT MajorVersion: " << logging::Hex(majorVer);
+    LOG(DEBUG) << L"Raw NT MinorVersion: " << logging::Hex(minorVer);
+    LOG(DEBUG) << L"Raw NT BuildNumber: " << logging::Hex(buildVer);
+  }
+  // RtlGetNtVersionNumbers packs the build-type flag into the top 4 bits
+  // of the build number: 0xC0000000 = checked (debug) build, 0xF0000000 =
+  // free (release) build. Mask them off so callers see the same plain
+  // build number the OS reports everywhere else (e.g. 2600 on XP SP3,
+  // 7601 on Win7 SP1, 19045 on a recent Win10) instead of the raw
+  // 0xF0000A28 = 4026534440 mess.
+  const DWORD cleanBuildVer = buildVer & 0x0FFFFFFFu;
+  // Out-params are individually optional - skip the assignment if a caller
+  // passed nullptr (e.g. they only care about the major version).
+  if (major != nullptr) {
+    *major = static_cast<unsigned int>(majorVer);
+  }
+  if (minor != nullptr) {
+    *minor = static_cast<unsigned int>(minorVer);
+  }
+  if (build != nullptr) {
+    *build = static_cast<unsigned int>(cleanBuildVer);
+  }
+  return true;
+}
+
+bool GetKernelNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
+  HMODULE hNtDll = GetModuleHandleW(L"ntdll.dll");
+  if (hNtDll == nullptr) {
+    return false;
+  }
+  const RtlGetVersion_t pfnRtlGetVersion =
+      reinterpret_cast<RtlGetVersion_t>(GetProcAddress(hNtDll, "RtlGetVersion"));
+  if (pfnRtlGetVersion == nullptr) {
+    return false;
+  }
+  // Zero-init so the non-set members start clean (the API only writes the
+  // ones it knows about for the size we passed). dwOSVersionInfoSize must
+  // be exactly sizeof(OSVERSIONINFOEXW) or the call rejects the buffer.
+  OSVERSIONINFOEXW osverinfo    = {};
+  osverinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+  // RtlGetVersion returns NTSTATUS; STATUS_SUCCESS == 0. In practice it
+  // never fails for a correctly-sized buffer, but checking the contract
+  // beats trusting it.
+  const NTSTATUS rtlStatus = pfnRtlGetVersion(&osverinfo);
+  if (rtlStatus != 0 || osverinfo.dwMajorVersion == 0) {
+    return false;
+  }
+  const UINT majorVer = static_cast<UINT>(osverinfo.dwMajorVersion);
+  const UINT minorVer = static_cast<UINT>(osverinfo.dwMinorVersion);
+  const UINT buildVer = static_cast<UINT>(osverinfo.dwBuildNumber);
+  const UINT spMajor  = static_cast<UINT>(osverinfo.wServicePackMajor);
+  if (is_dcheck) {
+    LOG(DEBUG) << L"NT MajorVersion: " << logging::Hex(majorVer);
+    LOG(DEBUG) << L"NT MinorVersion: " << logging::Hex(minorVer);
+    LOG(DEBUG) << L"NT BuildNumber: " << logging::Hex(buildVer);
+    LOG(DEBUG) << L"NT Service Pack: " << logging::Hex(spMajor);
+  }
+  if (major != nullptr) {
+    *major = majorVer;
+  }
+  if (minor != nullptr) {
+    *minor = minorVer;
+  }
+  if (build != nullptr) {
+    *build = buildVer;
+  }
+  if (sp != nullptr) {
+    *sp = spMajor;
+  }
+  return true;
+}
+
+bool GetUserNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
+  HMODULE hKernel32Dll = GetModuleHandleW(L"kernel32.dll");
+  if (hKernel32Dll == nullptr) {
+    return false;
+  }
+  const GetVersionExW_t pfnGetVersionExW = reinterpret_cast<GetVersionExW_t>(
+      GetProcAddress(hKernel32Dll, "GetVersionExW"));
+  if (pfnGetVersionExW == nullptr) {
+    return false;
+  }
+  // Zero-init for the same reason as GetKernelNtVersion above.
+  OSVERSIONINFOEXW osverinfo    = {};
+  osverinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+  // GetVersionExW returns BOOL; 0 = failure. Combine with the dwMajorVersion
+  // sanity check so a partially-failing call can't slip through.
+  if (!pfnGetVersionExW(&osverinfo) || osverinfo.dwMajorVersion == 0) {
+    return false;
+  }
+  const UINT majorVer = static_cast<UINT>(osverinfo.dwMajorVersion);
+  const UINT minorVer = static_cast<UINT>(osverinfo.dwMinorVersion);
+  const UINT buildVer = static_cast<UINT>(osverinfo.dwBuildNumber);
+  const UINT spMajor  = static_cast<UINT>(osverinfo.wServicePackMajor);
+  if (is_dcheck) {
+    LOG(DEBUG) << L"User NT MajorVersion: " << logging::Hex(majorVer);
+    LOG(DEBUG) << L"User NT MinorVersion: " << logging::Hex(minorVer);
+    LOG(DEBUG) << L"User NT BuildNumber: " << logging::Hex(buildVer);
+    LOG(DEBUG) << L"User NT Service Pack: " << logging::Hex(spMajor);
+  }
+  if (major != nullptr) {
+    *major = majorVer;
+  }
+  if (minor != nullptr) {
+    *minor = minorVer;
+  }
+  if (build != nullptr) {
+    *build = buildVer;
+  }
+  if (sp != nullptr) {
+    *sp = spMajor;
+  }
+  return true;
+}
+
+void LogOsInfo() {
+  std::string winever;
+  if (IsRunningOnWine(&winever)) {
+    LOG(INFO) << L"Running on WINE " << winever.c_str();
+  }
+  UINT major = 0;
+  UINT minor = 0;
+  UINT build = 0;
+  UINT sp    = 0;
+  // Test raw version. Can't be spoofed, using undocumented function the MSVCRT uses.
+  // RtlGetNtVersionNumbers does not return service-pack info.
+  if (GetRawNtVersion(&major, &minor, &build)) {
+    LOG(INFO) << L"RtlGetNtVersionNumbers NTVER: " << major << L"." << minor << L"." << build;
+  }
+  // Reset back to zero
+  major = 0;
+  minor = 0;
+  build = 0;
+  sp    = 0;
+  // Test the "official" way to get "real" NT version numbers. Kernel mode.
+  if (GetKernelNtVersion(&major, &minor, &build, &sp)) {
+    LOG(INFO) << L"RtlGetVersion NTVER: " << major << L"." << minor << L"." << build
+              << L" SP" << sp;
+  }
+  major = 0;
+  minor = 0;
+  build = 0;
+  sp    = 0;
+  // Test the legacy "official" way to get Windows version info from user mode.
+  if (GetUserNtVersion(&major, &minor, &build, &sp)) {
+    LOG(INFO) << L"GetVersionExW NTVER: " << major << L"." << minor << L"." << build
+              << L" SP" << sp;
+  }
+}
