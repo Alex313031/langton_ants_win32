@@ -80,15 +80,17 @@ void InitMenuDefaults(HWND hWnd) {
     return;
   }
 
-  // Background color
-  static const struct {
+  // Background color. Struct named so the for-loop can spell its type
+  // explicitly (MSVC 2008 / C++03 has no auto / no decltype).
+  struct BkgEntry {
     UINT id;
     COLORREF color;
-  } bkgs[] = {
+  };
+  static const BkgEntry bkgs[] = {
       {IDM_WHITE_BKG, RGB_WHITE}, {IDM_BLACK_BKG, RGB_BLACK}, {IDM_GREY_BKG, RGB_GREY},
       {IDM_RED_BKG, RGB_RED},     {IDM_GREEN_BKG, RGB_GREEN}, {IDM_BLUE_BKG, RGB_BLUE},
   };
-  for (const auto& bkg : bkgs) {
+  for (const BkgEntry& bkg : bkgs) {
     if (GetMenuState(hBkgMenu, bkg.id, MF_BYCOMMAND) & MF_CHECKED) {
       g_bkg_color = bkg.color;
       break;
@@ -96,14 +98,15 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Draw delay
-  const struct {
+  struct DelayEntry {
     UINT id;
     unsigned long ms;
-  } delays[] = {
+  };
+  const DelayEntry delays[] = {
       {IDM_SLOW, kSlowSpeed},   {IDM_MEDIUM, kMedSpeed},   {IDM_FAST, kHighSpeed},
       {IDM_HYPER, kHyperSpeed}, {IDM_REALTIME, kRealTime},
   };
-  for (const auto& delay : delays) {
+  for (const DelayEntry& delay : delays) {
     if (GetMenuState(hDelay, delay.id, MF_BYCOMMAND) & MF_CHECKED) {
       g_delay         = delay.ms;
       g_default_speed = delay.ms;
@@ -154,16 +157,17 @@ void InitMenuDefaults(HWND hWnd) {
   // Ant color - exactly one of the IDM_*ANT items must be CHECKED in
   // the RC. Map the checked one to g_ant_color (kRandomAntColor for
   // the "Random" entry, otherwise the literal RGB).
-  const struct {
+  struct AntColorEntry {
     UINT id;
     COLORREF color;
-  } antColors[] = {
+  };
+  const AntColorEntry antColors[] = {
       {IDM_CYANANT, RGB_CYAN},
       {IDM_YELLOWANT, RGB_YELLOW},
       {IDM_MAGENTAANT, RGB_MAGENTA},
       {IDM_ALLCOLORANT, kRandomAntColor},
   };
-  for (const auto& antColor : antColors) {
+  for (const AntColorEntry& antColor : antColors) {
     if (GetMenuState(hSettings, antColor.id, MF_BYCOMMAND) & MF_CHECKED) {
       g_ant_color = antColor.color;
       break;
@@ -1079,8 +1083,8 @@ bool IsRunningOnWine(std::string* outWineVer) {
   }
   // Cleaner one-liner via a typedef than splitting the function-pointer
   // declaration and the assignment across two lines.
-  using WineGetVersion_t = const char*(CDECL*)(void);
-  const auto pwine_get_version =
+  typedef const char*(CDECL* WineGetVersion_t)(void);
+  const WineGetVersion_t pwine_get_version =
       reinterpret_cast<WineGetVersion_t>(GetProcAddress(ntdll, "wine_get_version"));
   if (pwine_get_version == nullptr) {
     return false;

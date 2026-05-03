@@ -60,7 +60,7 @@ static const AlgoPattern kAlgoPatterns[] = {
 // defensive fallback if g_algorithm somehow holds an unknown value (would
 // only happen on a programming error - the menu only ever sets a known one).
 static const AlgoPattern& CurrentAlgoPattern() {
-  for (const auto& entry : kAlgoPatterns) {
+  for (const AlgoPattern& entry : kAlgoPatterns) {
     if (entry.algo == g_algorithm) {
       return entry;
     }
@@ -862,7 +862,7 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
 
   // Mask off the high (reserved/alpha) byte when comparing so any noise there
   // doesn't cause false negatives on pixels that should match.
-  for (auto& pixel : pixels) {
+  for (DWORD& pixel : pixels) {
     if ((pixel & 0x00FFFFFF) == oldPix) {
       pixel = (pixel & 0xFF000000) | newPix;
     }
