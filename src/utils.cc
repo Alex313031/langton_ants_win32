@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <shlwapi.h>
+
 #include "ants.h"
 #include "globals.h"
 #include "resource.h"
@@ -1006,7 +1008,7 @@ const std::wstring GetAppName() {
   return app_name;
 }
 
-const bool IsWindowsXpOrLater() {
+bool IsWindowsXpOrLater() {
   OSVERSIONINFOW osvi      = {};
   osvi.dwOSVersionInfoSize = sizeof(osvi);
   if (!GetVersionExW(&osvi)) {
@@ -1017,4 +1019,82 @@ const bool IsWindowsXpOrLater() {
   static const bool isVistaOrNewer   = osvi.dwMajorVersion >= 6;
   static const bool isXpOrServer2003 = osvi.dwMajorVersion == 5 && osvi.dwMinorVersion >= 1;
   return isVistaOrNewer || isXpOrServer2003;
+}
+
+static DWORD GetCommCtrlVersion() {
+  static const wchar_t* kComCtl32Dll = L"comctl32.dll";
+  // Resolve the system comctl32.dll path explicitly. GetSystemDirectoryW
+  // returns 0 on failure, or >= MAX_PATH if our buffer was too small (in
+  // which case it reports the required size). Either is fatal for us -
+  // bail rather than fall through with an empty path that would let
+  // LoadLibraryW search the standard DLL order and silently bypass the
+  // "explicitly use the system one" intent.
+  wchar_t systemDir[MAX_PATH];
+  const UINT length = GetSystemDirectoryW(systemDir, MAX_PATH);
+  if (length == 0 || length >= MAX_PATH) {
+    const DWORD error = GetLastError();
+    LOG(ERROR) << L"Failed to get system directory! Error: " << logging::Hex(error);
+    return 0;
+  }
+  const std::wstring comctl32_path = std::wstring(systemDir) + L"\\" + kComCtl32Dll;
+
+  HINSTANCE hComCtl32Dll = LoadLibraryW(comctl32_path.c_str());
+  if (hComCtl32Dll == nullptr) {
+    const DWORD error = GetLastError();
+    LOG(ERROR) << L"Failed to load " << kComCtl32Dll
+               << L", hComCtl32Dll was null! Error: " << logging::Hex(error);
+    return 0;
+  }
+
+  DWORD dwVersion                  = 0;
+  DLLGETVERSIONPROC pDllGetVersion = reinterpret_cast<DLLGETVERSIONPROC>(
+      GetProcAddress(hComCtl32Dll, "DllGetVersion"));
+  if (pDllGetVersion == nullptr) {
+    const DWORD error = GetLastError();
+    LOG(ERROR) << L"Failed to get DllGetVersion address. Error: " << logging::Hex(error);
+  } else {
+    DLLVERSIONINFO dvi = {sizeof(dvi)};
+    const HRESULT hr   = pDllGetVersion(&dvi);
+    if (hr == S_OK) {
+      dwVersion = _PACKVERSION(dvi.dwMajorVersion, dvi.dwMinorVersion);
+    } else {
+      LOG(ERROR) << L"Failed to run DllGetVersion. HRESULT: " << logging::Hex(hr);
+    }
+  }
+  FreeLibrary(hComCtl32Dll);
+  return dwVersion;
+}
+
+bool IsCommCtrlAtLeast(const DWORD to_compare) {
+  const DWORD kCommCtrlVer = GetCommCtrlVersion();
+  LOG(DEBUG) << L"Target common controls version: " << logging::Hex(to_compare);
+  LOG(DEBUG) << L"Installed common controls version: " << logging::Hex(kCommCtrlVer);
+  return kCommCtrlVer >= to_compare;
+}
+
+bool IsRunningOnWine(std::string* outWineVer) {
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  if (ntdll == nullptr) {
+    return false;
+  }
+  // Cleaner one-liner via a typedef than splitting the function-pointer
+  // declaration and the assignment across two lines.
+  using WineGetVersion_t       = const char*(CDECL*)(void);
+  const auto pwine_get_version = reinterpret_cast<WineGetVersion_t>(
+      GetProcAddress(ntdll, "wine_get_version"));
+  if (pwine_get_version == nullptr) {
+    return false;
+  }
+  // Wine's implementation always returns a valid string in practice, but
+  // std::string(nullptr) is undefined behavior - guard it.
+  const char* wineVer = pwine_get_version();
+  if (wineVer == nullptr) {
+    return false;
+  }
+  // outWineVer is optional: callers that only care about the bool can pass
+  // nullptr. Without this null-check we'd crash on the dereference below.
+  if (outWineVer != nullptr) {
+    *outWineVer = wineVer;
+  }
+  return true;
 }

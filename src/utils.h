@@ -75,6 +75,11 @@ extern int g_statusBarHeight; // Height of the bottom status bar in pixels; 0 if
 // un-minimizing instead of seeing it blow away while they couldn't.
 extern bool g_status_revert_pending;
 
+// Minimum common controls version for certain functions, used for fallback codepaths
+// See https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions
+inline constexpr DWORD dwComCtl32TargetVer =
+    _PACKVERSION(static_cast<DWORD>(5u), static_cast<DWORD>(82u));
+
 // Gets default settings from CHECKED state of menu items
 void InitMenuDefaults(HWND hWnd);
 
@@ -178,6 +183,16 @@ const std::wstring GetAppName();
 
 // Returns true on Windows XP (5.1) or later, false on Windows 2000 (5.0)
 // or earlier. Used to gate styles / APIs that exist only on WinXP.
-const bool IsWindowsXpOrLater();
+bool IsWindowsXpOrLater();
+
+// For checking system's commctl32.dll
+bool IsCommCtrlAtLeast(const DWORD to_compare);
+
+// Returns true if the app is running under Wine, false on a real Windows
+// kernel. Detection is via ntdll.dll's wine_get_version export, which only
+// exists in Wine's ntdll. If outWineVer is non-null AND the result is true,
+// the version string is written there. Pass nullptr to skip the version
+// (just probe the bool).
+bool IsRunningOnWine(std::string* outWineVer);
 
 #endif // LANGTON_ANTS_UTILS_H_

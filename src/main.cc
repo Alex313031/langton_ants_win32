@@ -1308,6 +1308,10 @@ bool InitApp(HWND hWnd) {
   // false, so it's RC-driven via InitMenuDefaults' IDM_SOUND read with
   // no extra branching here.
   PostMessageW(hWnd, WM_APP_AUTOPLAY, 0, 0);
+  static std::string winever;
+  if (IsRunningOnWine(&winever)) {
+    LOG(INFO) << L"Running on WINE " << winever.c_str();
+  }
   return ok;
 }
 
@@ -1356,15 +1360,23 @@ bool InitStatusBar(HWND hWnd) {
                                  CW_USEDEFAULT, CW_USEDEFAULT, hWnd, nullptr, g_hInstance, nullptr);
   if (s_hStatusTip == nullptr) {
     LOG(WARN) << L"Status bar tooltip CreateWindowEx failed - tooltips will be unavailable.";
-    return true;
+    return false;
   }
   s_statusTipText[0] = L"Current Status.";
   s_statusTipText[1] = L"Total CPU usage of this app.";
+  static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
     SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
-    TOOLINFOW ti = {};
-    ti.cbSize    = sizeof(TOOLINFOW);
+    TOOLINFOW ti = {0};
+    if (can_use_582_controls) {
+      ti.cbSize = sizeof(ti);
+    } else {
+      // MinGW's TOOLINFOW always includes lpReserved, but Windows 2000's
+      // comctl32 v5.81 only supports up to V2 (through lParam). Using
+      // sizeof(ti) gives V3 size which Win2000's TTM_ADDTOOLW rejects.
+      ti.cbSize = TTTOOLINFOW_V2_SIZE;
+    }
     // TTF_SUBCLASS: the tooltip control hooks hStatusBar's mouse messages
     // itself; without it we'd have to call TTM_RELAYEVENT in WM_MOUSEMOVE.
     ti.uFlags   = TTF_SUBCLASS;
