@@ -242,7 +242,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   // branch) - identical input means identical rand() sequence, defeating
   // the per-slot decorrelation the Fibonacci mix exists for.
   const DWORD slotMix = (slotIdx + 1u) * fibonacci;
-  if (slot->customSeedRequest) {
+  if (slot->customSeedReq) {
     cSeed = slot->customSeed;
     seed  = static_cast<DWORD>(cSeed) ^ slotMix;
   } else {
@@ -278,16 +278,16 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     }
     // Two exit paths: global shutdown OR this individual slot was asked to die
     // (EnsureThreadCount shrinking the pool).
-    if (!g_running || slot->exitRequest) {
+    if (!g_running || slot->exitReq) {
       break;
     }
     // Main thread may have requested a reseed (IDM_REPAINT). Clearing
     // cellX triggers the needsPlacement branch below, which rerolls
     // position, direction, and marker color from the current rand()
     // state - so each reseed produces a fresh layout.
-    if (slot->reseedRequest) {
-      slot->reseedRequest = false;
-      cellX               = -1;
+    if (slot->reseedReq) {
+      slot->reseedReq = false;
+      cellX           = -1;
     }
     // Place-mode handoff. The main thread painted the marker on the canvas
     // already, so we adopt the user-clicked position + the marker's color
@@ -296,12 +296,12 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // direction is rolled from rand() (which may have been seeded by a
     // custom seed at thread startup), so a custom seed only varies the
     // direction in place mode; position and color stay user-controlled.
-    if (slot->placementRequested) {
-      slot->placementRequested = false;
-      cellX                    = slot->placeCellX;
-      cellY                    = slot->placeCellY;
-      antColor                 = slot->placeColor;
-      dir                      = rand() & 3;
+    if (slot->customPlaceReq) {
+      slot->customPlaceReq = false;
+      cellX                = slot->placeCellX;
+      cellY                = slot->placeCellY;
+      antColor             = slot->placeColor;
+      dir                  = rand() & 3;
       continue;
     }
     // Color-only refresh (Monochrome toggle). Re-pick antColor from the
@@ -313,8 +313,8 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
     // state in g_state_grid is also untouched.
     // cellX < 0 means we haven't placed yet; the next needsPlacement
     // branch will pick a color naturally, so we skip the paint.
-    if (slot->colorRefreshRequest) {
-      slot->colorRefreshRequest = false;
+    if (slot->colorRefreshReq) {
+      slot->colorRefreshReq = false;
       if (g_monochrome) {
         antColor = CurrentPathColor();
       } else if (g_ant_color == kRandomAntColor) {
@@ -517,9 +517,9 @@ bool EnsureThreadCount(int targetCount) {
 
   // Grow: spawn new slots up to targetCount.
   while (s_activeCount < targetCount) {
-    const int i            = s_activeCount;
-    s_slots[i].exitRequest = false;
-    s_slots[i].hTickEvent  = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    const int i           = s_activeCount;
+    s_slots[i].exitReq    = false;
+    s_slots[i].hTickEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     if (s_slots[i].hTickEvent == nullptr) {
       return false;
     }
@@ -538,11 +538,11 @@ bool EnsureThreadCount(int targetCount) {
   }
 
   // Shrink: ask the highest-indexed threads to exit, one by one. The thread
-  // can only observe exitRequest after a wake, so we SetEvent to force it
+  // can only observe exitReq after a wake, so we SetEvent to force it
   // to run the check. Then join and clean up.
   while (s_activeCount > targetCount) {
-    const int i            = s_activeCount - 1;
-    s_slots[i].exitRequest = true;
+    const int i        = s_activeCount - 1;
+    s_slots[i].exitReq = true;
     SetEvent(s_slots[i].hTickEvent);
     WaitForSingleObject(s_slots[i].hThread, INFINITE);
     CloseHandle(s_slots[i].hThread);
@@ -573,7 +573,7 @@ void RefreshAntColors() {
   // simulation continues exactly where it was, just dressed in the new
   // color scheme.
   for (int i = 0; i < s_activeCount; i++) {
-    s_slots[i].colorRefreshRequest = true;
+    s_slots[i].colorRefreshReq = true;
     if (s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
@@ -588,8 +588,8 @@ void ReseedAnts(bool pulse) {
   // tick events and the wiped canvas stays blank until something else
   // (typically the resume path in TogglePaintAnts) pulses them.
   for (int i = 0; i < s_activeCount; i++) {
-    s_slots[i].reseedRequest     = true;
-    s_slots[i].customSeedRequest = false;
+    s_slots[i].reseedReq     = true;
+    s_slots[i].customSeedReq = false;
     if (pulse && s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
@@ -637,7 +637,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // leaves g_running = true so the freshly-spawned threads below don't
   // immediately exit on their first tick.
   for (int i = 0; i < s_activeCount; i++) {
-    s_slots[i].exitRequest = true;
+    s_slots[i].exitReq = true;
     if (s_slots[i].hTickEvent != nullptr) {
       SetEvent(s_slots[i].hTickEvent);
     }
@@ -663,7 +663,7 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   // WM_SIZE can race in between.
   ClearCanvasToBackground(cxClient, cyClient);
   if (inPlaceMode) {
-    // Their pre-seed color stays - the AntThread placementRequested handler
+    // Their pre-seed color stays - the AntThread customPlaceReq handler
     // re-rolls antColor from the seeded rand() once the simulation resumes,
     // so the moving ant may briefly differ in color until the first Langton
     // step overpaints the marker with the trail color.
@@ -671,15 +671,15 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   }
 
   // Stage the seed on the slot scratch fields BEFORE EnsureThreadCount
-  // creates the threads - AntThread reads customSeedRequest in its
+  // creates the threads - AntThread reads customSeedReq in its
   // startup block, picks up customSeed, and srand's its per-thread rand()
   // from it. Reset the other request flags too so a stale placement /
   // reseed from a prior session can't fire on the very first tick.
   for (int i = 0; i < desiredCount; i++) {
-    s_slots[i].customSeedRequest  = true;
-    s_slots[i].customSeed         = custom_seed;
-    s_slots[i].reseedRequest      = false;
-    s_slots[i].placementRequested = false;
+    s_slots[i].customSeedReq  = true;
+    s_slots[i].customSeed     = custom_seed;
+    s_slots[i].reseedReq      = false;
+    s_slots[i].customPlaceReq = false;
   }
   if (!EnsureThreadCount(desiredCount)) {
     LOG(FATAL) << L"EnsureThreadCount(" << desiredCount
@@ -1129,10 +1129,10 @@ static bool ApplyPlacements() {
       ok = false;
     }
     for (int i = 0; i < g_placed_ants_count; i++) {
-      s_slots[i].placeCellX         = s_placedAnts[i].cellX;
-      s_slots[i].placeCellY         = s_placedAnts[i].cellY;
-      s_slots[i].placeColor         = s_placedAnts[i].color;
-      s_slots[i].placementRequested = true;
+      s_slots[i].placeCellX     = s_placedAnts[i].cellX;
+      s_slots[i].placeCellY     = s_placedAnts[i].cellY;
+      s_slots[i].placeColor     = s_placedAnts[i].color;
+      s_slots[i].customPlaceReq = true;
     }
   }
   g_placed_ants_count = 0;

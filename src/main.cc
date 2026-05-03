@@ -1364,6 +1364,7 @@ bool InitStatusBar(HWND hWnd) {
   }
   s_statusTipText[0] = L"Current Status.";
   s_statusTipText[1] = L"Total CPU usage of this app.";
+
   static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};

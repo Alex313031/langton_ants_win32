@@ -53,30 +53,29 @@ extern bool g_no_client_bounds;
 // lets us dynamically spawn/terminate individual threads when the user
 // changes the Num Ants setting.
 struct AntThreadSlot {
-  HANDLE hThread              = nullptr;
-  HANDLE hTickEvent           = nullptr; // auto-reset; SetEvent = "go draw"
-  volatile bool exitRequest   = false;   // set true to make thread exit cleanly
-  volatile bool reseedRequest = false;   // set true to reroll position / color / dir
-  // Place-mode handoff: when placementRequested is set the thread adopts
+  HANDLE hThread          = nullptr;
+  HANDLE hTickEvent       = nullptr; // auto-reset; SetEvent = "go draw"
+  volatile bool exitReq   = false;   // set true to make thread exit cleanly
+  volatile bool reseedReq = false;   // set true to reroll position / color / dir
+  // Place-mode handoff: when customPlaceReq is set the thread adopts
   // (placeCellX, placeCellY, placeColor) on its next tick, picks a random
   // direction, and skips the step (the marker is already painted on the
   // canvas by PlaceAntAtClient). The starting "state" comes from the
   // parallel state grid at that cell, no extra field needed here.
   // Cleared by the thread once consumed.
-  volatile bool placementRequested = false;
-  int placeCellX                   = 0;
-  int placeCellY                   = 0;
-  COLORREF placeColor              = 0;
-  volatile bool customSeedRequest  = false; // Whether to use custom seed for seeding randomization
-  UINT customSeed =
-      0; // When 0 or customSeedRequest = false, this is unused, otherwise use for srand()
+  volatile bool customPlaceReq = false;
+  int placeCellX               = 0;
+  int placeCellY               = 0;
+  COLORREF placeColor          = 0;
+  volatile bool customSeedReq  = false; // Whether to use custom seed for srand()
+  UINT customSeed              = 0;     // Custom seed, used when customSeedReq = true
   // Color-refresh handoff: when set, the thread re-picks antColor against
   // the current g_monochrome and overpaints its current cell so the new
   // color is visible immediately (even when paused). Position, direction
   // and the cell's state in g_state_grid are left alone - used by the
   // Monochrome toggle which is meant to behave like picking a Colors entry
   // (just swap colors, don't touch ant draw state).
-  volatile bool colorRefreshRequest = false;
+  volatile bool colorRefreshReq = false;
 };
 
 // True while the user is "seeding" ants by clicking on the canvas (entered

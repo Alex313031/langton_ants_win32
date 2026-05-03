@@ -1041,14 +1041,14 @@ static DWORD GetCommCtrlVersion() {
   HINSTANCE hComCtl32Dll = LoadLibraryW(comctl32_path.c_str());
   if (hComCtl32Dll == nullptr) {
     const DWORD error = GetLastError();
-    LOG(ERROR) << L"Failed to load " << kComCtl32Dll
-               << L", hComCtl32Dll was null! Error: " << logging::Hex(error);
+    LOG(ERROR) << L"Failed to load " << kComCtl32Dll << L", hComCtl32Dll was null! Error: "
+               << logging::Hex(error);
     return 0;
   }
 
-  DWORD dwVersion                  = 0;
-  DLLGETVERSIONPROC pDllGetVersion = reinterpret_cast<DLLGETVERSIONPROC>(
-      GetProcAddress(hComCtl32Dll, "DllGetVersion"));
+  DWORD dwVersion = 0;
+  DLLGETVERSIONPROC pDllGetVersion =
+      reinterpret_cast<DLLGETVERSIONPROC>(GetProcAddress(hComCtl32Dll, "DllGetVersion"));
   if (pDllGetVersion == nullptr) {
     const DWORD error = GetLastError();
     LOG(ERROR) << L"Failed to get DllGetVersion address. Error: " << logging::Hex(error);
@@ -1079,9 +1079,9 @@ bool IsRunningOnWine(std::string* outWineVer) {
   }
   // Cleaner one-liner via a typedef than splitting the function-pointer
   // declaration and the assignment across two lines.
-  using WineGetVersion_t       = const char*(CDECL*)(void);
-  const auto pwine_get_version = reinterpret_cast<WineGetVersion_t>(
-      GetProcAddress(ntdll, "wine_get_version"));
+  using WineGetVersion_t = const char*(CDECL*)(void);
+  const auto pwine_get_version =
+      reinterpret_cast<WineGetVersion_t>(GetProcAddress(ntdll, "wine_get_version"));
   if (pwine_get_version == nullptr) {
     return false;
   }

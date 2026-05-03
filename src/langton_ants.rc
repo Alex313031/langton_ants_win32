@@ -147,10 +147,10 @@ BEGIN
         MENUITEM SEPARATOR
         POPUP "&Customize"
         BEGIN
-            MENUITEM "Sh&ow Grid Lines",       IDM_SHOWGRID
+            MENUITEM "Sh&ow Grid Lines",       IDM_SHOWGRID, CHECKED
             MENUITEM "&Place ants with mouse", IDM_CUSTOMPLACE
             MENUITEM "Custom &Seed",           IDM_CUSTOMSEED
-            MENUITEM "&No Canvas Bounds",      IDM_NOCLIENTBOUNDS, CHECKED
+            MENUITEM "&No Canvas Bounds",      IDM_NOCLIENTBOUNDS
             MENUITEM SEPARATOR
             POPUP "&Algorithms"
             BEGIN
