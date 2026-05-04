@@ -442,7 +442,7 @@ bool SyncBgm() {
     // failure and can react (e.g., clear g_playsound + refresh the UI).
     return false;
   }
-  // desired == false, audio currently playing → pause. PauseWavFile is
+  // desired == false, audio currently playing -> pause. PauseWavFile is
   // a no-op when the device isn't open (early-returns true) so we treat
   // the transition as successful even in pathological "play failed
   // earlier" states.

@@ -125,7 +125,7 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Algorithm - exactly one IDM_CLASSIC..IDM_LOGARITHMIC must be CHECKED.
-  // Submenu path: Settings (1) → Customize (7) → Algorithms (3).
+  // Submenu path: Settings (1) -> Customize (7) -> Algorithms (3).
   // Customize layout: CustomPlace, CustomSeed, separator, Algorithms popup.
   HMENU hCustom = GetSubMenu(hSettings, 7);
   HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 3) : nullptr;
@@ -723,9 +723,9 @@ void SetPauseButton(bool paused) {
   bi.dwMask        = TBIF_IMAGE | TBIF_TEXT;
   bi.iImage        = paused ? s_idxPlay : s_idxPause;
   // Three label states sharing one button:
-  //   not paused           → "Pause"   (running, click to pause)
-  //   paused, mid-run      → "Resume"  (was playing, click to continue)
-  //   paused, fresh/stopped → "Play"   (no animation yet OR after IDM_STOP)
+  //   not paused           -> "Pause"   (running, click to pause)
+  //   paused, mid-run      -> "Resume"  (was playing, click to continue)
+  //   paused, fresh/stopped -> "Play"   (no animation yet OR after IDM_STOP)
   // Both paused variants use the play icon since both start the timer.
   const wchar_t* label;
   if (!paused) {
@@ -810,6 +810,25 @@ void SetAlgorithmCheck(AntAlgorithm algo) {
   CheckMenuRadioItem(hAlgo, IDM_CLASSIC, IDM_LOGARITHMIC, id, MF_BYCOMMAND);
 }
 
+void SetCustomSeedCheck(bool active) {
+  if (mainHwnd == nullptr) {
+    return;
+  }
+  HMENU hMenu = GetMenu(mainHwnd);
+  if (hMenu == nullptr) {
+    return;
+  }
+  HMENU hSettings = GetSubMenu(hMenu, 1);
+  if (hSettings == nullptr) {
+    return;
+  }
+  HMENU hCustom = GetSubMenu(hSettings, 7);
+  if (hCustom == nullptr) {
+    return;
+  }
+  CheckMenuItem(hCustom, IDM_CUSTOMSEED, MF_BYCOMMAND | (active ? MF_CHECKED : MF_UNCHECKED));
+}
+
 bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu) {
   bool ok = true;
   if (s_hToolbar == nullptr || hMenu == nullptr) {
@@ -879,7 +898,7 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       text = L"Change iteration (crawling) speed";
       break;
     case IDM_CUSTOM:
-      text = L"Customize ant placement and starting \"seed\"";
+      text = L"Customize ant placement, algorithm, and starting \"seed\"";
       break;
     case IDM_CELLOPTIONS:
       text = L"Cell options: grid lines, canvas bounds, cell size";
@@ -1210,7 +1229,7 @@ bool GetKernelNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
   // never fails for a correctly-sized buffer, but checking the contract
   // beats trusting it.
   const NTSTATUS rtlStatus = pfnRtlGetVersion(&osverinfo);
-  if (rtlStatus != 0 || osverinfo.dwMajorVersion == 0) {
+  if (rtlStatus != STATUS_SUCCESS || osverinfo.dwMajorVersion == 0) {
     return false;
   }
   const UINT majorVer = static_cast<UINT>(osverinfo.dwMajorVersion);

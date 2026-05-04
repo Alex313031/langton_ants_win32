@@ -54,8 +54,8 @@ extern HICON kSmallIcon;
 // to compute the actual outer window size, so the user always gets a
 // CW_WIDTH x CW_HEIGHT ant canvas at startup regardless of how tall the
 // menu bar / toolbar end up being.
-inline constexpr INT CW_WIDTH  = 654;
-inline constexpr INT CW_HEIGHT = 654;
+inline constexpr INT CW_WIDTH  = 800;
+inline constexpr INT CW_HEIGHT = 600;
 
 // Minimum desired ant canvas size. WM_GETMINMAXINFO converts these to
 // outer-window minimums (chrome + g_toolbarHeight added) so the canvas
@@ -155,11 +155,17 @@ void SetSoundButton(bool playing);
 // a mark.
 void SetNumAntsCheck(unsigned int num);
 
-// Reflects the current algorithm on the Settings → Customize → Algorithms
+// Reflects the current algorithm on the Settings -> Customize -> Algorithms
 // submenu. Pass the value you just set g_algorithm to. The IDM_CLASSIC..
 // IDM_LOGARITHMIC IDs are consecutive and aligned with AntAlgorithm's
 // underlying values, so the radio target is derived directly.
 void SetAlgorithmCheck(AntAlgorithm algo);
+
+// Reflects whether a user-specified seed is currently driving the
+// simulation. Pass true after a successful CustomSeedAnts and false
+// whenever the seed is replaced by a random one (ReseedAnts paths).
+// The check mark goes on Settings -> Customize -> IDM_CUSTOMSEED.
+void SetCustomSeedCheck(bool active);
 
 // Handles a TTN_GETDISPINFOW / TTN_NEEDTEXTW notification from the toolbar's
 // tooltip control by supplying a descriptive string based on the hovered

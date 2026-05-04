@@ -53,7 +53,7 @@ IDB_CELLS_BMP  BITMAP "res/grid.bmp"
 // next to the exe instead.
 IDR_BGM_WAVE   WAVE   "res/ants.wav"
 
-// "Fahh" sound effect for Dev → Test Trap. Standard PCM WAV; played via
+// "Fahh" sound effect for Dev -> Test Trap. Standard PCM WAV; played via
 // PlaySoundW with SND_RESOURCE, which reads the bytes directly from the
 // loaded PE image without needing a temp file.
 IDR_FAHH_WAVE  WAVE   "res/fahh.wav"

@@ -38,6 +38,13 @@ bool g_show_grid = false;
 // RC's IDM_NOCLIENTBOUNDS CHECKED state to pick the startup value.
 bool g_no_client_bounds = false;
 
+// True after a successful CustomSeedAnts; cleared by ReseedAnts (any path
+// that re-rolls to a random seed: Repaint Now, Stop, algorithm change,
+// cell-size change). Drives the IDM_CUSTOMSEED check mark via
+// SetCustomSeedCheck so the menu shows whether the running simulation is
+// using a user-specified seed or a random one.
+bool g_custom_seed_active = false;
+
 // Default ant cell size, controllable from MIN_CELL_PX to MAX_CELL_PX.
 // volatile because the main thread mutates it (SetCellSize) while ant
 // threads read it every tick - the actual ordering / atomicity guarantee
@@ -182,7 +189,7 @@ static COLORREF CurrentPathColor() {
 //   - Avoid magenta / cyan / yellow exactly - those are ant marker colors
 //     and isBlocked() keys off them for ant-vs-ant collision detection.
 //   - Avoid the six selectable bg colors exactly (white, black, grey,
-//     red, green, blue). RecolorBackground swaps oldBg → newBg pixel by
+//     red, green, blue). RecolorBackground swaps oldBg -> newBg pixel by
 //     pixel; a palette color matching one would get swept away with the bg.
 //   - Mid-saturation hues so cells stay visible against any of the
 //     selectable backgrounds.
@@ -270,7 +277,7 @@ DWORD WINAPI AntThread(LPVOID pvoid_in) {
   COLORREF antColor = RGB_MAGENTA;
   // The cell's "state" is read from g_state_grid each tick - no per-thread
   // cache is needed (see the multi-state step branch below).
-  // Direction → (dx, dy) in cell units, matching the encoding above.
+  // Direction -> (dx, dy) in cell units, matching the encoding above.
   static const int kDx[4] = {0, 1, 0, -1};
   static const int kDy[4] = {-1, 0, 1, 0};
 
@@ -602,6 +609,8 @@ void ReseedAnts(bool pulse) {
       SetEvent(s_slots[i].hTickEvent);
     }
   }
+  g_custom_seed_active = false;
+  SetCustomSeedCheck(false);
 }
 
 bool CustomSeedAnts(const unsigned int custom_seed) {
@@ -706,6 +715,10 @@ bool CustomSeedAnts(const unsigned int custom_seed) {
   if (wasRunning && mainHwnd != nullptr) {
     SetTimer(mainHwnd, TIMER_ANTS, g_delay, nullptr);
     SignalAntsTick();
+  }
+  if (ok) {
+    g_custom_seed_active = true;
+    SetCustomSeedCheck(true);
   }
   return ok;
 }
@@ -1001,7 +1014,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
     LOG(WARN) << L"Place cap hit (" << kMaxAntThreads << L"): click ignored.";
     return false;
   }
-  // Window-client → back-buffer coords (the toolbar lives at the top of the
+  // Window-client -> back-buffer coords (the toolbar lives at the top of the
   // client area; the ants canvas starts below it).
   const int bx = clientX;
   const int by = clientY - g_toolbarHeight;
@@ -1034,7 +1047,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   const int px = cellX * CELL_PX;
   const int py = cellY * CELL_PX;
-  // Color picker mirrors AntThread's needsPlacement branch: monochrome →
+  // Color picker mirrors AntThread's needsPlacement branch: monochrome ->
   // match the trail color (ants vanish into their paths, no ant-vs-ant
   // collision); otherwise pick from the magenta/cyan/yellow set so
   // isBlocked sees the marker. The starting "state" the thread reads on
@@ -1233,14 +1246,15 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
           }
           const unsigned long lnum = wcstoul(buf, nullptr, 10);
           const UINT numAnts       = static_cast<unsigned int>(lnum);
-          SetNumAnts(numAnts);
-          // Reflect the new count on the menu: a typed value of 1-16 still
-          // lights up the matching IDM_CONC_N radio (so picking "5" via the
-          // dialog looks the same as picking "5" via the menu); 17-128 lands
-          // on IDM_CONC_CUSTOM with the radios cleared.
-          SetNumAntsCheck(numAnts);
-          UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(numAnts) +
-                      L".");
+          if (SetNumAnts(numAnts)) {
+            // Reflect the new count on the menu: a typed value of 1-16 still
+            // lights up the matching IDM_CONC_N radio (so picking "5" via the
+            // dialog looks the same as picking "5" via the menu); 17-128 lands
+            // on IDM_CONC_CUSTOM with the radios cleared.
+            SetNumAntsCheck(numAnts);
+            UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(numAnts) +
+                        L".");
+          }
           EndDialog(hDlg, IDOK);
           return TRUE;
         }

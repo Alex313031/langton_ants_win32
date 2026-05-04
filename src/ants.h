@@ -5,7 +5,7 @@
 
 extern bool g_monochrome;
 
-// User's ant marker color preference (set from Colors → Ant Colors).
+// User's ant marker color preference (set from Colors -> Ant Colors).
 // Set to kRandomAntColor (the default) to roll a per-ant color from
 // {magenta, cyan, yellow}; otherwise every ant uses this exact COLORREF.
 // Ignored entirely while g_monochrome is true.
@@ -45,6 +45,11 @@ extern bool g_show_grid;
 // rule kicks in. Ant-vs-ant collision still bounces in either mode.
 extern bool g_no_client_bounds;
 
+// True while the simulation is running with a user-specified seed (set by
+// CustomSeedAnts, cleared by ReseedAnts). Drives the IDM_CUSTOMSEED check
+// mark; see SetCustomSeedCheck in utils.h.
+extern bool g_custom_seed_active;
+
 // --- Thread pool state ----------------------------------------------------
 // Each live ant thread has its own auto-reset "tick" event and an exit flag.
 // WM_TIMER (via SignalAntsTick) calls SetEvent on exactly s_activeCount of
@@ -79,7 +84,7 @@ struct AntThreadSlot {
 };
 
 // True while the user is "seeding" ants by clicking on the canvas (entered
-// via Settings → Custom → Custom Seed, or the IDM_CUSTOM toolbar dropdown).
+// via Settings -> Custom -> Custom Seed, or the IDM_CUSTOM toolbar dropdown).
 // While set, WM_LBUTTONDOWN places an ant at the click instead of starting
 // a window drag, and the simulation is paused. Cleared either by exiting
 // place mode or by ApplyPlacements() at resume time.
@@ -133,7 +138,7 @@ void SignalAntsTick();
 void ReseedAnts(bool pulse = true);
 
 // Refreshes each running ant's marker color against the current
-// g_monochrome value (mono → match the trail color, otherwise pick from
+// g_monochrome value (mono -> match the trail color, otherwise pick from
 // magenta/cyan/yellow). Position, direction and per-cell state are preserved
 // so the simulation continues exactly where it was - used by IDM_MONOCHROME
 // so toggling mono behaves like picking a Colors entry (just swaps colors).
@@ -209,7 +214,7 @@ bool UndoLastPlacement();
 // using its recorded marker color. Used after a canvas wipe (custom seed
 // respawn, algorithm change) so the user's pending clicks stay visible
 // through the operation - the placement list itself is untouched, so the
-// eventual resume → ApplyPlacements path still drains them into the
+// eventual resume -> ApplyPlacements path still drains them into the
 // threads. No-op when the list is empty.
 void RepaintPlacementMarkers();
 

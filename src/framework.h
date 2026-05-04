@@ -5,11 +5,26 @@
 #include "version.h" // Keep this at the top!
 
 #define NOMINMAX
-#include <windows.h>  // Main Windows header
+
+// On MSVC, <windows.h> defines a small subset of NTSTATUS codes, which then
+// conflict with the full set in <ntstatus.h>. WIN32_NO_STATUS suppresses those
+// definitions so <ntstatus.h> can own them without redefinition errors.
+// MinGW handles this automatically, so the guard is MSVC-only.
+#ifdef _MSC_VER
+ #define WIN32_NO_STATUS
+#endif
+#include <windows.h> // Main Windows header
+#ifdef _MSC_VER
+ #undef WIN32_NO_STATUS
+#endif
 #include <commctrl.h> // Common Controls
 #include <commdlg.h>  // Common dialogs
-#include <tchar.h>    // Unicode TCHAR
+#include <ntstatus.h> // Full NTSTATUS codes (e.g. STATUS_SUCCESS)
 
+// C Runtime Headers
+#include <tchar.h> // For TCHAR, and automatically deducing wchar_t type
+
+// C++ STL Headers
 #include <algorithm> // std::min / std::max
 #include <iostream>  // Console output and ostringstream
 #include <limits>    // Numeric limits

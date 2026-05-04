@@ -67,8 +67,8 @@ CRITICAL_SECTION g_paintCS;
 COLORREF g_bkg_color = RGB_BLUE;
 
 // Background color the user had selected just before monochrome was turned
-// on. Captured on the off → on transition of IDM_MONOCHROME and restored
-// on the on → off transition, so the user can flip between monochrome
+// on. Captured on the off -> on transition of IDM_MONOCHROME and restored
+// on the on -> off transition, so the user can flip between monochrome
 // and their colorful setup without losing their bg choice. Default
 // matches g_bkg_color's initial value as a safe fallback if monochrome
 // was somehow active before any toggle had a chance to save a real value.
@@ -321,7 +321,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // status bar's current height, so the canvas can't be squeezed
       // below MINWIDTH x MINHEIGHT - and as the toolbar wraps onto extra
       // rows at narrow widths, the min grows accordingly because
-      // g_toolbarHeight grew on the last WM_SIZE → LayoutToolbar pass.
+      // g_toolbarHeight grew on the last WM_SIZE -> LayoutToolbar pass.
       RECT canvasMin = {0, 0, MINWIDTH, MINHEIGHT};
       AdjustWindowRectEx(&canvasMin, static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)), TRUE,
                          static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)));
@@ -375,7 +375,26 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // Blit the whole back buffer to the window at (0, g_toolbarHeight).
         // Back buffer coords are ants-canvas-local (0..cxClient-1, 0..cyClient-1);
         // shifting by the toolbar height places the canvas below the toolbar.
-        BitBlt(hdc, 0, g_toolbarHeight, cxClient, cyClient, g_hdcMem, 0, 0, SRCCOPY);
+        //
+        // During s_in_size_move cxClient/cyClient are already the NEW (post-
+        // drag) values but the bitmap is still held at its OLD size (we
+        // defer RecreateBackBuffer to WM_EXITSIZEMOVE). Using cxClient/
+        // cyClient here would BitBlt past the bitmap's edge and copy
+        // garbage from past-the-bitmap memory into the newly-exposed area
+        // - which is the visible artifact during a drag-resize. Query the
+        // bitmap's actual size and clamp to that. Outside the modal loop,
+        // RecreateBackBuffer keeps the two in sync so cxClient/cyClient is
+        // already correct - skip the GetObjectW call in the hot path.
+        int blitWidth  = cxClient;
+        int blitHeight = cyClient;
+        if (s_in_size_move) {
+          BITMAP bm = {};
+          if (GetObjectW(g_hbmMem, sizeof(BITMAP), &bm)) {
+            blitWidth  = bm.bmWidth;
+            blitHeight = bm.bmHeight;
+          }
+        }
+        BitBlt(hdc, 0, g_toolbarHeight, blitWidth, blitHeight, g_hdcMem, 0, 0, SRCCOPY);
         // Cell-grid overlay. Drawn LAST so the lines sit on top of both the
         // bg fill and the back-buffer pixels - keeps the back buffer "pure"
         // ant data (toggling the grid on/off doesn't need a canvas wipe).
@@ -662,7 +681,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDM_COLORS: {
           // Button-body click on the Colors split button - mirrors IDM_ANTS.
-          // The dropdown is the existing Settings → Colors submenu so the
+          // The dropdown is the existing Settings -> Colors submenu so the
           // IDM_*_BKG / IDM_MONOCHROME handlers below pick up the selection
           // unchanged.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
@@ -735,8 +754,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // placed count - track that here so we can refresh the Num Ants
           // radio after the toggle.
           const bool drainedPlacements = (g_paused && g_place_mode);
+          const bool was_stopped = g_stopped;
           TogglePaintAnts(hWnd);
-          UserMessage(g_paused ? L"Ants paused." : L"Ants resumed.");
+          UserMessage(g_paused ? L"Ants paused." : was_stopped ? L"Ants started." : L"Ants resumed.");
           // Reflect the new paused state in the menu check mark.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           CheckMenuItem(hSettings, IDM_PAUSED,
@@ -768,9 +788,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Refresh unconditionally - when the user hits Stop while already
           // paused, the !g_paused branch above didn't run SetPauseButton
           // and the label would otherwise stay at the old "Resume".
+          const bool was_stopped = g_stopped;
           g_stopped = true;
           SetPauseButton(g_paused);
-          UserMessage(L"Stopped Ants.");
+          if (!was_stopped) {
+            UserMessage(L"Stopped Ants.");
+          } else {
+            UserMessage(L"No Ants to Stop.");
+          }
           // Audio follows the simulation automatically: TogglePaintAnts
           // above (when called) pauses BGM via SyncBgm. The user's sound
           // preference (g_playsound) is preserved across Stop, so a later
@@ -832,9 +857,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // invalidate the canvas so WM_PAINT redraws with/without lines.
           g_show_grid     = !g_show_grid;
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom   = (hSettings != nullptr) ? GetSubMenu(hSettings, 7) : nullptr;
-          if (hCustom != nullptr) {
-            CheckMenuItem(hCustom, IDM_SHOWGRID,
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          if (hCells != nullptr) {
+            CheckMenuItem(hCells, IDM_SHOWGRID,
                           MF_BYCOMMAND | (g_show_grid ? MF_CHECKED : MF_UNCHECKED));
           }
           InvalidateRect(hWnd, nullptr, FALSE);
@@ -852,9 +877,9 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // effect on the very next tick, no need to invalidate.
           g_no_client_bounds = !g_no_client_bounds;
           HMENU hSettings    = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom      = (hSettings != nullptr) ? GetSubMenu(hSettings, 7) : nullptr;
-          if (hCustom != nullptr) {
-            CheckMenuItem(hCustom, IDM_NOCLIENTBOUNDS,
+          HMENU hCells       = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          if (hCells != nullptr) {
+            CheckMenuItem(hCells, IDM_NOCLIENTBOUNDS,
                           MF_BYCOMMAND | (g_no_client_bounds ? MF_CHECKED : MF_UNCHECKED));
           }
           UserMessage(g_no_client_bounds ? L"Canvas bounds turned off (ants now wrap around edges)."
@@ -878,7 +903,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // intent we preserve - the user wants "use my chosen positions
           // with the new algorithm", not "discard my placements and re-roll".
           // After the wipe, re-paint the markers so the user still sees
-          // them; the eventual resume → ApplyPlacements path drains them
+          // them; the eventual resume -> ApplyPlacements path drains them
           // into the threads as usual. Outside place mode (regular run)
           // we do mirror IDM_REPAINT - reseed to fresh random positions.
           const bool preservePlacements = (g_place_mode && g_placed_ants_count > 0);
@@ -925,10 +950,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CONC_16: {
           // Consecutive IDs let us derive the count directly from the command.
           const unsigned int newCount = (command - IDM_CONC_1) + 1;
-          SetNumAnts(newCount);
-          SetNumAntsCheck(newCount);
-          UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(newCount) +
-                      L".");
+          if (SetNumAnts(newCount)) {
+            SetNumAntsCheck(newCount);
+            UserMessage(std::wstring(L"Number of ants changed to ") + std::to_wstring(newCount) +
+                        L".");
+          }
           break;
         }
         case IDM_MONOCHROME: {
