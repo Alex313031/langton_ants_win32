@@ -7,9 +7,9 @@
 // clang-format on
 
 // Typedef for accessing undocumented RtlGetNtVersionNumbers in ntdll.dll
-typedef void(WINAPI* RtlGetNtVersionNumbers_t)(DWORD *pNtMajorVersion,
-                                               DWORD *pNtMinorVersion,
-                                               DWORD *pNtBuildNumber);
+typedef void(WINAPI* RtlGetNtVersionNumbers_t)(DWORD* pNtMajorVersion,
+                                               DWORD* pNtMinorVersion,
+                                               DWORD* pNtBuildNumber);
 
 // RtlGetVersion, in NtosKrnl.exe, uses ntdll.dll internally.
 // LPOSVERSIONINFOEXW is already a pointer typedef (OSVERSIONINFOEXW*) - no

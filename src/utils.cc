@@ -146,9 +146,8 @@ void InitMenuDefaults(HWND hWnd) {
   if (hCells == nullptr) {
     LOG(ERROR) << L"Missing Settings/Cell Options submenu (RC index drift?)";
   } else {
-    g_show_grid = (GetMenuState(hCells, IDM_SHOWGRID, MF_BYCOMMAND) & MF_CHECKED) != 0;
-    g_no_client_bounds =
-        (GetMenuState(hCells, IDM_NOCLIENTBOUNDS, MF_BYCOMMAND) & MF_CHECKED) != 0;
+    g_show_grid        = (GetMenuState(hCells, IDM_SHOWGRID, MF_BYCOMMAND) & MF_CHECKED) != 0;
+    g_no_client_bounds = (GetMenuState(hCells, IDM_NOCLIENTBOUNDS, MF_BYCOMMAND) & MF_CHECKED) != 0;
   }
 
   // Sound - seed the user's sound preference from the IDM_SOUND menu
@@ -1144,7 +1143,7 @@ bool IsRunningOnWine(std::string* outWineVer) {
   }
   // Cleaner one-liner via a typedef than splitting the function-pointer
   // declaration and the assignment across two lines.
-  typedef const char*(CDECL* WineGetVersion_t)(void);
+  typedef const char*(CDECL * WineGetVersion_t)(void);
   const WineGetVersion_t pwine_get_version =
       reinterpret_cast<WineGetVersion_t>(GetProcAddress(ntdll, "wine_get_version"));
   if (pwine_get_version == nullptr) {
@@ -1170,8 +1169,7 @@ bool GetRawNtVersion(UINT* major, UINT* minor, UINT* build) {
     return false;
   }
   const RtlGetNtVersionNumbers_t pfnRtlGetNtVersionNumbers =
-      reinterpret_cast<RtlGetNtVersionNumbers_t>(
-          GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
+      reinterpret_cast<RtlGetNtVersionNumbers_t>(GetProcAddress(hNtDll, "RtlGetNtVersionNumbers"));
   if (pfnRtlGetNtVersionNumbers == nullptr) {
     LOG(DEBUG) << L"RtlGetNtVersionNumbers not found. (Win 2K?)";
     return false;
@@ -1262,8 +1260,8 @@ bool GetUserNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
   if (hKernel32Dll == nullptr) {
     return false;
   }
-  const GetVersionExW_t pfnGetVersionExW = reinterpret_cast<GetVersionExW_t>(
-      GetProcAddress(hKernel32Dll, "GetVersionExW"));
+  const GetVersionExW_t pfnGetVersionExW =
+      reinterpret_cast<GetVersionExW_t>(GetProcAddress(hKernel32Dll, "GetVersionExW"));
   if (pfnGetVersionExW == nullptr) {
     return false;
   }
@@ -1322,8 +1320,8 @@ void LogOsInfo() {
   sp    = 0;
   // Test the "official" way to get "real" NT version numbers. Kernel mode.
   if (GetKernelNtVersion(&major, &minor, &build, &sp)) {
-    LOG(INFO) << L"RtlGetVersion NTVER: " << major << L"." << minor << L"." << build
-              << L" SP" << sp;
+    LOG(INFO) << L"RtlGetVersion NTVER: " << major << L"." << minor << L"." << build << L" SP"
+              << sp;
   }
   major = 0;
   minor = 0;
@@ -1331,7 +1329,7 @@ void LogOsInfo() {
   sp    = 0;
   // Test the legacy "official" way to get Windows version info from user mode.
   if (GetUserNtVersion(&major, &minor, &build, &sp)) {
-    LOG(INFO) << L"GetVersionExW NTVER: " << major << L"." << minor << L"." << build
-              << L" SP" << sp;
+    LOG(INFO) << L"GetVersionExW NTVER: " << major << L"." << minor << L"." << build << L" SP"
+              << sp;
   }
 }

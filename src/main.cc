@@ -725,7 +725,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_CELLSIZE: {
-          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMCELLSIZE), hWnd, CustomCellSizeDlgProc);
+          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMCELLSIZE), hWnd,
+                     CustomCellSizeDlgProc);
           break;
         }
         case IDM_UNDO: {
@@ -754,9 +755,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // placed count - track that here so we can refresh the Num Ants
           // radio after the toggle.
           const bool drainedPlacements = (g_paused && g_place_mode);
-          const bool was_stopped = g_stopped;
+          const bool was_stopped       = g_stopped;
           TogglePaintAnts(hWnd);
-          UserMessage(g_paused ? L"Ants paused." : was_stopped ? L"Ants started." : L"Ants resumed.");
+          UserMessage(g_paused      ? L"Ants paused."
+                      : was_stopped ? L"Ants started."
+                                    : L"Ants resumed.");
           // Reflect the new paused state in the menu check mark.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           CheckMenuItem(hSettings, IDM_PAUSED,
@@ -789,7 +792,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // paused, the !g_paused branch above didn't run SetPauseButton
           // and the label would otherwise stay at the old "Resume".
           const bool was_stopped = g_stopped;
-          g_stopped = true;
+          g_stopped              = true;
           SetPauseButton(g_paused);
           if (!was_stopped) {
             UserMessage(L"Stopped Ants.");

@@ -1295,9 +1295,9 @@ INT_PTR CALLBACK CustomCellSizeDlgProc(HWND hDlg, UINT message, WPARAM wParam, L
           wchar_t buf[9] = {};
           GetDlgItemTextW(hDlg, IDC_CUSTOMCELLSIZE, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCellSize(buf)) {
-            static const std::wstring msg =
-                L"Invalid input - must be between " + std::to_wstring(MIN_CELL_PX)
-                + L" - " + std::to_wstring(MAX_CELL_PX) + L".";
+            static const std::wstring msg = L"Invalid input - must be between " +
+                                            std::to_wstring(MIN_CELL_PX) + L" - " +
+                                            std::to_wstring(MAX_CELL_PX) + L".";
             ErrorBox(hDlg, L"Custom Cell Size Validation Error", msg);
             // Re-focus the edit so the user can correct without retabbing.
             // Dialog stays open (return TRUE without EndDialog).
