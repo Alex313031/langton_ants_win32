@@ -73,6 +73,9 @@ inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 // Delay in ms. before resetting status bar text to kDefaultCpuBubbleText.
 inline constexpr unsigned long kStatusBarResetDelay = 5000ul; // 5 second delay
 
+// Whether to use small toolbar without text labels.
+inline constexpr bool use_small_toolbar = true;
+
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
                             // below it.
 
@@ -94,6 +97,10 @@ extern bool g_status_revert_pending;
 // See https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions
 inline constexpr DWORD dwComCtl32TargetVer =
     _PACKVERSION(static_cast<DWORD>(5u), static_cast<DWORD>(82u));
+
+// Min and max CELL_PX size limits
+inline constexpr int MIN_CELL_PX = 2;
+inline constexpr int MAX_CELL_PX = 48;
 
 // Gets default settings from CHECKED state of menu items
 void InitMenuDefaults(HWND hWnd);
@@ -180,6 +187,10 @@ bool ValidateCustomSeed(LPCWSTR cSeed);
 // Must be an unsigned integer less than kMaxAntThreads, no spaces, decimals,
 // or alphanumeric characters,
 bool ValidateCustomNum(LPCWSTR cNum);
+
+// Validates that custom cell size is valid, same as above, but clamped to
+// MIN_CELL_PX - MAX_CELL_PX.
+bool ValidateCellSize(LPCWSTR cCell);
 
 // Updates text in a specified part of the status bar.
 void UpdateStatusBar(const unsigned int part, const std::wstring& text);

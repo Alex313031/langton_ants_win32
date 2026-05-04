@@ -21,6 +21,7 @@
 #define IDB_CUSTOM_BMP              112 /* "Custom" icon for toolbar strip */
 #define IDB_STOP_BMP                113 /* "Stop" icon for toolbar strip */
 #define IDB_COLORS_BMP              114 /* "Colors" icon for toolbar strip */
+#define IDB_CELLS_BMP               115 /* "Cells" icon for toolbar strip */
 
 /* Main application resource, also used to attach menu */
 #define IDR_MAIN                    120
@@ -31,6 +32,8 @@
 #define IDC_CUSTOMSEED              132
 #define IDD_CUSTOMNUM               133
 #define IDC_CUSTOMNUM               134
+#define IDD_CUSTOMCELLSIZE          135
+#define IDC_CUSTOMCELLSIZE          136
 
 /* Menu items */
 #define IDM_ABOUT                   200
@@ -104,7 +107,7 @@
 // Toolbar button identifier for "Speed" button with drop down menu.
 #define IDM_SPEED                   263
 
-// Toolbar button identifier for "Custom" button with drop down menu.
+// Toolbar button identifier for "Customize" button with drop down menu.
 #define IDM_CUSTOM                  264
 #define IDM_CUSTOMPLACE             265
 #define IDM_CUSTOMSEED              266
@@ -121,11 +124,13 @@
 #define IDM_MAGENTAANT              271
 #define IDM_ALLCOLORANT             272
 
-// Toggle showing background "grid"
-#define IDM_SHOWGRID                273
-
+// Toolbar button identifier for "Cells" button with drop down menu.
+#define IDM_CELLOPTIONS             273
+#define IDM_SHOWGRID                274 // Toggle showing background "grid"
 // Whether ants are not restricted by client area, they don't "bounce" off walls
-#define IDM_NOCLIENTBOUNDS          274
+#define IDM_NOCLIENTBOUNDS          275
+// Control cell size in pixels
+#define IDM_CELLSIZE                276
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280

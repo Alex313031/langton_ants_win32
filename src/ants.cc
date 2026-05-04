@@ -38,6 +38,14 @@ bool g_show_grid = false;
 // RC's IDM_NOCLIENTBOUNDS CHECKED state to pick the startup value.
 bool g_no_client_bounds = false;
 
+// Default ant cell size, controllable from MIN_CELL_PX to MAX_CELL_PX.
+// volatile because the main thread mutates it (SetCellSize) while ant
+// threads read it every tick - the actual ordering / atomicity guarantee
+// comes from g_paintCS holding both writes and reads, but volatile
+// documents the runtime mutability and matches the convention used by
+// g_paused / g_running / g_num_ants.
+volatile int CELL_PX = 6;
+
 // --- Algorithm pattern table ---------------------------------------------
 // One entry per AntAlgorithm value. Pattern is the right/left turn string
 // shown in the menu; numStates = strlen(pattern). Each cell's "state" is an
@@ -1144,7 +1152,7 @@ INT_PTR CALLBACK CustomSeedDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
   UNREFERENCED_PARAMETER(lParam);
   switch (message) {
     case WM_INITDIALOG:
-      // Set icon in titlebar of about dialog
+      // Set icon in titlebar of custom seed dialog
       SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kSmallIcon);
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
       return TRUE;
@@ -1195,7 +1203,7 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
   UNREFERENCED_PARAMETER(lParam);
   switch (message) {
     case WM_INITDIALOG:
-      // Set icon in titlebar of about dialog
+      // Set icon in titlebar of custom num dialog
       SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kSmallIcon);
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
       return TRUE;
@@ -1212,7 +1220,7 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
           return TRUE;
         case IDOK: {
           // 9 chars is plenty - 8, plus null terminator.
-          // ValidateCustomNum already enforces only 1 up to kMaxAntThreads.
+          // ValidateCustomNum already enforces only 1 up to kMaxAntThreads (not more than 256).
           wchar_t buf[9] = {};
           GetDlgItemTextW(hDlg, IDC_CUSTOMNUM, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCustomNum(buf)) {
@@ -1246,4 +1254,81 @@ INT_PTR CALLBACK CustomNumDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
       break;
   }
   return FALSE;
+}
+
+INT_PTR CALLBACK CustomCellSizeDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+  UNREFERENCED_PARAMETER(lParam);
+  switch (message) {
+    case WM_INITDIALOG:
+      // Set icon in titlebar of custom cell size dialog
+      SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kSmallIcon);
+      SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kSmallIcon);
+      return TRUE;
+    case WM_CLOSE:
+      LOG(INFO) << L"Cell Size dialog cancelled by user";
+      EndDialog(hDlg, TRUE);
+      return TRUE;
+    case WM_COMMAND: {
+      const int cmd = LOWORD(wParam);
+      switch (cmd) {
+        case IDCANCEL:
+          LOG(INFO) << L"Cell Size dialog cancelled by user";
+          EndDialog(hDlg, IDCANCEL);
+          return TRUE;
+        case IDOK: {
+          // 4 chars is plenty - 3, plus null terminator.
+          // ValidateCellSize already enforces only 2 up to 48.
+          wchar_t buf[9] = {};
+          GetDlgItemTextW(hDlg, IDC_CUSTOMCELLSIZE, buf, sizeof(buf) / sizeof(buf[0]));
+          if (!ValidateCellSize(buf)) {
+            static const std::wstring msg =
+                L"Invalid input - must be between " + std::to_wstring(MIN_CELL_PX)
+                + L" - " + std::to_wstring(MAX_CELL_PX) + L".";
+            ErrorBox(hDlg, L"Custom Cell Size Validation Error", msg);
+            // Re-focus the edit so the user can correct without retabbing.
+            // Dialog stays open (return TRUE without EndDialog).
+            SetFocus(GetDlgItem(hDlg, IDC_CUSTOMCELLSIZE));
+            return TRUE;
+          }
+          const unsigned long lnum = wcstoul(buf, nullptr, 10);
+          const int cellSize       = static_cast<int>(lnum);
+          SetCellSize(cellSize);
+          EndDialog(hDlg, IDOK);
+          return TRUE;
+        }
+        case IDC_CUSTOMCELLSIZE:
+          break;
+        default:
+          break;
+      }
+    } break;
+    default:
+      break;
+  }
+  return FALSE;
+}
+
+void SetCellSize(const int size) {
+  DCHECK(size >= MIN_CELL_PX);
+  DCHECK(size <= MAX_CELL_PX);
+  if (g_place_mode) {
+    ExitPlaceMode();
+  }
+  // CELL_PX and the state grid have to change together: the grid is sized
+  // in cells (cxClient / CELL_PX), so a torn pair would let an ant thread
+  // compute gridW from the new CELL_PX and index into the still-old-sized
+  // grid - out of bounds when CELL_PX shrinks. Hold g_paintCS across both
+  // the assignment and the resize so the AntThread tick (which acquires
+  // the same lock) can never observe the inconsistency.
+  EnterCriticalSection(&g_paintCS);
+  CELL_PX = size;
+  ResizeStateGrid(cxClient / CELL_PX, cyClient / CELL_PX);
+  LeaveCriticalSection(&g_paintCS);
+  // Wipe the canvas + zero the (newly-resized) state grid. ClearCanvasToBackground
+  // re-acquires the lock; CRITICAL_SECTION is recursive on Windows so even
+  // re-entering on the same thread would be safe, but we already released above.
+  ClearCanvasToBackground(cxClient, cyClient);
+  ReseedAnts();
+  InvalidateRect(mainHwnd, nullptr, FALSE);
+  UserMessage(std::wstring(L"Cell Size changed to ") + std::to_wstring(size) + L".");
 }

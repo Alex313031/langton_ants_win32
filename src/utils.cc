@@ -52,6 +52,7 @@ static int s_idxMute   = 0;
 static int s_idxAnts   = 0;
 static int s_idxSpeed  = 0;
 static int s_idxCustom = 0;
+static int s_idxCells  = 0;
 static int s_idxColors = 0;
 
 // Reads the CHECKED state of every menu group at startup and sets the
@@ -124,11 +125,10 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Algorithm - exactly one IDM_CLASSIC..IDM_LOGARITHMIC must be CHECKED.
-  // The submenu lives at Settings → Customize (index 7) → Algorithms (index 5).
-  // Customize layout: ShowGrid, CustomPlace, CustomSeed, NoClientBounds,
-  // separator, Algorithms popup.
+  // Submenu path: Settings (1) → Customize (7) → Algorithms (3).
+  // Customize layout: CustomPlace, CustomSeed, separator, Algorithms popup.
   HMENU hCustom = GetSubMenu(hSettings, 7);
-  HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 5) : nullptr;
+  HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 3) : nullptr;
   if (hAlgo == nullptr) {
     LOG(ERROR) << L"Missing Customize/Algorithms submenu (RC index drift?)";
   } else {
@@ -140,13 +140,15 @@ void InitMenuDefaults(HWND hWnd) {
     }
   }
 
-  // Show-grid + no-client-bounds toggles. Both live directly in the
-  // Customize submenu (no nested popup), so read them off hCustom by
-  // command ID.
-  if (hCustom != nullptr) {
-    g_show_grid = (GetMenuState(hCustom, IDM_SHOWGRID, MF_BYCOMMAND) & MF_CHECKED) != 0;
+  // Show-grid + no-client-bounds toggles. Cell Options is now a top-level
+  // entry under Settings (index 9), no longer nested inside Customize.
+  HMENU hCells = GetSubMenu(hSettings, 9);
+  if (hCells == nullptr) {
+    LOG(ERROR) << L"Missing Settings/Cell Options submenu (RC index drift?)";
+  } else {
+    g_show_grid = (GetMenuState(hCells, IDM_SHOWGRID, MF_BYCOMMAND) & MF_CHECKED) != 0;
     g_no_client_bounds =
-        (GetMenuState(hCustom, IDM_NOCLIENTBOUNDS, MF_BYCOMMAND) & MF_CHECKED) != 0;
+        (GetMenuState(hCells, IDM_NOCLIENTBOUNDS, MF_BYCOMMAND) & MF_CHECKED) != 0;
   }
 
   // Sound - seed the user's sound preference from the IDM_SOUND menu
@@ -555,6 +557,9 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbab.nID = IDB_CUSTOM_BMP;
   s_idxCustom =
       static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
+  tbab.nID = IDB_CELLS_BMP;
+  s_idxCells =
+      static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
   tbab.nID = IDB_COLORS_BMP;
   s_idxColors =
       static_cast<int>(SendMessageW(hTB, TB_ADDBITMAP, 1, reinterpret_cast<LPARAM>(&tbab)));
@@ -579,7 +584,7 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // from simulation control), one between Stop and Num Ants (divides
   // transport controls from simulation knobs), and one between Sound
   // and Exit (sets Exit apart). All other buttons sit flush.
-  TBBUTTON tbButtons[12] = {};
+  TBBUTTON tbButtons[13] = {};
 
   tbButtons[0].iBitmap   = idxSave;
   tbButtons[0].idCommand = IDM_SAVE_AS;
@@ -621,25 +626,31 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   tbButtons[7].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
   tbButtons[7].iString   = reinterpret_cast<INT_PTR>(L"Customize");
 
-  tbButtons[8].iBitmap   = s_idxColors;
-  tbButtons[8].idCommand = IDM_COLORS;
+  tbButtons[8].iBitmap   = s_idxCells;
+  tbButtons[8].idCommand = IDM_CELLOPTIONS;
   tbButtons[8].fsState   = TBSTATE_ENABLED;
   tbButtons[8].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
-  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Colors");
+  tbButtons[8].iString   = reinterpret_cast<INT_PTR>(L"Cell Options");
 
-  tbButtons[9].iBitmap   = s_idxSound;
-  tbButtons[9].idCommand = IDM_SOUND;
+  tbButtons[9].iBitmap   = s_idxColors;
+  tbButtons[9].idCommand = IDM_COLORS;
   tbButtons[9].fsState   = TBSTATE_ENABLED;
-  tbButtons[9].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Sound");
+  tbButtons[9].fsStyle   = TBSTYLE_BUTTON | TBSTYLE_DROPDOWN;
+  tbButtons[9].iString   = reinterpret_cast<INT_PTR>(L"Colors");
 
-  tbButtons[10].fsStyle = TBSTYLE_SEP;
+  tbButtons[10].iBitmap   = s_idxSound;
+  tbButtons[10].idCommand = IDM_SOUND;
+  tbButtons[10].fsState   = TBSTATE_ENABLED;
+  tbButtons[10].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[10].iString   = reinterpret_cast<INT_PTR>(L"Sound");
 
-  tbButtons[11].iBitmap   = idxExit;
-  tbButtons[11].idCommand = IDM_EXIT;
-  tbButtons[11].fsState   = TBSTATE_ENABLED;
-  tbButtons[11].fsStyle   = TBSTYLE_BUTTON;
-  tbButtons[11].iString   = reinterpret_cast<INT_PTR>(L"Exit");
+  tbButtons[11].fsStyle = TBSTYLE_SEP;
+
+  tbButtons[12].iBitmap   = idxExit;
+  tbButtons[12].idCommand = IDM_EXIT;
+  tbButtons[12].fsState   = TBSTATE_ENABLED;
+  tbButtons[12].fsStyle   = TBSTYLE_BUTTON;
+  tbButtons[12].iString   = reinterpret_cast<INT_PTR>(L"Exit");
 
   SendMessageW(hTB, TB_ADDBUTTONS, sizeof(tbButtons) / sizeof(tbButtons[0]),
                reinterpret_cast<LPARAM>(tbButtons));
@@ -786,9 +797,10 @@ void SetAlgorithmCheck(AntAlgorithm algo) {
   if (hCustom == nullptr) {
     return;
   }
-  // Algorithms is the 6th item in Customize (index 5): IDM_SHOWGRID, place,
-  // custom seed, no-client-bounds, separator, then this popup.
-  HMENU hAlgo = GetSubMenu(hCustom, 5);
+  // Algorithms is the 4th item in Customize (index 3): CustomPlace,
+  // CustomSeed, separator, then this popup. Cell Options moved out to
+  // a top-level Settings entry.
+  HMENU hAlgo = GetSubMenu(hCustom, 3);
   if (hAlgo == nullptr) {
     return;
   }
@@ -868,6 +880,9 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
       break;
     case IDM_CUSTOM:
       text = L"Customize ant placement and starting \"seed\"";
+      break;
+    case IDM_CELLOPTIONS:
+      text = L"Cell options: grid lines, canvas bounds, cell size";
       break;
     case IDM_COLORS:
       text = L"Choose color options";
@@ -957,6 +972,33 @@ bool ValidateCustomNum(LPCWSTR cNum) {
   } else {
     // Check that custom num is less than hard limit
     is_valid = (antNumValue > 0 && antNumValue <= kMaxAntThreads);
+  }
+  return is_valid;
+}
+
+bool ValidateCellSize(LPCWSTR cCell) {
+  bool is_valid = false;
+  // nullptr check first so the *cCell dereference below is safe.
+  if (cCell == nullptr || *cCell == L'\0') {
+    return false; // Early fail on null pointer or empty string.
+  }
+  // Check that all characters are digits
+  for (const wchar_t* p = cCell; *p != L'\0'; ++p) {
+    if (*p < L'0' || *p > L'9') {
+      return false;
+    }
+  }
+  wchar_t* end;
+  const long cellsValue = wcstol(cCell, &end, 10);
+  // Check conversion was successful (end should point to null terminator)
+  if (*end != L'\0') {
+    return false;
+  }
+  if (cellsValue == 0) {
+    LOG(WARN) << L"Custom cell size value was 0!";
+    is_valid = false;
+  } else {
+    is_valid = (cellsValue >= MIN_CELL_PX && cellsValue <= MAX_CELL_PX);
   }
   return is_valid;
 }
@@ -1161,7 +1203,8 @@ bool GetKernelNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
   // Zero-init so the non-set members start clean (the API only writes the
   // ones it knows about for the size we passed). dwOSVersionInfoSize must
   // be exactly sizeof(OSVERSIONINFOEXW) or the call rejects the buffer.
-  OSVERSIONINFOEXW osverinfo    = {};
+  OSVERSIONINFOEXW osverinfo;
+  SecureZeroMemory(&osverinfo, sizeof(OSVERSIONINFOEXW));
   osverinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
   // RtlGetVersion returns NTSTATUS; STATUS_SUCCESS == 0. In practice it
   // never fails for a correctly-sized buffer, but checking the contract
@@ -1206,7 +1249,8 @@ bool GetUserNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp) {
     return false;
   }
   // Zero-init for the same reason as GetKernelNtVersion above.
-  OSVERSIONINFOEXW osverinfo    = {};
+  OSVERSIONINFOEXW osverinfo;
+  SecureZeroMemory(&osverinfo, sizeof(OSVERSIONINFOEXW));
   osverinfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
   // GetVersionExW returns BOOL; 0 = failure. Combine with the dwMajorVersion
   // sanity check so a partially-failing call can't slip through.

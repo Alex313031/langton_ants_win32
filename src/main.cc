@@ -588,6 +588,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
+        if (pnmtb->iItem == IDM_CELLOPTIONS) {
+          // Cell Options is now a top-level entry in Settings (index 9),
+          // no longer nested inside Customize.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          if (hCells != nullptr) {
+            TrackPopupMenu(hCells, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
+          }
+          return TBDDRET_DEFAULT;
+        }
         if (pnmtb->iItem == IDM_COLORS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
           HMENU hBkg      = GetSubMenu(hSettings, 5);
@@ -639,6 +649,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           PopupUnderToolbarButton(hWnd, IDM_CUSTOM, hCustom);
           break;
         }
+        case IDM_CELLOPTIONS: {
+          // Button-body click on the Cells split button - mirrors IDM_CUSTOM.
+          // Cell Options now lives directly under Settings (index 9), not
+          // nested inside Customize.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          if (hCells != nullptr) {
+            PopupUnderToolbarButton(hWnd, IDM_CELLOPTIONS, hCells);
+          }
+          break;
+        }
         case IDM_COLORS: {
           // Button-body click on the Colors split button - mirrors IDM_ANTS.
           // The dropdown is the existing Settings → Colors submenu so the
@@ -682,6 +703,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case IDM_CONC_CUSTOM: {
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMNUM), hWnd, CustomNumDlgProc);
+          break;
+        }
+        case IDM_CELLSIZE: {
+          DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_CUSTOMCELLSIZE), hWnd, CustomCellSizeDlgProc);
           break;
         }
         case IDM_UNDO: {
