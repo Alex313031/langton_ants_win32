@@ -3,7 +3,6 @@
 #include <cstring> // memcpy/memset for the state grid
 #include <new>     // std::nothrow
 
-#include "cpu.h"
 #include "globals.h"
 #include "resource.h"
 #include "sound.h"

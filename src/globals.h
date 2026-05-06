@@ -11,8 +11,6 @@ extern HINSTANCE g_hInstance; // This program instance, everything descends from
 
 extern HWND mainHwnd; // Our main window handle
 
-extern HWND hStatusBar; // Our status bar handle
-
 extern volatile bool g_running; // Controlling ants threads state
 extern volatile bool g_paused;  // Keep track of paused state. PauseAnts() uses this in utils.cc
 extern volatile bool g_stopped; // True at startup (no animation has happened yet) and after

@@ -68,7 +68,7 @@
 
 // These next few lines are where we control version number and copyright year
 // Adhere to semver > semver.org
-#define MAJOR_VERSION 0
+#define MAJOR_VERSION 1
 #define MINOR_VERSION 5
 #define BUILD_VERSION 9
 

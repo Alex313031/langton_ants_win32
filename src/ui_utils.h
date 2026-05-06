@@ -3,6 +3,8 @@
 
 #include "utils.h"
 
+extern HWND hStatusBar; // Our status bar handle
+
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
                             // below it.
 
