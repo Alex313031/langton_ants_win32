@@ -54,15 +54,15 @@ extern HICON kSmallIcon;
 // to compute the actual outer window size, so the user always gets a
 // CW_WIDTH x CW_HEIGHT ant canvas at startup regardless of how tall the
 // menu bar / toolbar end up being.
-inline constexpr INT CW_WIDTH  = 800;
-inline constexpr INT CW_HEIGHT = 600;
+inline constexpr INT CW_WIDTH  = 806;
+inline constexpr INT CW_HEIGHT = 606;
 
 // Minimum desired ant canvas size. WM_GETMINMAXINFO converts these to
 // outer-window minimums (chrome + g_toolbarHeight added) so the canvas
 // never gets squeezed below this even when the toolbar wraps onto extra
 // rows at narrow widths.
-inline constexpr INT MINWIDTH  = 252;
-inline constexpr INT MINHEIGHT = 252;
+inline constexpr INT MINWIDTH  = 320;
+inline constexpr INT MINHEIGHT = 320;
 
 // Width of CPU status area in status bar, for split
 inline constexpr INT CPU_STATUS_WIDTH = 120;

@@ -679,7 +679,10 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   SendMessageW(hTB, TB_AUTOSIZE, 0, 0);
 
   // Buttons and layout are in place; show the toolbar now.
-  ShowWindow(hTB, SW_SHOW);
+  if (ShowWindow(hTB, SW_SHOW)) {
+    // If the window was previously visible, the return value is nonzero (TRUE).
+    LOG(DEBUG) << L"Toolbar was already visible!";
+  }
 
   // Store the handle and measure the initial height. GetWindowRect returns
   // screen coords, but for a toolbar docked at the top the height component

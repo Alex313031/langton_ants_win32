@@ -90,47 +90,48 @@
 
 // Different ant algorithms
 #define IDM_CLASSIC                 256 // Classic original Right-Left algorithm
-#define IDM_FILL                    257 // Ants tend to "fill" an area, with no highways
-#define IDM_ARCHIMEDES              258 // Creates an Archimedes spiral
-#define IDM_LOGARITHMIC             259 // Creates a logarithmic spiral
+#define IDM_SYMMETRIC               257 // Ants grow symmetrically
+#define IDM_FILL                    258 // Ants tend to "fill" an area, with no highways
+#define IDM_ARCHIMEDES              259 // Creates an Archimedes spiral
+#define IDM_LOGARITHMIC             260 // Creates a logarithmic spiral
 
 // Forces painting a new canvas, with whatever settings it currently has
-#define IDM_REPAINT                 260
+#define IDM_REPAINT                 261
 
 // "Single step" through ant painting, allows you to run it manually one iteration at a time
 // instead of using timer
-#define IDM_SINGLE                  261
+#define IDM_SINGLE                  262
 
 // Toolbar button identifier for "Num Ants" button with drop down menu.
-#define IDM_ANTS                    262
+#define IDM_ANTS                    263
 
 // Toolbar button identifier for "Speed" button with drop down menu.
-#define IDM_SPEED                   263
+#define IDM_SPEED                   264
 
 // Toolbar button identifier for "Customize" button with drop down menu.
-#define IDM_CUSTOM                  264
-#define IDM_CUSTOMPLACE             265
-#define IDM_CUSTOMSEED              266
+#define IDM_CUSTOM                  265
+#define IDM_CUSTOMPLACE             266
+#define IDM_CUSTOMSEED              267
 
 // Toolbar button identifier for "Colors" button with drop down menu.
-#define IDM_COLORS                  267
+#define IDM_COLORS                  268
 
 // Not in a UI menu, just keyboard accelerator
-#define IDM_UNDO                    268
+#define IDM_UNDO                    269
 
 // Ant color options
-#define IDM_CYANANT                 269
-#define IDM_YELLOWANT               270
-#define IDM_MAGENTAANT              271
-#define IDM_ALLCOLORANT             272
+#define IDM_CYANANT                 270
+#define IDM_YELLOWANT               271
+#define IDM_MAGENTAANT              272
+#define IDM_ALLCOLORANT             273
 
 // Toolbar button identifier for "Cells" button with drop down menu.
-#define IDM_CELLOPTIONS             273
-#define IDM_SHOWGRID                274 // Toggle showing background "grid"
+#define IDM_CELLOPTIONS             274
+#define IDM_SHOWGRID                275 // Toggle showing background "grid"
 // Whether ants are not restricted by client area, they don't "bounce" off walls
-#define IDM_NOCLIENTBOUNDS          275
+#define IDM_NOCLIENTBOUNDS          276
 // Control cell size in pixels
-#define IDM_CELLSIZE                276
+#define IDM_CELLSIZE                277
 
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280

@@ -890,6 +890,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           break;
         }
         case IDM_CLASSIC:
+        case IDM_SYMMETRIC:
         case IDM_FILL:
         case IDM_ARCHIMEDES:
         case IDM_LOGARITHMIC: {
@@ -914,13 +915,21 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           if (preservePlacements) {
             RepaintPlacementMarkers();
           } else {
-            ReseedAnts();
+            // pulse=false while paused/stopped so the threads don't wake up
+            // and repaint their fresh markers onto the just-wiped canvas
+            // before the user has resumed. The reseedReq flag still gets
+            // set, so the next genuine resume tick (TogglePaintAnts ->
+            // SignalAntsTick) picks new positions.
+            ReseedAnts(!g_paused);
           }
           InvalidateRect(hWnd, nullptr, FALSE);
           const wchar_t* algoName = L"?";
           switch (newAlgo) {
             case AntAlgorithm::Classic:
               algoName = L"Classic (RL)";
+              break;
+            case AntAlgorithm::Symmetric:
+              algoName = L"Symmetric (LLRR)";
               break;
             case AntAlgorithm::Fill:
               algoName = L"Fill (LRL)";

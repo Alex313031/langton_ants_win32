@@ -25,9 +25,10 @@ extern unsigned long g_delay; // Global ant draw delay
 // menu's CheckMenuRadioItem can derive the radio target the same way.
 enum class AntAlgorithm : UINT {
   Classic     = 0, // RL            - original Langton (2 states)
-  Fill        = 1, // LRL           - 3 states, area-filling
-  Archimedes  = 2, // LRRRRLLLRRR   - 11 states, Archimedean spiral
-  Logarithmic = 3, // RLLLLRRRLLLR  - 12 states, logarithmic spiral
+  Symmetric   = 1, // LLRR          - 4 states, symmetric growth
+  Fill        = 2, // LRL           - 3 states, area-filling
+  Archimedes  = 3, // LRRRRLLLRRR   - 11 states, Archimedean spiral
+  Logarithmic = 4, // RLLLLRRRLLLR  - 12 states, logarithmic spiral
 };
 
 extern AntAlgorithm g_algorithm; // Currently active algorithm

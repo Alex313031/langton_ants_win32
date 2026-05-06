@@ -66,6 +66,7 @@ struct AlgoPattern {
 // Our different algorithm options
 static const AlgoPattern kAlgoPatterns[] = {
     {AntAlgorithm::Classic, "RL", 2},
+    {AntAlgorithm::Symmetric, "LLRR", 4},
     {AntAlgorithm::Fill, "LRL", 3},
     {AntAlgorithm::Archimedes, "LRRRRLLLRRR", 11},
     {AntAlgorithm::Logarithmic, "RLLLLRRRLLLR", 12},
@@ -863,6 +864,14 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
   const int width  = cxClient;
   const int height = cyClient;
 
+  // GetDIBits / SetDIBits documentation: "The bitmap identified by the hbmp
+  // parameter must not be selected into a device context when the application
+  // calls this function." Violating this gives undefined behavior; on some
+  // configurations the calls succeed silently but no pixels actually move.
+  // Use a throwaway memory DC for the round trip so g_hbmMem is operated on
+  // while NOT selected anywhere.
+  HDC hdcScratch = CreateCompatibleDC(g_hdcMem);
+
   BITMAPINFOHEADER bi = {};
   bi.biSize           = sizeof(BITMAPINFOHEADER);
   bi.biWidth          = width;
@@ -872,7 +881,7 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
   bi.biCompression    = BI_RGB;
 
   std::vector<DWORD> pixels(static_cast<size_t>(width) * height);
-  GetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
+  GetDIBits(hdcScratch, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
             DIB_RGB_COLORS);
 
   // Convert the two COLORREFs to the DIB's DWORD representation.
@@ -889,8 +898,10 @@ void RecolorBackground(COLORREF oldColor, COLORREF newColor) {
     }
   }
 
-  SetDIBits(g_hdcMem, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
+  SetDIBits(hdcScratch, g_hbmMem, 0, height, pixels.data(), reinterpret_cast<BITMAPINFO*>(&bi),
             DIB_RGB_COLORS);
+
+  DeleteDC(hdcScratch);
 
   LeaveCriticalSection(&g_paintCS);
 }

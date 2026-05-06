@@ -155,6 +155,7 @@ BEGIN
             BEGIN
                 MENUITEM "Classic  (RL)",              IDM_CLASSIC, CHECKED
                 MENUITEM "Fill  (LRL)",                IDM_FILL
+                MENUITEM "Symmetric (LLRR)",           IDM_SYMMETRIC
                 MENUITEM "Archimedes (LRRRRLLLRRR)",   IDM_ARCHIMEDES
                 MENUITEM "Logarithmic (RLLLLRRRLLLR)", IDM_LOGARITHMIC
             END
