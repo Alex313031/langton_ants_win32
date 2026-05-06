@@ -565,16 +565,16 @@ bool ParseCommandLine(int argc, LPWSTR argv[]) {
     // path containing characters that happen to match a flag literal can't
     // false-trigger one of the wcscmp checks below.
     for (int i = 1; i < argc; ++i) {
-      wchar_t* arg     = argv[i];
-      is_debug_mode   |= (wcscmp(arg, L"--debug") == 0) || (wcscmp(arg, L"-d") == 0) ||
-                         (wcscmp(arg, L"-debug") == 0) || (wcscmp(arg, L"/d") == 0) ||
-                         (wcscmp(arg, L"/D") == 0);
+      wchar_t* arg = argv[i];
+      is_debug_mode |= (wcscmp(arg, L"--debug") == 0) || (wcscmp(arg, L"-d") == 0) ||
+                       (wcscmp(arg, L"-debug") == 0) || (wcscmp(arg, L"/d") == 0) ||
+                       (wcscmp(arg, L"/D") == 0);
       is_version_mode |= (wcscmp(arg, L"--version") == 0) || (wcscmp(arg, L"-v") == 0) ||
                          (wcscmp(arg, L"-ver") == 0) || (wcscmp(arg, L"/v") == 0) ||
                          (wcscmp(arg, L"/V") == 0);
-      is_help_mode    |= (wcscmp(arg, L"--help") == 0) || (wcscmp(arg, L"-h") == 0) ||
-                         (wcscmp(arg, L"-?") == 0) || (wcscmp(arg, L"/h") == 0) ||
-                         (wcscmp(arg, L"/H") == 0) || (wcscmp(arg, L"/?") == 0);
+      is_help_mode |= (wcscmp(arg, L"--help") == 0) || (wcscmp(arg, L"-h") == 0) ||
+                      (wcscmp(arg, L"-?") == 0) || (wcscmp(arg, L"/h") == 0) ||
+                      (wcscmp(arg, L"/H") == 0) || (wcscmp(arg, L"/?") == 0);
     }
     parsed = true;
   } else {

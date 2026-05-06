@@ -76,9 +76,9 @@ COLORREF g_bkg_color = RGB_BLUE;
 // was somehow active before any toggle had a chance to save a real value.
 static COLORREF s_pre_mono_bg = RGB_BLUE;
 
-bool g_debug_mode = is_debug;
+bool g_debug_mode   = is_debug;
 bool g_show_version = false;
-bool g_show_help = false;
+bool g_show_help    = false;
 
 // Store handles to main icon since commonly used
 HICON kMainIcon  = nullptr;
@@ -210,8 +210,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // is the post-exe-path tail only; we want the full thing so argv[0] is the
   // exe path that ParseCommandLine's loop skips). Failure path is "no flags
   // set" - we can't LOG(ERROR) here because logging isn't initialized yet.
-  int argc          = 0;
-  LPWSTR* argv      = CommandLineToArgvW(GetCommandLineW(), &argc);
+  int argc     = 0;
+  LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
   if (!ParseCommandLine(argc, argv)) {
     std::wcerr << L"Failed to parse command line, aborting!" << std::endl;
     return 2;
@@ -221,8 +221,8 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   }
   // Whether to open conhost window for debugging. InitLogging handles the
   // AttachConsole/AllocConsole + freopen dance internally based on log_sink.
-  static const bool open_console      = g_debug_mode || g_show_version || g_show_help;
-  const logging::LogDest kLogSink     =
+  static const bool open_console = g_debug_mode || g_show_version || g_show_help;
+  const logging::LogDest kLogSink =
       open_console ? g_debug_mode ? logging::LOG_TO_ALL : logging::LOG_TO_STDERR
                    : logging::LOG_NONE;
   static const std::wstring file_name = std::wstring(INTERNAL_NAME);
