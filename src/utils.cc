@@ -296,16 +296,14 @@ const std::wstring GetAppName() {
 }
 
 bool IsWindowsXpOrLater() {
-  OSVERSIONINFOW osvi      = {};
-  osvi.dwOSVersionInfoSize = sizeof(osvi);
-  if (!GetVersionExW(&osvi)) {
-    return false;
+  UINT major = 0;
+  UINT minor = 0;
+  // Use the raw NT version: can't be spoofed by the manifest-driven shim that
+  // GetVersionExW / RtlGetVersion go through, anything higher than 5.0 returns true.
+  if (GetRawNtVersion(&major, &minor, nullptr)) {
+    return major > 5u || (major == 5u && minor >= 1u);
   }
-  // Major 6+ covers Vista / 7 / 8 / 10 / 11. Major 5 splits: 5.0 = Win2000
-  // (the case we want to exclude), 5.1 = XP, 5.2 = Server 2003 / XP x64.
-  static const bool isVistaOrNewer   = osvi.dwMajorVersion >= 6;
-  static const bool isXpOrServer2003 = osvi.dwMajorVersion == 5 && osvi.dwMinorVersion >= 1;
-  return isVistaOrNewer || isXpOrServer2003;
+  return false; // Safe fallback, assume Win 2K
 }
 
 static DWORD GetCommCtrlVersion() {

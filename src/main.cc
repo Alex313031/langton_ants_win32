@@ -139,6 +139,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   int argc          = 0;
   LPWSTR* argv      = CommandLineToArgvW(GetCommandLineW(), &argc);
   if (!ParseCommandLine(argc, argv)) {
+    std::wcerr << L"Failed to parse command line, aborting!" << std::endl;
     return 2;
   }
   if (argv != nullptr) {
@@ -176,7 +177,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return showed_help;
   }
   LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
-  LOG(INFO) << L"Version: " << GetVersionString();
+  LOG(INFO) << L"Version: " << GetVersionString() << (is_debug ? L" DEBUG" : L"");
   DCHECK(kMainIcon != nullptr);
   DCHECK(kSmallIcon != nullptr);
 
@@ -231,6 +232,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   DCHECK(mainHwnd != nullptr);
   if (mainHwnd == nullptr) {
+    LOG(ERROR) << L"Creating main window failed! Exiting...";
     return 4;
   }
 
@@ -255,6 +257,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   ShowWindow(mainHwnd, iCmdShow);
   if (!UpdateWindow(mainHwnd)) {
+    LOG(ERROR) << L"UpdateWindow failed for main window " << mainHwnd;
     return 5;
   }
 
