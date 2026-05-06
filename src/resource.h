@@ -27,13 +27,14 @@
 #define IDR_MAIN                    120
 
 /* Dialogs */
-#define IDD_ABOUTDLG                130
-#define IDD_CUSTOMDLG               131
-#define IDC_CUSTOMSEED              132
-#define IDD_CUSTOMNUM               133
-#define IDC_CUSTOMNUM               134
-#define IDD_CUSTOMCELLSIZE          135
-#define IDC_CUSTOMCELLSIZE          136
+#define IDD_ABOUTDLG                130 // About Dialog
+#define IDD_CUSTOMDLG               131 // Custom seed dialog
+#define IDC_CUSTOMSEED              132 // Edit control in custom seed dialog
+#define IDD_CUSTOMNUM               133 // Custom ant number dialog
+#define IDC_CUSTOMNUM               134 // Edit control in custom ant num dialog
+#define IDD_CUSTOMCELLSIZE          135 // Custom ant cell size dialog
+#define IDC_CUSTOMCELLSIZE          136 // Edit control for custom cell size dialog
+#define IDC_DEFCELLSIZE             278 // Button to reset cell size to default
 
 /* Menu items */
 #define IDM_ABOUT                   200

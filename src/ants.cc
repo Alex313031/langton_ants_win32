@@ -7,7 +7,7 @@
 #include "globals.h"
 #include "resource.h"
 #include "sound.h"
-#include "utils.h"
+#include "ui_utils.h"
 
 volatile bool g_running = false; // Global ant threads running state
 volatile bool g_paused  = false; // Affects g_running, used by IDM_PAUSED
@@ -51,7 +51,7 @@ bool g_custom_seed_active = false;
 // comes from g_paintCS holding both writes and reads, but volatile
 // documents the runtime mutability and matches the convention used by
 // g_paused / g_running / g_num_ants.
-volatile int CELL_PX = 6;
+volatile int CELL_PX = kDefaultCellSize;
 
 // --- Algorithm pattern table ---------------------------------------------
 // One entry per AntAlgorithm value. Pattern is the right/left turn string
@@ -1025,7 +1025,7 @@ bool PlaceAntAtClient(int clientX, int clientY) {
     LOG(WARN) << L"Place cap hit (" << kMaxAntThreads << L"): click ignored.";
     return false;
   }
-  // Window-client -> back-buffer coords (the toolbar lives at the top of the
+  // Window-client back-buffer coords (the toolbar lives at the top of the
   // client area; the ants canvas starts below it).
   const int bx = clientX;
   const int by = clientY - g_toolbarHeight;
@@ -1058,9 +1058,9 @@ bool PlaceAntAtClient(int clientX, int clientY) {
 
   const int px = cellX * CELL_PX;
   const int py = cellY * CELL_PX;
-  // Color picker mirrors AntThread's needsPlacement branch: monochrome ->
+  // Color picker mirrors AntThread's needsPlacement branch: If monochrome,
   // match the trail color (ants vanish into their paths, no ant-vs-ant
-  // collision); otherwise pick from the magenta/cyan/yellow set so
+  // collision), otherwise pick from the magenta/cyan/yellow set so
   // isBlocked sees the marker. The starting "state" the thread reads on
   // its first step comes from g_state_grid at this cell, no extra field
   // recorded here.
@@ -1301,9 +1301,10 @@ INT_PTR CALLBACK CustomCellSizeDlgProc(HWND hDlg, UINT message, WPARAM wParam, L
           EndDialog(hDlg, IDCANCEL);
           return TRUE;
         case IDOK: {
-          // 4 chars is plenty - 3, plus null terminator.
-          // ValidateCellSize already enforces only 2 up to 48.
-          wchar_t buf[9] = {};
+          // 5 chars max (MAX_CELL_PX is 48, two digits) plus null
+          // terminator; oversized to a comfortable 5 wchars.
+          // ValidateCellSize enforces the MIN_CELL_PX..MAX_CELL_PX range.
+          wchar_t buf[5] = {};
           GetDlgItemTextW(hDlg, IDC_CUSTOMCELLSIZE, buf, sizeof(buf) / sizeof(buf[0]));
           if (!ValidateCellSize(buf)) {
             static const std::wstring msg = L"Invalid input - must be between " +
@@ -1321,6 +1322,10 @@ INT_PTR CALLBACK CustomCellSizeDlgProc(HWND hDlg, UINT message, WPARAM wParam, L
           EndDialog(hDlg, IDOK);
           return TRUE;
         }
+        case IDC_DEFCELLSIZE:
+          SetCellSize(kDefaultCellSize);
+          EndDialog(hDlg, IDC_DEFCELLSIZE);
+          return TRUE;
         case IDC_CUSTOMCELLSIZE:
           break;
         default:
@@ -1353,7 +1358,10 @@ void SetCellSize(const int size) {
   // re-acquires the lock; CRITICAL_SECTION is recursive on Windows so even
   // re-entering on the same thread would be safe, but we already released above.
   ClearCanvasToBackground(cxClient, cyClient);
-  ReseedAnts();
+  // pulse=false while paused/stopped so the threads don't wake and paint
+  // fresh markers onto the just-wiped canvas before the user resumes;
+  // SignalAntsTick on resume picks up the reseed flag.
+  ReseedAnts(!g_paused);
   InvalidateRect(mainHwnd, nullptr, FALSE);
-  UserMessage(std::wstring(L"Cell Size changed to ") + std::to_wstring(size) + L".");
+  UserMessage(std::wstring(L"Cell Size changed to ") + std::to_wstring(size) + L"px.");
 }

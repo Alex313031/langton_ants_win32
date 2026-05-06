@@ -76,23 +76,6 @@ inline constexpr unsigned long kStatusBarResetDelay = 5000ul; // 5 second delay
 // Whether to use small toolbar without text labels.
 inline constexpr bool use_small_toolbar = true;
 
-extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
-                            // below it.
-
-extern int g_statusBarHeight; // Height of the bottom status bar in pixels; 0 if none. Ants
-                              // "canvas" ends above it. Measured by InitStatusBar after the bar
-                              // is created and re-measured on every WM_SIZE so DPI / font
-                              // changes don't leave stale rows of canvas hidden under the bar.
-
-// True between a UserMessage call and the TIMER_STATUS_RESET firing - i.e.
-// "the bar is currently showing a transient user message, not the default".
-// UserMessage sets it; the WM_TIMER handler for TIMER_STATUS_RESET clears
-// it. Read by main.cc on minimize/restore so a pending revert can be
-// suspended while minimized and re-armed after restore (with a fresh
-// kStatusBarResetDelay window) - the user gets to read the message after
-// un-minimizing instead of seeing it blow away while they couldn't.
-extern bool g_status_revert_pending;
-
 // Minimum common controls version for certain functions, used for fallback codepaths
 // See https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions
 inline constexpr DWORD dwComCtl32TargetVer =
@@ -102,14 +85,13 @@ inline constexpr DWORD dwComCtl32TargetVer =
 inline constexpr int MIN_CELL_PX = 2;
 inline constexpr int MAX_CELL_PX = 48;
 
-// Gets default settings from CHECKED state of menu items
-void InitMenuDefaults(HWND hWnd);
-
 // Gets the current side by side directory, regardless of where .exe is started from
 const std::wstring GetExeDir();
 
-// Save client area as a .BMP photo, capturing moment menu was clicked.
-bool SaveClientBitmap(HWND hWnd);
+// Save client area as a .BMP photo, capturing moment menu was clicked. On
+// success, if outSavedPath is non-null, the chosen path is written there so
+// the caller can surface it (e.g. via UserMessage); pass nullptr to skip.
+bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath);
 
 // Test debug trap, choosing between DCHECK and CHECK
 void TestTrap(const bool dcheck);
@@ -126,65 +108,6 @@ bool WarnBox(HWND hWnd, const std::wstring& title, const std::wstring& message);
 
 bool ErrorBox(HWND hWnd, const std::wstring& title, const std::wstring& message);
 
-// Creates the app's top toolbar as a child of hParent. Call once from
-// WM_CREATE. Stores the toolbar handle internally and measures the global
-// g_toolbarHeight so the rest of the app can offset the ants area below it.
-// Returns true on success; returns false if the toolbar window itself
-// failed to create (callers can warn the user that the toolbar will be
-// missing - the rest of the app still works via the menu bar).
-bool CreateAppToolbar(HWND hParent, HINSTANCE hInst);
-
-// Re-auto-sizes the toolbar to the parent's new width and re-measures its
-// height into g_toolbarHeight. Call from WM_SIZE. No-op if the toolbar
-// hasn't been created yet.
-void LayoutToolbar(HWND hWnd);
-
-// Swaps the IDM_PAUSED toolbar button's icon+label between "Pause" (simulation
-// running) and "Resume" (simulation paused). Call after toggling g_paused.
-void SetPauseButton(bool paused);
-
-// Swaps the IDM_SOUND toolbar button's icon+label between "Music" (silent,
-// click to start) and "Mute" (playing, click to stop). Call after ToggleSound.
-void SetSoundButton(bool playing);
-
-// Reflects the current ant count on the Num Ants submenu. Pass the value
-// you just set g_num_ants to. Counts 1-16 light up the matching IDM_CONC_N
-// radio and clear IDM_CONC_CUSTOM; counts outside that range (17-128 from
-// the Custom Num dialog, or post-place-mode counts > 16) clear all the
-// radios and check IDM_CONC_CUSTOM instead so exactly one entry shows
-// a mark.
-void SetNumAntsCheck(unsigned int num);
-
-// Reflects the current algorithm on the Settings -> Customize -> Algorithms
-// submenu. Pass the value you just set g_algorithm to. The IDM_CLASSIC..
-// IDM_LOGARITHMIC IDs are consecutive and aligned with AntAlgorithm's
-// underlying values, so the radio target is derived directly.
-void SetAlgorithmCheck(AntAlgorithm algo);
-
-// Reflects whether a user-specified seed is currently driving the
-// simulation. Pass true after a successful CustomSeedAnts and false
-// whenever the seed is replaced by a random one (ReseedAnts paths).
-// The check mark goes on Settings -> Customize -> IDM_CUSTOMSEED.
-void SetCustomSeedCheck(bool active);
-
-// Handles a TTN_GETDISPINFOW / TTN_NEEDTEXTW notification from the toolbar's
-// tooltip control by supplying a descriptive string based on the hovered
-// button's command ID (and, for state-toggling buttons, the current state).
-// Call this first inside the parent's WM_NOTIFY and return early if it
-// returns true. Returns false for any other notification code so the caller
-// can continue dispatching.
-bool HandleToolbarTooltips(NMHDR* pnmh);
-
-// Pops up hMenu anchored just below the toolbar button identified by
-// idCommand. Useful for WM_COMMAND handlers on TBSTYLE_DROPDOWN buttons
-// where the user clicked the button body (not the arrow) and we want to
-// show the same dropdown as TBN_DROPDOWN would. hOwner receives the
-// WM_COMMAND messages generated by menu selections. Returns true on
-// success; returns false when the toolbar isn't ready, the menu handle
-// is null, the button rect lookup failed, or TrackPopupMenu itself
-// failed - meaning the user clicked but no menu actually appeared.
-bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu);
-
 // Validates that the input from "Custom Seed" dialog is valid.
 // Must be an unsigned integer, no spaces, decimals, or alphanumeric characters.
 bool ValidateCustomSeed(LPCWSTR cSeed);
@@ -197,12 +120,6 @@ bool ValidateCustomNum(LPCWSTR cNum);
 // Validates that custom cell size is valid, same as above, but clamped to
 // MIN_CELL_PX - MAX_CELL_PX.
 bool ValidateCellSize(LPCWSTR cCell);
-
-// Updates text in a specified part of the status bar.
-void UpdateStatusBar(const unsigned int part, const std::wstring& text);
-
-// Logs to console at INFO level, and updates status bar 1st part.
-void UserMessage(const std::wstring& message);
 
 // Gets version as human readable wstring.
 const std::wstring GetVersionString();

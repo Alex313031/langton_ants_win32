@@ -70,7 +70,7 @@
 // Adhere to semver > semver.org
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 5
-#define BUILD_VERSION 8
+#define BUILD_VERSION 9
 
 // String constants
 #define VERSION_STRING _VERSION(MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION)
@@ -89,7 +89,7 @@
 
 #define ABOUT_TITLE     L"About " APP_NAME
 #define ABOUT_CONTENT   L"Langton's Ants for Win32"
-#define ABOUT_VERSION   INTERNAL_NAME L" v" VERSION_STRING
+#define ABOUT_VERSION   L"Version " VERSION_STRING
 #define ABOUT_COPYRIGHT LEGAL_COPYRIGHT
 
 #ifndef _PACKVERSION

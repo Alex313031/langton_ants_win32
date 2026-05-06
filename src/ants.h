@@ -48,7 +48,7 @@ extern bool g_no_client_bounds;
 
 // True while the simulation is running with a user-specified seed (set by
 // CustomSeedAnts, cleared by ReseedAnts). Drives the IDM_CUSTOMSEED check
-// mark; see SetCustomSeedCheck in utils.h.
+// mark; see SetCustomSeedCheck in ui_utils.h.
 extern bool g_custom_seed_active;
 
 // --- Thread pool state ----------------------------------------------------
@@ -106,6 +106,9 @@ extern HBITMAP g_hbmMem;
 // The IDM_CONC_* menu exposes IDM_CONC_1..IDM_CONC_16; the "Custom Num"
 // dialog (IDM_CONC_CUSTOM) lets the user reach the rest up to this cap.
 inline constexpr int kMaxAntThreads = static_cast<int>(128u);
+
+// Default ant cell size in pixels
+inline constexpr int kDefaultCellSize = static_cast<int>(6u);
 
 // Size of one logical ant "pixel" in real hardware pixels. An ant occupies
 // a CELL_PX × CELL_PX square and every path mark quantizes to the same

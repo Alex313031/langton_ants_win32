@@ -204,7 +204,7 @@ END
 
 // About Dialog Box
 // Everything is RES, X, Y, Width, Height, Style
-IDD_ABOUTDLG DIALOGEX 7, 7, 132, 60
+IDD_ABOUTDLG DIALOGEX 14, 7, 132, 66
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_DLGFRAME
 CAPTION ABOUT_TITLE
 FONT 8, "MS Shell Dlg 2"
@@ -213,45 +213,48 @@ BEGIN
     LTEXT           ABOUT_CONTENT, IDC_STATIC, 36, 7, 116, 8, SS_NOPREFIX
     LTEXT           ABOUT_VERSION, IDC_STATIC, 36, 17, 116, 8, SS_NOPREFIX
     LTEXT           ABOUT_COPYRIGHT, IDC_STATIC, 36, 27, 116, 8, SS_NOPREFIX
-    DEFPUSHBUTTON   "OK", IDOK, 40, 40, 40, 14, WS_TABSTOP
+    DEFPUSHBUTTON   "OK", IDOK, 40, 45, 50, 14, WS_TABSTOP
 END
 
-// Layout (DLU): 180 wide x 66 tall, 7 dlu margins on every side.
-//   y=9..17  label (full width, 166 dlu)
-//   y=22..36 edit  (full width, ES_AUTOHSCROLL so long input scrolls
-//                   instead of being clipped by the border)
-//   y=45..59 OK + Cancel - right-aligned, 50 dlu wide each, 4 dlu apart
-IDD_CUSTOMDLG DIALOGEX 14, 14, 180, 66
+// Layout (DLU) - 176 wide x 61 tall, 7 dlu margins, 4 dlu label-to-edit gap,
+// 7 dlu edit-to-buttons gap, 4 dlu between buttons. Label + edit span the
+// inner width (162 dlu). Buttons keep their 50 dlu width and are centered
+// as a group:
+//   2 buttons (50+4+50 = 104) -> left margin (176-104)/2 = 36
+//   3 buttons (50+4+50+4+50 = 158) -> left margin (176-158)/2 = 9
+// Vertical math: 7+8+4+14+7+14+7 = 61 (fits exactly).
+IDD_CUSTOMDLG DIALOGEX 14, 14, 176, 61
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTERMOUSE | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Choose Custom Ant Seed"
 FONT 8, "MS Shell Dlg 2"
 BEGIN
-    LTEXT         "Ant Start Seed:", IDC_STATIC, 7, 9, 166, 8, SS_NOPREFIX
-    EDITTEXT      IDC_CUSTOMSEED, 7, 22, 166, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
-    DEFPUSHBUTTON "OK",     IDOK,      62, 45, 50, 14, WS_TABSTOP
-    PUSHBUTTON    "Cancel", IDCANCEL, 116, 45, 50, 14, WS_TABSTOP
+    LTEXT         "Ant Start Seed:", IDC_STATIC, 7, 7, 162, 8, SS_NOPREFIX
+    EDITTEXT      IDC_CUSTOMSEED, 7, 19, 162, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+    DEFPUSHBUTTON "OK",     IDOK,     36, 40, 50, 14, WS_TABSTOP
+    PUSHBUTTON    "Cancel", IDCANCEL, 90, 40, 50, 14, WS_TABSTOP
 END
 
-IDD_CUSTOMNUM DIALOGEX 14, 14, 180, 66
+IDD_CUSTOMNUM DIALOGEX 14, 14, 176, 61
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTERMOUSE | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Choose Custom Number of Ants"
 FONT 8, "MS Shell Dlg 2"
 BEGIN
-    LTEXT         "Number of Ants (1 - 128):", IDC_STATIC, 7, 9, 166, 8, SS_NOPREFIX
-    EDITTEXT      IDC_CUSTOMNUM, 7, 22, 166, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
-    DEFPUSHBUTTON "OK",     IDOK,      62, 45, 50, 14, WS_TABSTOP
-    PUSHBUTTON    "Cancel", IDCANCEL, 116, 45, 50, 14, WS_TABSTOP
+    LTEXT         "Number of Ants (1 - 128):", IDC_STATIC, 7, 7, 162, 8, SS_NOPREFIX
+    EDITTEXT      IDC_CUSTOMNUM, 7, 19, 162, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+    DEFPUSHBUTTON "OK",     IDOK,     36, 40, 50, 14, WS_TABSTOP
+    PUSHBUTTON    "Cancel", IDCANCEL, 90, 40, 50, 14, WS_TABSTOP
 END
 
-IDD_CUSTOMCELLSIZE DIALOGEX 14, 14, 180, 66
+IDD_CUSTOMCELLSIZE DIALOGEX 14, 14, 176, 61
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTERMOUSE | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Choose Custom Ant Cell Size"
 FONT 8, "MS Shell Dlg 2"
 BEGIN
-    LTEXT         "Cell Size in Pixels (2 - 48):", IDC_STATIC, 7, 9, 166, 8, SS_NOPREFIX
-    EDITTEXT      IDC_CUSTOMCELLSIZE, 7, 22, 166, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
-    DEFPUSHBUTTON "OK",     IDOK,      62, 45, 50, 14, WS_TABSTOP
-    PUSHBUTTON    "Cancel", IDCANCEL, 116, 45, 50, 14, WS_TABSTOP
+    LTEXT         "Cell Size in Pixels (2 - 48):", IDC_STATIC, 7, 7, 162, 8, SS_NOPREFIX
+    EDITTEXT      IDC_CUSTOMCELLSIZE, 7, 19, 162, 14, ES_LEFT | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+    DEFPUSHBUTTON "OK",     IDOK,             9, 40, 50, 14, WS_TABSTOP
+    PUSHBUTTON    "Reset",  IDC_DEFCELLSIZE, 63, 40, 50, 14, WS_TABSTOP
+    PUSHBUTTON    "Cancel", IDCANCEL,       117, 40, 50, 14, WS_TABSTOP
 END
 
 // Version Information

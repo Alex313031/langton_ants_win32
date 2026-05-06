@@ -4,7 +4,7 @@
 
 #include "globals.h"
 #include "resource.h"
-#include "utils.h"
+#include "ui_utils.h"
 
 static GetNativeSystemInfo_t pfnGetNativeSystemInfo = nullptr;
 

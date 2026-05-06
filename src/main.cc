@@ -8,6 +8,7 @@
 #include "cpu.h"
 #include "resource.h"
 #include "sound.h"
+#include "ui_utils.h"
 #include "version.h"
 
 HWND mainHwnd = nullptr;
@@ -67,8 +68,8 @@ CRITICAL_SECTION g_paintCS;
 COLORREF g_bkg_color = RGB_BLUE;
 
 // Background color the user had selected just before monochrome was turned
-// on. Captured on the off -> on transition of IDM_MONOCHROME and restored
-// on the on -> off transition, so the user can flip between monochrome
+// on. Captured on the off to on transition of IDM_MONOCHROME and restored
+// on the on to off transition, so the user can flip between monochrome
 // and their colorful setup without losing their bg choice. Default
 // matches g_bkg_color's initial value as a safe fallback if monochrome
 // was somehow active before any toggle had a chance to save a real value.
@@ -321,7 +322,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // status bar's current height, so the canvas can't be squeezed
       // below MINWIDTH x MINHEIGHT - and as the toolbar wraps onto extra
       // rows at narrow widths, the min grows accordingly because
-      // g_toolbarHeight grew on the last WM_SIZE -> LayoutToolbar pass.
+      // g_toolbarHeight grew on the last WM_SIZE LayoutToolbar pass.
       RECT canvasMin = {0, 0, MINWIDTH, MINHEIGHT};
       AdjustWindowRectEx(&canvasMin, static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_STYLE)), TRUE,
                          static_cast<DWORD>(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)));
@@ -641,9 +642,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_HELP:
           LaunchHelp(hWnd);
           break;
-        case IDM_SAVE_AS:
-          SaveClientBitmap(hWnd);
+        case IDM_SAVE_AS: {
+          std::wstring savepath;
+          if (SaveClientBitmap(hWnd, &savepath)) {
+            UserMessage(std::wstring(L"Saved canvas to ") + savepath);
+          }
           break;
+        }
         case IDM_ANTS: {
           // Button-body click on the Num Ants split button. Show the same
           // dropdown the arrow does so users don't have to hit the arrow's
@@ -907,7 +912,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // intent we preserve - the user wants "use my chosen positions
           // with the new algorithm", not "discard my placements and re-roll".
           // After the wipe, re-paint the markers so the user still sees
-          // them; the eventual resume -> ApplyPlacements path drains them
+          // them; the eventual resume ApplyPlacements path drains them
           // into the threads as usual. Outside place mode (regular run)
           // we do mirror IDM_REPAINT - reseed to fresh random positions.
           const bool preservePlacements = (g_place_mode && g_placed_ants_count > 0);
@@ -918,7 +923,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             // pulse=false while paused/stopped so the threads don't wake up
             // and repaint their fresh markers onto the just-wiped canvas
             // before the user has resumed. The reseedReq flag still gets
-            // set, so the next genuine resume tick (TogglePaintAnts ->
+            // set, so the next genuine resume tick (TogglePaintAnts running
             // SignalAntsTick) picks new positions.
             ReseedAnts(!g_paused);
           }
