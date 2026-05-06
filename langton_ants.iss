@@ -2,7 +2,7 @@
 ; Only for Inno Setup 5.x to support Windows 2000/XP
 ; Tested with ISS 5.6.1
 
-#define AppVer "1.5.9"
+#define AppVer "1.6.0"
 #define AppName "Langton's Ants Win32"
 #define ExeName "langton_ants"
 #define Developer "Alex313031"

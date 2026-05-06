@@ -5,6 +5,15 @@
 #include "resource.h"
 #include "sound.h" // g_playsound for HandleToolbarTooltips
 
+// Min/Max width of toolbar buttons
+static inline constexpr int kMaxToolbarButtonWidth = static_cast<int>(64u);
+static inline constexpr int kMinToolbarButtonWidth = static_cast<int>(16u);
+
+// Size of small toolbar buttons (icon only, without label).
+static inline constexpr int kSmallToolbarButtonWidth = static_cast<int>(24u);
+
+bool use_small_toolbar = false;
+
 // The toolbar child window handle. Kept file-static so nothing else can
 // accidentally mutate it - other TUs interact only via the functions below.
 static HWND s_hToolbar = nullptr;
@@ -66,9 +75,9 @@ void InitMenuDefaults(HWND hWnd) {
     LOG(ERROR) << L"GetSubMenu(Settings) returned null - menu defaults skipped";
     return;
   }
-  HMENU hConc    = GetSubMenu(hSettings, 3); // Num Ants submenu
-  HMENU hDelay   = GetSubMenu(hSettings, 4); // Speed menu
-  HMENU hBkgMenu = GetSubMenu(hSettings, 5); // Colors menu (bg colors + monochrome)
+  HMENU hConc    = GetSubMenu(hSettings, 4); // Num Ants submenu
+  HMENU hDelay   = GetSubMenu(hSettings, 5); // Speed menu
+  HMENU hBkgMenu = GetSubMenu(hSettings, 6); // Colors menu (bg colors + monochrome)
   if (hConc == nullptr || hDelay == nullptr || hBkgMenu == nullptr) {
     LOG(ERROR) << L"Missing Settings sub-submenu (RC index drift?) "
                   L"hConc="
@@ -121,9 +130,9 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Algorithm - exactly one IDM_CLASSIC..IDM_LOGARITHMIC must be CHECKED.
-  // Submenu path: Settings (1) -> Customize (7) -> Algorithms (3).
+  // Submenu path: Settings (1) -> Customize (8) -> Algorithms (3).
   // Customize layout: CustomPlace, CustomSeed, separator, Algorithms popup.
-  HMENU hCustom = GetSubMenu(hSettings, 7);
+  HMENU hCustom = GetSubMenu(hSettings, 8);
   HMENU hAlgo   = (hCustom != nullptr) ? GetSubMenu(hCustom, 3) : nullptr;
   if (hAlgo == nullptr) {
     LOG(ERROR) << L"Missing Customize/Algorithms submenu (RC index drift?)";
@@ -137,8 +146,8 @@ void InitMenuDefaults(HWND hWnd) {
   }
 
   // Show-grid + no-client-bounds toggles. Cell Options is now a top-level
-  // entry under Settings (index 9), no longer nested inside Customize.
-  HMENU hCells = GetSubMenu(hSettings, 9);
+  // entry under Settings (index 10), no longer nested inside Customize.
+  HMENU hCells = GetSubMenu(hSettings, 10);
   if (hCells == nullptr) {
     LOG(ERROR) << L"Missing Settings/Cell Options submenu (RC index drift?)";
   } else {
@@ -150,6 +159,13 @@ void InitMenuDefaults(HWND hWnd) {
   // check. SyncBgm later (via WM_APP_AUTOPLAY) reads this to decide
   // whether to start playback at startup.
   g_playsound = (GetMenuState(hSettings, IDM_SOUND, MF_BYCOMMAND) & MF_CHECKED) != 0;
+
+  // Small-toolbar preference - read from Settings -> Small Toolbar?. This must
+  // be set BEFORE CreateAppToolbar runs (called next from InitApp); the create
+  // path branches on use_small_toolbar to pick label-row + button-width sizes.
+  // GetMenuState with MF_BYCOMMAND walks nested popups, so passing the top-level
+  // hMenu is enough regardless of which submenu the entry sits in.
+  use_small_toolbar = (GetMenuState(hMenu, IDM_SMALLTOOLBAR, MF_BYCOMMAND) & MF_CHECKED) != 0;
 
   // Ant color - exactly one of the IDM_*ANT items must be CHECKED in
   // the RC. Map the checked one to g_ant_color (kRandomAntColor for
@@ -326,7 +342,25 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   // versions, which makes the toolbar visibly taller than the icons need
   // - shrinking the vertical pad is what brings the toolbar height down.
   // LOWORD = horizontal pad, HIWORD = vertical pad.
-  // SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(6, 5));
+  // SendMessageW(hTB, TB_SETPADDING, 0, MAKELPARAM(3, 6));
+
+  // Width / label-row sizing depends on use_small_toolbar:
+  //   small mode -> hide the label row (TB_SETMAXTEXTROWS=0) and let buttons
+  //                 size to icon + padding (max width = 0). Tooltips still
+  //                 fire on hover since they're dispatched via WM_NOTIFY,
+  //                 not via the button label.
+  //   full mode  -> labels visible (one row) and button width clamped to
+  //                 kMaxToolbarButtonWidth so long labels like "Cell Options"
+  //                 / "Customize" don't push the toolbar wide enough to wrap
+  //                 at the default window size.
+  if (use_small_toolbar) {
+    SendMessageW(hTB, TB_SETMAXTEXTROWS, 0, 0);
+    SendMessageW(hTB, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kSmallToolbarButtonWidth, kSmallToolbarButtonWidth));
+  } else {
+    SendMessageW(hTB, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kMinToolbarButtonWidth, kMaxToolbarButtonWidth));
+  }
 
   // --- Bitmap loading ------------------------------------------------------
   // Each TB_ADDBITMAP adds images to the toolbar's internal image list and
@@ -567,7 +601,7 @@ void SetNumAntsCheck(unsigned int num) {
   if (hSettings == nullptr) {
     return;
   }
-  HMENU hConc = GetSubMenu(hSettings, 3);
+  HMENU hConc = GetSubMenu(hSettings, 4);
   if (hConc == nullptr) {
     return;
   }
@@ -596,7 +630,7 @@ void SetAlgorithmCheck(AntAlgorithm algo) {
   if (hSettings == nullptr) {
     return;
   }
-  HMENU hCustom = GetSubMenu(hSettings, 7);
+  HMENU hCustom = GetSubMenu(hSettings, 8);
   if (hCustom == nullptr) {
     return;
   }
@@ -625,7 +659,7 @@ void SetCustomSeedCheck(bool active) {
   if (hSettings == nullptr) {
     return;
   }
-  HMENU hCustom = GetSubMenu(hSettings, 7);
+  HMENU hCustom = GetSubMenu(hSettings, 8);
   if (hCustom == nullptr) {
     return;
   }
@@ -767,4 +801,40 @@ void UserMessage(const std::wstring& message) {
       g_status_revert_pending = true;
     }
   }
+}
+
+bool SetUseSmallToolbar(const bool use_small) {
+  use_small_toolbar = use_small;
+  // Flag-only update if the toolbar isn't built yet (e.g. called pre-WM_CREATE
+  // to seed the create-time branch). The CreateAppToolbar path will pick the
+  // right styles when it runs.
+  if (s_hToolbar == nullptr) {
+    return false;
+  }
+  // Apply both knobs the create-time branch sets, then re-autosize so the
+  // toolbar re-measures its rows + height for the new layout.
+  if (use_small) {
+    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 0, 0);
+    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kSmallToolbarButtonWidth, kSmallToolbarButtonWidth));
+  } else {
+    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 1, 0);
+    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kMinToolbarButtonWidth, kMaxToolbarButtonWidth));
+  }
+  SendMessageW(s_hToolbar, TB_AUTOSIZE, 0, 0);
+  RECT tbRect;
+  GetWindowRect(s_hToolbar, &tbRect);
+  g_toolbarHeight = tbRect.bottom - tbRect.top;
+  // Tell the parent to relayout so cxClient/cyClient + the back buffer
+  // pick up the new toolbar height; without this the canvas would either
+  // sit under the bigger bar or leave a stripe of bg above itself.
+  if (mainHwnd != nullptr) {
+    RECT pc;
+    GetClientRect(mainHwnd, &pc);
+    SendMessageW(mainHwnd, WM_SIZE, SIZE_RESTORED,
+                 MAKELPARAM(pc.right - pc.left, pc.bottom - pc.top));
+    InvalidateRect(mainHwnd, nullptr, TRUE);
+  }
+  return true;
 }

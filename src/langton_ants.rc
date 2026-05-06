@@ -94,8 +94,9 @@ BEGIN
     END
     POPUP "&Settings"
     BEGIN
-        MENUITEM "&Pause Ants",   IDM_PAUSED
-        MENUITEM "&Sound?",       IDM_SOUND
+        MENUITEM "&Pause Ants",    IDM_PAUSED
+        MENUITEM "&Sound?",        IDM_SOUND
+        MENUITEM "Small Toolbar?", IDM_SMALLTOOLBAR
         MENUITEM SEPARATOR
         POPUP "&Num Ants"
         BEGIN
@@ -172,6 +173,7 @@ BEGIN
     BEGIN
         MENUITEM "&Repaint Now",                    IDM_REPAINT
         MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
+        MENUITEM "&Stop Ants",                      IDM_STOP
         MENUITEM SEPARATOR
         MENUITEM "&Test Trap (Crashes app)",        IDM_TESTTRAP
     END
@@ -186,20 +188,24 @@ END
 // Keyboard Accelerators
 IDR_MAIN ACCELERATORS
 BEGIN
-    "?",       IDM_ABOUT,   ASCII,   ALT      // "?" key About
-    VK_OEM_2,  IDM_ABOUT,   VIRTKEY, ALT      // "/" key About
-    0x51,      IDM_EXIT,    VIRTKEY, CONTROL  // Ctrl+Q Exit
-    VK_ESCAPE, IDM_EXIT,    VIRTKEY, NOINVERT // Esc key Exit
-    0x4D,      IDM_SOUND,   VIRTKEY, NOINVERT // M key Mute
-    0x4D,      IDM_SOUND,   VIRTKEY, CONTROL  // Ctrl+M Mute
-    0x50,      IDM_PAUSED,  VIRTKEY, NOINVERT // P key Paused
-    0x50,      IDM_PAUSED,  VIRTKEY, CONTROL  // Ctrl+P Paused
-    0x52,      IDM_REPAINT, VIRTKEY, NOINVERT // R key Repaint
-    0x52,      IDM_REPAINT, VIRTKEY, CONTROL  // Ctrl+R Repaint
-    0x53,      IDM_SAVE_AS, VIRTKEY, CONTROL  // Ctrl+S Save As
-    VK_SPACE,  IDM_SINGLE,  VIRTKEY, NOINVERT // Spacebar Single-step
-    0x5A,      IDM_UNDO,    VIRTKEY, CONTROL  // Ctrl+Z Undo Ant Placement
-    0x43,  IDM_CUSTOMPLACE, VIRTKEY, NOINVERT // C key, customize
+    "?",       IDM_ABOUT,   ASCII,   ALT      // '?' key  - About
+    VK_OEM_2,  IDM_ABOUT,   VIRTKEY, ALT      // '/' key  - About
+    0x51,      IDM_EXIT,    VIRTKEY, CONTROL  // 'Ctrl+Q' - Exit
+    VK_ESCAPE, IDM_EXIT,    VIRTKEY, NOINVERT // 'Esc'    - Exit
+    0x4D,      IDM_SOUND,   VIRTKEY, NOINVERT // 'M key'  - Mute/UnMute
+    0x4D,      IDM_SOUND,   VIRTKEY, CONTROL  // 'Ctrl+M' - Mute/UnMute
+    0x43,  IDM_CUSTOMPLACE, VIRTKEY, NOINVERT // 'C key'  - Customize
+    0x50,      IDM_PAUSED,  VIRTKEY, NOINVERT // 'P key'  - Pause/Resume
+    0x50,      IDM_PAUSED,  VIRTKEY, CONTROL  // 'Ctrl+P' - Pause/Resume
+    VK_SPACE,  IDM_PAUSED,  VIRTKEY, NOINVERT // 'Space'  - Pause/Resume
+    0x52,      IDM_REPAINT, VIRTKEY, NOINVERT // 'R key'  - Repaint
+    0x52,      IDM_REPAINT, VIRTKEY, CONTROL  // 'Ctrl+R' - Repaint
+    0x53,      IDM_SINGLE,  VIRTKEY, NOINVERT // 'S key'  - Single-Step
+    0x53,      IDM_SAVE_AS, VIRTKEY, CONTROL  // 'Ctrl+S' - Save As
+    0x5A,      IDM_UNDO,    VIRTKEY, CONTROL  // 'Ctrl+Z' - Undo Ant Placement
+    0x58,      IDM_STOP,    VIRTKEY, CONTROL  // 'Ctrl+X' - Stop Ants
+    0x54, IDM_SMALLTOOLBAR, VIRTKEY, NOINVERT // 'T key'  - Toggle small/regular toolbar
+    0x54, IDM_SMALLTOOLBAR, VIRTKEY, CONTROL  // 'Ctrl+T' - Toggle small/regular toolbar
 END
 
 // About Dialog Box

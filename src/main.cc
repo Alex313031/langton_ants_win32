@@ -593,27 +593,27 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // state sync needed.
         if (pnmtb->iItem == IDM_ANTS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hAnts     = GetSubMenu(hSettings, 3);
+          HMENU hAnts     = GetSubMenu(hSettings, 4);
           TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_SPEED) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hSpeed    = GetSubMenu(hSettings, 4);
+          HMENU hSpeed    = GetSubMenu(hSettings, 5);
           TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_CUSTOM) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom   = GetSubMenu(hSettings, 7);
+          HMENU hCustom   = GetSubMenu(hSettings, 8);
           TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_CELLOPTIONS) {
-          // Cell Options is now a top-level entry in Settings (index 9),
+          // Cell Options is now a top-level entry in Settings (index 10),
           // no longer nested inside Customize.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             TrackPopupMenu(hCells, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           }
@@ -621,7 +621,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         if (pnmtb->iItem == IDM_COLORS) {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hBkg      = GetSubMenu(hSettings, 5);
+          HMENU hBkg      = GetSubMenu(hSettings, 6);
           TrackPopupMenu(hBkg, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
@@ -655,14 +655,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // dropdown the arrow does so users don't have to hit the arrow's
           // narrow hit box.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hAnts     = GetSubMenu(hSettings, 3);
+          HMENU hAnts     = GetSubMenu(hSettings, 4);
           PopupUnderToolbarButton(hWnd, IDM_ANTS, hAnts);
           break;
         }
         case IDM_SPEED: {
           // Button-body click on the Speed split button - mirrors IDM_ANTS.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hSpeed    = GetSubMenu(hSettings, 4);
+          HMENU hSpeed    = GetSubMenu(hSettings, 5);
           PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
           break;
         }
@@ -670,16 +670,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Button-body click on the Custom split button - mirrors IDM_ANTS.
           // Place-ant mode lives on its own menu item now (IDM_CUSTOMPLACE).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCustom   = GetSubMenu(hSettings, 7);
+          HMENU hCustom   = GetSubMenu(hSettings, 8);
           PopupUnderToolbarButton(hWnd, IDM_CUSTOM, hCustom);
           break;
         }
         case IDM_CELLOPTIONS: {
           // Button-body click on the Cells split button - mirrors IDM_CUSTOM.
-          // Cell Options now lives directly under Settings (index 9), not
+          // Cell Options now lives directly under Settings (index 10), not
           // nested inside Customize.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             PopupUnderToolbarButton(hWnd, IDM_CELLOPTIONS, hCells);
           }
@@ -691,7 +691,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // IDM_*_BKG / IDM_MONOCHROME handlers below pick up the selection
           // unchanged.
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hBkg      = GetSubMenu(hSettings, 5);
+          HMENU hBkg      = GetSubMenu(hSettings, 6);
           PopupUnderToolbarButton(hWnd, IDM_COLORS, hBkg);
           break;
         }
@@ -866,7 +866,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // invalidate the canvas so WM_PAINT redraws with/without lines.
           g_show_grid     = !g_show_grid;
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             CheckMenuItem(hCells, IDM_SHOWGRID,
                           MF_BYCOMMAND | (g_show_grid ? MF_CHECKED : MF_UNCHECKED));
@@ -886,13 +886,29 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // effect on the very next tick, no need to invalidate.
           g_no_client_bounds = !g_no_client_bounds;
           HMENU hSettings    = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hCells       = (hSettings != nullptr) ? GetSubMenu(hSettings, 9) : nullptr;
+          HMENU hCells       = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             CheckMenuItem(hCells, IDM_NOCLIENTBOUNDS,
                           MF_BYCOMMAND | (g_no_client_bounds ? MF_CHECKED : MF_UNCHECKED));
           }
           UserMessage(g_no_client_bounds ? L"Canvas bounds turned off (ants now wrap around edges)."
                                          : L"Canvas bounds turned on (ants now bounce off edges).");
+          break;
+        }
+        case IDM_SMALLTOOLBAR: {
+          // SetUseSmallToolbar updates the flag and re-styles the live
+          // toolbar; the menu click only ever happens after CreateAppToolbar
+          // has run, so we ignore its bool (only false at pre-create flag-only
+          // calls from InitMenuDefaults).
+          SetUseSmallToolbar(!use_small_toolbar);
+          // Settings menu is at index 1; reflect the new state on the entry.
+          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          if (hSettings != nullptr) {
+            CheckMenuItem(hSettings, IDM_SMALLTOOLBAR,
+                          MF_BYCOMMAND | (use_small_toolbar ? MF_CHECKED : MF_UNCHECKED));
+          }
+          UserMessage(use_small_toolbar ? L"Small toolbar enabled (icons only)."
+                                        : L"Regular toolbar enabled (icons & labels).");
           break;
         }
         case IDM_CLASSIC:
@@ -995,7 +1011,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // get disabled. Also grey the entire Ant Colors submenu - in
           // monochrome the marker always matches the trail color so the
           // user-picked ant color is moot.
-          HMENU hBkgMenu        = GetSubMenu(hSettings, 5);
+          HMENU hBkgMenu        = GetSubMenu(hSettings, 6);
           const UINT colorState = g_monochrome ? MF_GRAYED : MF_ENABLED;
           EnableMenuItem(hBkgMenu, IDM_RED_BKG, MF_BYCOMMAND | colorState);
           EnableMenuItem(hBkgMenu, IDM_GREEN_BKG, MF_BYCOMMAND | colorState);
@@ -1070,7 +1086,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_GREEN_BKG:
         case IDM_BLUE_BKG: {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
+          HMENU hBkgMenu  = GetSubMenu(hSettings, 6);
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
           const wchar_t* bgName   = L"?";
@@ -1125,7 +1141,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // preference (RefreshAntColors keeps position, direction, and
           // per-cell state intact and only swaps the visible color).
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hBkgMenu  = GetSubMenu(hSettings, 5);
+          HMENU hBkgMenu  = GetSubMenu(hSettings, 6);
           CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT, command, MF_BYCOMMAND);
           const wchar_t* antName = L"?";
           switch (command) {
@@ -1161,7 +1177,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_HYPER:
         case IDM_REALTIME: {
           HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
-          HMENU hDelay    = GetSubMenu(hSettings, 4);
+          HMENU hDelay    = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
           const wchar_t* speedName = L"?";
           switch (command) {

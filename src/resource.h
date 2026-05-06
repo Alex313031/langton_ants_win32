@@ -134,6 +134,9 @@
 // Control cell size in pixels
 #define IDM_CELLSIZE                277
 
+// Toggle small/regular sized toolbar
+#define IDM_SMALLTOOLBAR            278
+
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280
 

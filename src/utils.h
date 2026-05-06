@@ -54,8 +54,8 @@ extern HICON kSmallIcon;
 // to compute the actual outer window size, so the user always gets a
 // CW_WIDTH x CW_HEIGHT ant canvas at startup regardless of how tall the
 // menu bar / toolbar end up being.
-inline constexpr INT CW_WIDTH  = 806;
-inline constexpr INT CW_HEIGHT = 606;
+inline constexpr INT CW_WIDTH  = 800;
+inline constexpr INT CW_HEIGHT = 600;
 
 // Minimum desired ant canvas size. WM_GETMINMAXINFO converts these to
 // outer-window minimums (chrome + g_toolbarHeight added) so the canvas
@@ -72,9 +72,6 @@ inline constexpr DWORD dwCHILD = WS_CHILD | WS_VISIBLE;
 
 // Delay in ms. before resetting status bar text to kDefaultCpuBubbleText.
 inline constexpr unsigned long kStatusBarResetDelay = 5000ul; // 5 second delay
-
-// Whether to use small toolbar without text labels.
-inline constexpr bool use_small_toolbar = true;
 
 // Minimum common controls version for certain functions, used for fallback codepaths
 // See https://learn.microsoft.com/en-us/windows/win32/controls/common-control-versions

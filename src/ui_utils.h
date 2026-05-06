@@ -5,6 +5,9 @@
 
 extern HWND hStatusBar; // Our status bar handle
 
+// Whether to use small toolbar without text labels.
+extern bool use_small_toolbar;
+
 extern int g_toolbarHeight; // Height of the top toolbar in pixels; 0 if none. Ants "canvas" lives
                             // below it.
 
@@ -89,5 +92,9 @@ void UpdateStatusBar(const unsigned int part, const std::wstring& text);
 
 // Logs to console at INFO level, and updates status bar 1st part.
 void UserMessage(const std::wstring& message);
+
+// Toggles whether to use the small icon-only toolbar or regular one.
+// Returns false if something went wrong doing so.
+bool SetUseSmallToolbar(const bool use_small);
 
 #endif // LANGTON_ANTS_UI_UTILS_H_
