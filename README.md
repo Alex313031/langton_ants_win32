@@ -1,7 +1,7 @@
 # Langton's Ants Win32 &nbsp;<img src="./assets/icon48.png" height="38">
 
 <p align="center">
-<img src="./assets/screenshot.png?raw=true" width="50%">
+<img src="https://raw.githubusercontent.com/Alex313031/langton_ants_win32/refs/heads/main/assets/screenshot.png" width="50%">
 </p>
 
 ## About
