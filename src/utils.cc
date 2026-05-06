@@ -556,3 +556,59 @@ void LogOsInfo() {
               << sp;
   }
 }
+
+bool ParseCommandLine(int argc, LPWSTR argv[]) {
+  bool parsed;
+  bool is_debug_mode   = false;
+  bool is_version_mode = false;
+  bool is_help_mode    = false;
+  if (argv) {
+    // argv[0] is the .exe path (CommandLineToArgvW convention); skip it so a
+    // path containing characters that happen to match a flag literal can't
+    // false-trigger one of the wcscmp checks below.
+    for (int i = 1; i < argc; ++i) {
+      wchar_t* arg     = argv[i];
+      is_debug_mode   |= (wcscmp(arg, L"--debug") == 0) || (wcscmp(arg, L"-d") == 0) ||
+                         (wcscmp(arg, L"-debug") == 0) || (wcscmp(arg, L"/d") == 0) ||
+                         (wcscmp(arg, L"/D") == 0);
+      is_version_mode |= (wcscmp(arg, L"--version") == 0) || (wcscmp(arg, L"-v") == 0) ||
+                         (wcscmp(arg, L"-ver") == 0) || (wcscmp(arg, L"/v") == 0) ||
+                         (wcscmp(arg, L"/V") == 0);
+      is_help_mode    |= (wcscmp(arg, L"--help") == 0) || (wcscmp(arg, L"-h") == 0) ||
+                         (wcscmp(arg, L"-?") == 0) || (wcscmp(arg, L"/h") == 0) ||
+                         (wcscmp(arg, L"/H") == 0) || (wcscmp(arg, L"/?") == 0);
+    }
+    parsed = true;
+  } else {
+    parsed = false;
+  }
+  if (is_version_mode && !is_help_mode) {
+    g_show_version = true;
+  }
+  if (is_help_mode) {
+    g_show_help = true;
+  }
+  if (is_debug_mode) {
+    g_debug_mode = true;
+  }
+  return parsed;
+}
+
+int ShowVersionAndExit() {
+  std::wcout << GetAppName() << L" Win32 Version " << GetVersionString() << std::endl;
+  system("pause");
+  return 0;
+}
+
+int ShowHelpAndExit() {
+  std::wcout << L"\n " << ORIG_FILENAME << L" Usage: \n" << std::flush;
+  std::wostringstream wostr;
+  wostr << L"   /d | -d | --debug   : Enable debug logging\n"
+        << L"   /v | -v | --version : Show version info \n"
+        << L"   /? | -h | --help    : Show this Help \n"
+        << std::flush;
+  static const std::wstring kHelpMsg = wostr.str();
+  std::wcout << kHelpMsg.c_str() << std::endl;
+  system("pause");
+  return 0;
+}

@@ -82,6 +82,10 @@ inline constexpr DWORD dwComCtl32TargetVer =
 inline constexpr int MIN_CELL_PX = 2;
 inline constexpr int MAX_CELL_PX = 48;
 
+extern bool g_debug_mode;
+extern bool g_show_version;
+extern bool g_show_help;
+
 // Gets the current side by side directory, regardless of where .exe is started from
 const std::wstring GetExeDir();
 
@@ -171,5 +175,16 @@ bool GetUserNtVersion(UINT* major, UINT* minor, UINT* build, UINT* sp = nullptr)
 
 // Logs information about OS version (Wine, and using the above three functions).
 void LogOsInfo();
+
+// Parses the command line and changes settings or runtime behavior accordingly.
+bool ParseCommandLine(int argc, LPWSTR argv[]);
+
+// Prints program version to console, pauses, and exits when user presses a key.
+// Doesn't open normal window.
+int ShowVersionAndExit();
+
+// Prints commandline help to console, pauses, and exits when user presses a key.
+// Doesn't open normal window.
+int ShowHelpAndExit();
 
 #endif // LANGTON_ANTS_UTILS_H_

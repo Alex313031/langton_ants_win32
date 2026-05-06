@@ -76,8 +76,9 @@ COLORREF g_bkg_color = RGB_BLUE;
 // was somehow active before any toggle had a chance to save a real value.
 static COLORREF s_pre_mono_bg = RGB_BLUE;
 
-// Whether to open conhost window for debugging.
-static constexpr bool debug_console = is_debug;
+bool g_debug_mode = is_debug;
+bool g_show_version = false;
+bool g_show_help = false;
 
 // Store handles to main icon since commonly used
 HICON kMainIcon  = nullptr;
@@ -129,31 +130,50 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   if (!RegisterClassExW(&wndclass)) {
     ErrorBox(nullptr, L"RegisterClassEx Error", L"This program requires Windows NT!");
-    return 2;
-  } else {
-    // Set up our logging using mini_logger library.
-    const logging::LogDest kLogSink     = debug_console ? logging::LOG_TO_ALL : logging::LOG_NONE;
-    static const std::wstring file_name = std::wstring(INTERNAL_NAME);
-    static const std::wstring file_extension = L".log";
-    const std::wstring kLogFile              = file_name + file_extension;
-    logging::LogInitSettings LoggingSettings;
-    LoggingSettings.log_sink          = kLogSink;
-    LoggingSettings.logfile_name      = kLogFile;
-    LoggingSettings.app_name          = appTitle;
-    LoggingSettings.show_func_sigs    = false;
-    LoggingSettings.show_line_numbers = false;
-    LoggingSettings.show_time         = false;
-    LoggingSettings.full_prefix_level = LOG_ERROR;
-    const bool init_logging           = logging::InitLogging(g_hInstance, LoggingSettings);
-    if (init_logging) {
-      logging::SetIsDCheck(is_dcheck);
-      LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
-      LOG(INFO) << L"Version: " << GetVersionString();
-    } else {
-      ErrorBox(nullptr, L"Logging Initialization Failure", L"InitLogging failed!");
-      return 3;
-    }
+    return 1;
   }
+  // Parse the command line into a real argv via CommandLineToArgvW (lpCmdLine
+  // is the post-exe-path tail only; we want the full thing so argv[0] is the
+  // exe path that ParseCommandLine's loop skips). Failure path is "no flags
+  // set" - we can't LOG(ERROR) here because logging isn't initialized yet.
+  int argc          = 0;
+  LPWSTR* argv      = CommandLineToArgvW(GetCommandLineW(), &argc);
+  if (!ParseCommandLine(argc, argv)) {
+    return 2;
+  }
+  if (argv != nullptr) {
+    LocalFree(argv);
+  }
+  // Whether to open conhost window for debugging. InitLogging handles the
+  // AttachConsole/AllocConsole + freopen dance internally based on log_sink.
+  static const bool open_console      = g_debug_mode || g_show_version || g_show_help;
+  const logging::LogDest kLogSink     =
+      open_console ? g_debug_mode ? logging::LOG_TO_ALL : logging::LOG_TO_STDERR
+                   : logging::LOG_NONE;
+  static const std::wstring file_name = std::wstring(INTERNAL_NAME);
+  const std::wstring kLogFile         = file_name + L".log";
+  logging::LogInitSettings LoggingSettings;
+  LoggingSettings.log_sink          = kLogSink;
+  LoggingSettings.logfile_name      = kLogFile;
+  LoggingSettings.app_name          = appTitle;
+  LoggingSettings.show_func_sigs    = false;
+  LoggingSettings.show_line_numbers = false;
+  LoggingSettings.show_time         = false;
+  LoggingSettings.full_prefix_level = LOG_ERROR;
+  const bool init_logging           = logging::InitLogging(g_hInstance, LoggingSettings);
+  if (!init_logging) {
+    ErrorBox(nullptr, L"Logging Initialization Failure", L"InitLogging failed!");
+    return 3;
+  }
+  logging::SetIsDCheck(is_dcheck);
+  if (g_show_version) {
+    return ShowVersionAndExit();
+  }
+  if (g_show_help) {
+    return ShowHelpAndExit();
+  }
+  LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
+  LOG(INFO) << L"Version: " << GetVersionString();
   DCHECK(g_hInstance != nullptr);
   DCHECK(kMainIcon != nullptr);
   DCHECK(kSmallIcon != nullptr);
@@ -209,7 +229,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   DCHECK(mainHwnd != nullptr);
   if (mainHwnd == nullptr) {
-    return 1;
+    return 4;
   }
 
   // CW_WIDTH / CW_HEIGHT name the desired ant CANVAS size, not the outer
@@ -233,7 +253,7 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
 
   ShowWindow(mainHwnd, iCmdShow);
   if (!UpdateWindow(mainHwnd)) {
-    return 1;
+    return 5;
   }
 
   HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
