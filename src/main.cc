@@ -166,15 +166,17 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     return 3;
   }
   logging::SetIsDCheck(is_dcheck);
+  DCHECK(g_hInstance != nullptr);
   if (g_show_version) {
-    return ShowVersionAndExit();
+    static const int showed_version = ShowVersionAndExit();
+    return showed_version;
   }
   if (g_show_help) {
-    return ShowHelpAndExit();
+    static const int showed_help = ShowHelpAndExit();
+    return showed_help;
   }
   LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
   LOG(INFO) << L"Version: " << GetVersionString();
-  DCHECK(g_hInstance != nullptr);
   DCHECK(kMainIcon != nullptr);
   DCHECK(kSmallIcon != nullptr);
 
