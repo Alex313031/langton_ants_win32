@@ -54,10 +54,9 @@ endif
 CXXFLAGS := $(CFLAGS) -std=c++17 -static-libstdc++
 
 # Libraries
-LIB_DIR  := ./osinfo/
 LIBS     := -lkernel32 -luser32 -lshell32 -lcomctl32 -lcomdlg32 -lgdi32 -lwinmm
 # Linker flags
-LDFLAGS  := -L$(LIB_DIR) -municode -Wl,--subsystem,windows:5.00
+LDFLAGS  := -L$(LOGGING_DIR) -municode -Wl,--subsystem,windows:5.00
 
 # Include generated dependency files
 -include $(OBJ_C:.o=.d)

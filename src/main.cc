@@ -1479,15 +1479,29 @@ void LayoutStatusTooltips() {
   if (hStatusBar == nullptr || s_hStatusTip == nullptr) {
     return;
   }
+  // TTM_NEWTOOLRECTW updates a tool's rect in the tooltip's tool list, but
+  // with TTF_SUBCLASS the subclass's internal hit-test state isn't always
+  // refreshed in lockstep, so hover-targeting can stay aligned to the OLD
+  // part rects after a resize. TTM_SETTOOLINFOW re-applies the full TOOLINFO
+  // (including uFlags), which forces the subclass to re-pick up the new rect.
+  // cbSize must match the comctl32 version that registered the tool: 5.82+
+  // accepts the full V3 size, 5.81 (Win2000) only V2.
+  static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
     SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
     TOOLINFOW ti = {};
-    ti.cbSize    = sizeof(TOOLINFOW);
-    ti.hwnd      = hStatusBar;
-    ti.uId       = i;
-    ti.rect      = partRc;
-    SendMessageW(s_hStatusTip, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&ti));
+    if (can_use_582_controls) {
+      ti.cbSize = sizeof(ti);
+    } else {
+      ti.cbSize = TTTOOLINFOW_V2_SIZE;
+    }
+    ti.uFlags   = TTF_SUBCLASS;
+    ti.hwnd     = hStatusBar;
+    ti.uId      = i;
+    ti.rect     = partRc;
+    ti.lpszText = const_cast<LPWSTR>(s_statusTipText[i].c_str());
+    SendMessageW(s_hStatusTip, TTM_SETTOOLINFOW, 0, reinterpret_cast<LPARAM>(&ti));
   }
 }
 

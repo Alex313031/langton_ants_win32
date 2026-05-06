@@ -61,7 +61,7 @@ inline constexpr INT CW_HEIGHT = 600;
 // outer-window minimums (chrome + g_toolbarHeight added) so the canvas
 // never gets squeezed below this even when the toolbar wraps onto extra
 // rows at narrow widths.
-inline constexpr INT MINWIDTH  = 320;
+inline constexpr INT MINWIDTH  = 340;
 inline constexpr INT MINHEIGHT = 320;
 
 // Width of CPU status area in status bar, for split

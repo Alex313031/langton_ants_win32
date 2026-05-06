@@ -10,7 +10,7 @@ static inline constexpr int kMaxToolbarButtonWidth = static_cast<int>(64u);
 static inline constexpr int kMinToolbarButtonWidth = static_cast<int>(16u);
 
 // Size of small toolbar buttons (icon only, without label).
-static inline constexpr int kSmallToolbarButtonWidth = static_cast<int>(24u);
+static inline constexpr int kSmallToolbarButtonWidth = static_cast<int>(32u);
 
 bool use_small_toolbar = false;
 
@@ -533,6 +533,51 @@ bool CreateAppToolbar(HWND hParent, HINSTANCE hInst) {
   return ok;
 }
 
+// True while LayoutToolbar's auto-fit forced small mode. Used to scope the
+// "back-off to full" attempt: we only ever undo small mode if WE turned it on,
+// never if the user explicitly checked the menu item. SetUseSmallToolbar
+// clears this so a user toggle takes over the auto state.
+static bool s_auto_small_active = false;
+
+// Applies the toolbar styles for the requested mode and re-autosizes,
+// updating g_toolbarHeight. Does NOT post WM_SIZE to the parent - both
+// SetUseSmallToolbar (user-driven, wants the parent re-layout) and
+// LayoutToolbar's auto-fit (already running inside a parent layout pass)
+// call this; the WM_SIZE roundtrip is added on top by the former only.
+static void ApplyToolbarMode(bool use_small) {
+  if (s_hToolbar == nullptr) {
+    return;
+  }
+  if (use_small) {
+    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 0, 0);
+    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kSmallToolbarButtonWidth, kSmallToolbarButtonWidth));
+  } else {
+    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 1, 0);
+    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
+                 MAKELPARAM(kMinToolbarButtonWidth, kMaxToolbarButtonWidth));
+  }
+  SendMessageW(s_hToolbar, TB_AUTOSIZE, 0, 0);
+  RECT tbRect;
+  GetWindowRect(s_hToolbar, &tbRect);
+  g_toolbarHeight = tbRect.bottom - tbRect.top;
+}
+
+// Pushes use_small_toolbar onto the IDM_SMALLTOOLBAR menu mark. Used after
+// LayoutToolbar's auto-fit changes state behind the user's back, so the menu
+// keeps reflecting the toolbar's actual mode.
+static void SyncSmallToolbarMenuCheck() {
+  if (mainHwnd == nullptr) {
+    return;
+  }
+  HMENU hSettings = GetSubMenu(GetMenu(mainHwnd), 1);
+  if (hSettings == nullptr) {
+    return;
+  }
+  CheckMenuItem(hSettings, IDM_SMALLTOOLBAR,
+                MF_BYCOMMAND | (use_small_toolbar ? MF_CHECKED : MF_UNCHECKED));
+}
+
 void LayoutToolbar(HWND hWnd) {
   if (s_hToolbar == nullptr || hWnd == nullptr) {
     return;
@@ -544,6 +589,29 @@ void LayoutToolbar(HWND hWnd) {
   RECT tbRect;
   GetWindowRect(s_hToolbar, &tbRect);
   g_toolbarHeight = tbRect.bottom - tbRect.top;
+
+  // Auto-fit: keep the toolbar at <= 2 rows. If we'd wrap to 3+ in full mode,
+  // force small. If we're auto-engaged in small and the window now has room,
+  // try going back to full and revert if it still wouldn't fit. A user-picked
+  // small (s_auto_small_active = false) is left alone regardless of width.
+  const int rows = static_cast<int>(SendMessageW(s_hToolbar, TB_GETROWS, 0, 0));
+  if (!use_small_toolbar && rows > 2) {
+    use_small_toolbar   = true;
+    s_auto_small_active = true;
+    ApplyToolbarMode(true);
+    SyncSmallToolbarMenuCheck();
+  } else if (use_small_toolbar && s_auto_small_active) {
+    ApplyToolbarMode(false);
+    const int newRows = static_cast<int>(SendMessageW(s_hToolbar, TB_GETROWS, 0, 0));
+    if (newRows > 2) {
+      // Window is still too narrow for full; revert to small.
+      ApplyToolbarMode(true);
+    } else {
+      use_small_toolbar   = false;
+      s_auto_small_active = false;
+      SyncSmallToolbarMenuCheck();
+    }
+  }
 }
 
 // TB_SETBUTTONINFO updates any subset of a TBBUTTON's fields by command ID.
@@ -804,31 +872,24 @@ void UserMessage(const std::wstring& message) {
 }
 
 bool SetUseSmallToolbar(const bool use_small) {
-  use_small_toolbar = use_small;
+  // User-driven toggle clears the auto-engage flag so LayoutToolbar's auto-fit
+  // won't try to undo their choice (it only undoes auto-engaged small modes).
+  // Note: if the user picks full but the window is too narrow for it, the
+  // WM_SIZE roundtrip below will re-trigger LayoutToolbar's auto-fit and force
+  // small back on - the menu mark will end up CHECKED to reflect actual state.
+  s_auto_small_active = false;
+  use_small_toolbar   = use_small;
   // Flag-only update if the toolbar isn't built yet (e.g. called pre-WM_CREATE
   // to seed the create-time branch). The CreateAppToolbar path will pick the
   // right styles when it runs.
   if (s_hToolbar == nullptr) {
     return false;
   }
-  // Apply both knobs the create-time branch sets, then re-autosize so the
-  // toolbar re-measures its rows + height for the new layout.
-  if (use_small) {
-    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 0, 0);
-    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
-                 MAKELPARAM(kSmallToolbarButtonWidth, kSmallToolbarButtonWidth));
-  } else {
-    SendMessageW(s_hToolbar, TB_SETMAXTEXTROWS, 1, 0);
-    SendMessageW(s_hToolbar, TB_SETBUTTONWIDTH, 0,
-                 MAKELPARAM(kMinToolbarButtonWidth, kMaxToolbarButtonWidth));
-  }
-  SendMessageW(s_hToolbar, TB_AUTOSIZE, 0, 0);
-  RECT tbRect;
-  GetWindowRect(s_hToolbar, &tbRect);
-  g_toolbarHeight = tbRect.bottom - tbRect.top;
-  // Tell the parent to relayout so cxClient/cyClient + the back buffer
-  // pick up the new toolbar height; without this the canvas would either
-  // sit under the bigger bar or leave a stripe of bg above itself.
+  ApplyToolbarMode(use_small);
+  // Tell the parent to relayout so cxClient/cyClient + the back buffer pick
+  // up the new toolbar height; without this the canvas would either sit under
+  // the bigger bar or leave a stripe of bg above itself. The WM_SIZE will
+  // re-enter LayoutToolbar, which is where auto-fit may override.
   if (mainHwnd != nullptr) {
     RECT pc;
     GetClientRect(mainHwnd, &pc);
