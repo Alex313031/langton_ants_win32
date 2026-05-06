@@ -715,6 +715,18 @@ void SetAlgorithmCheck(AntAlgorithm algo) {
   CheckMenuRadioItem(hAlgo, IDM_CLASSIC, IDM_LOGARITHMIC, id, MF_BYCOMMAND);
 }
 
+HMENU GetSettingsMenu(HWND hWnd) {
+  if (hWnd == nullptr) {
+    return nullptr;
+  }
+  HMENU hMenu = GetMenu(hWnd);
+  if (hMenu == nullptr) {
+    return nullptr;
+  }
+  // Settings is the second top-level popup (File, Settings, Dev, About).
+  return GetSubMenu(hMenu, 1); // 0 is 1st menu, 1 is second one.
+}
+
 void SetCustomSeedCheck(bool active) {
   if (mainHwnd == nullptr) {
     return;

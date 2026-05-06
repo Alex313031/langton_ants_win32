@@ -22,4 +22,6 @@ extern CRITICAL_SECTION g_paintCS; // For thread sync on back buffer access
 
 extern COLORREF g_bkg_color; // Current background color, changed via the Colors menu
 
+extern bool can_use_582_controls; // Whether we can use "modern" common controls from XP+
+
 #endif // LANGTON_ANTS_GLOBALS_H_

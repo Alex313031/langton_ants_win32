@@ -88,27 +88,9 @@ HICON kSmallIcon = nullptr;
 static bool clean_shutdown = false;
 
 // Whether we have commctl32 5.82 (XP/I.E 6.0)
-static bool can_use_582_controls = false;
+bool can_use_582_controls = false;
 
-int APIENTRY wWinMain(HINSTANCE hInstance,
-                      HINSTANCE hPrevInstance,
-                      LPWSTR lpCmdLine,
-                      int iCmdShow) {
-  UNREFERENCED_PARAMETER(hPrevInstance);
-  g_hInstance = hInstance;
-  // Initialize common controls
-  INITCOMMONCONTROLSEX icex;
-  icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-  icex.dwICC  = ICC_STANDARD_CLASSES | ICC_BAR_CLASSES;
-  InitCommonControlsEx(&icex);
-
-  static const std::wstring name   = GetAppName();
-  static const LPCWSTR appTitle    = name.c_str();
-  static const LPCWSTR szClassName = MAIN_WNDCLASS;
-
-  kMainIcon  = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
-  kSmallIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
-
+bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
   WNDCLASSEXW wndclass;
   wndclass.cbSize      = sizeof(WNDCLASSEX);
   wndclass.style       = 0;
@@ -125,13 +107,105 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   // window before our first WM_PAINT.
   wndclass.hbrBackground = nullptr;
   wndclass.lpszMenuName  = MAKEINTRESOURCEW(IDR_MAIN);
-  wndclass.lpszClassName = szClassName;
+  wndclass.lpszClassName = className;
   wndclass.hIconSm       = kSmallIcon;
 
-  if (!RegisterClassExW(&wndclass)) {
+  // RegisterClassEx returns an ATOM (typedef unsigned short - really a short
+  // pointer left over from Win16 days), 0 on failure. The double cast spells
+  // out "this is an ATOM-shaped zero" rather than relying on the implicit
+  // promotion from int 0.
+  if (RegisterClassExW(&wndclass) == static_cast<ATOM>(static_cast<unsigned short>(0))) {
+    return false;
+  }
+  return true;
+}
+
+bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdShow) {
+  // WS_EX_COMPOSITED was tried here historically but is not used: the canvas
+  // is already double-buffered via g_hdcMem/g_hbmMem (see WM_PAINT), so the
+  // OS-level offscreen composite WS_EX_COMPOSITED forces just buys latency
+  // on the modal move/size loop without buying any extra smoothness.
+  static constexpr DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
+  // WS_CLIPCHILDREN keeps the parent's painting out of child windows' regions
+  // (here: the toolbar). The toolbar is responsible for drawing itself; the
+  // OS handles its theming (themed on XP+, classic on Win2000).
+  static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
+                                 WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
+  // SPI_GETWORKAREA gives us the screen minus the taskbar. Available
+  // back to Win2000 and correct regardless of which edge the taskbar is
+  // docked on. Used below to center the window after the toolbar height
+  // is known; if the query fails we fall back to letting the OS place
+  // the window itself (CW_USEDEFAULT).
+  RECT workArea          = {};
+  const bool gotWorkArea = SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
+
+  // Create at a placeholder size - the real size depends on the toolbar
+  // height, which won't exist until WM_CREATE runs CreateAppToolbar.
+  // SetWindowPos below resizes + centers before ShowWindow makes the
+  // window visible, so the user never sees the placeholder.
+  mainHwnd = CreateWindowExW(exStyle, className, title, style, CW_USEDEFAULT, CW_USEDEFAULT,
+                             CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, hInstance, nullptr);
+
+  DCHECK(mainHwnd != nullptr);
+  if (mainHwnd == nullptr) {
+    LOG(ERROR) << L"Creating main window failed!";
+    return false;
+  }
+  // CW_WIDTH / CW_HEIGHT name the desired ant CANVAS size, not the outer
+  // window size. The outer window has to be larger by the OS chrome
+  // (borders + titlebar + menu, computed by AdjustWindowRectEx) plus
+  // the toolbar's measured height (set by CreateAppToolbar inside
+  // WM_CREATE) plus the status bar's measured height (set by
+  // InitStatusBar inside WM_CREATE - both have already returned by
+  // the time we get here).
+  RECT outer = {0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight + g_statusBarHeight};
+  AdjustWindowRectEx(&outer, style, TRUE, exStyle);
+  const int outerW = outer.right - outer.left;
+  const int outerH = outer.bottom - outer.top;
+  int xPos         = CW_USEDEFAULT;
+  int yPos         = CW_USEDEFAULT;
+  if (gotWorkArea) {
+    xPos = workArea.left + ((workArea.right - workArea.left) - outerW) / 2;
+    yPos = workArea.top + ((workArea.bottom - workArea.top) - outerH) / 2;
+  }
+  SetWindowPos(mainHwnd, nullptr, xPos, yPos, outerW, outerH, SWP_NOZORDER | SWP_NOACTIVATE);
+  ShowWindow(mainHwnd, iCmdShow);
+  if (!UpdateWindow(mainHwnd)) {
+    LOG(ERROR) << L"UpdateWindow failed for main window HWND: " << mainHwnd;
+    return false;
+  }
+  return true;
+}
+
+int APIENTRY wWinMain(HINSTANCE hInstance,
+                      HINSTANCE hPrevInstance,
+                      LPWSTR lpCmdLine,
+                      int iCmdShow) {
+  UNREFERENCED_PARAMETER(hPrevInstance);
+  g_hInstance = hInstance;
+  // Initialize common controls
+  INITCOMMONCONTROLSEX icex;
+  icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
+  icex.dwICC  = ICC_STANDARD_CLASSES | ICC_BAR_CLASSES;
+  InitCommonControlsEx(&icex);
+  // Now that comctl32 is initialized, probe its version once for callers
+  // that need to gate v5.82+ behavior (notably the status-bar tooltip
+  // TOOLINFO size that Win2000's v5.81 doesn't accept).
+  can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
+
+  static const std::wstring name   = GetAppName();
+  static const LPCWSTR appTitle    = name.c_str();
+  static const LPCWSTR szClassName = MAIN_WNDCLASS;
+
+  kMainIcon  = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_MAIN));
+  kSmallIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
+
+  // Register our window class.
+  if (!RegisterWndClass(g_hInstance, szClassName)) {
     ErrorBox(nullptr, L"RegisterClassEx Error", L"This program requires Windows NT!");
     return 1;
   }
+
   // Parse the command line into a real argv via CommandLineToArgvW (lpCmdLine
   // is the post-exe-path tail only; we want the full thing so argv[0] is the
   // exe path that ParseCommandLine's loop skips). Failure path is "no flags
@@ -169,12 +243,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
   logging::SetIsDCheck(is_dcheck);
   DCHECK(g_hInstance != nullptr);
   if (g_show_version) {
-    static const int showed_version = ShowVersionAndExit();
-    return showed_version;
+    return ShowVersionAndExit();
   }
   if (g_show_help) {
-    static const int showed_help = ShowHelpAndExit();
-    return showed_help;
+    return ShowHelpAndExit();
   }
   LOG(INFO) << L"---- Welcome to " << GetAppName() << L" Win32 ----";
   LOG(INFO) << L"Version: " << GetVersionString() << (is_debug ? L" DEBUG" : L"");
@@ -202,63 +274,10 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
              L"Audio will be unavailable.");
   }
 
-  // Set for later functions to pick up for Win2000 compatibility.
-  can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
-
-  // WS_EX_COMPOSITED was tried here historically but is not used: the canvas
-  // is already double-buffered via g_hdcMem/g_hbmMem (see WM_PAINT), so the
-  // OS-level offscreen composite WS_EX_COMPOSITED forces just buys latency
-  // on the modal move/size loop without buying any extra smoothness.
-  static constexpr DWORD exStyle = WS_EX_OVERLAPPEDWINDOW;
-  // WS_CLIPCHILDREN keeps the parent's painting out of child windows' regions
-  // (here: the toolbar). The toolbar is responsible for drawing itself; the
-  // OS handles its theming (themed on XP+, classic on Win2000).
-  static constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX |
-                                 WS_MAXIMIZEBOX | WS_SIZEBOX | WS_CLIPCHILDREN;
-  // SPI_GETWORKAREA gives us the screen minus the taskbar. Available
-  // back to Win2000 and correct regardless of which edge the taskbar is
-  // docked on. Used below to center the window after the toolbar height
-  // is known; if the query fails we fall back to letting the OS place
-  // the window itself (CW_USEDEFAULT).
-  RECT workArea          = {};
-  const bool gotWorkArea = SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0) != 0;
-
-  // Create at a placeholder size - the real size depends on the toolbar
-  // height, which won't exist until WM_CREATE runs CreateAppToolbar.
-  // SetWindowPos below resizes + centers before ShowWindow makes the
-  // window visible, so the user never sees the placeholder.
-  mainHwnd = CreateWindowExW(exStyle, szClassName, appTitle, style, CW_USEDEFAULT, CW_USEDEFAULT,
-                             CW_USEDEFAULT, CW_USEDEFAULT, nullptr, nullptr, hInstance, nullptr);
-
-  DCHECK(mainHwnd != nullptr);
-  if (mainHwnd == nullptr) {
-    LOG(ERROR) << L"Creating main window failed! Exiting...";
+  // Open our window now!
+  if (!InitWindow(g_hInstance, szClassName, appTitle, iCmdShow)) {
+    LOG(ERROR) << L"InitWindow failed! Exiting...";
     return 4;
-  }
-
-  // CW_WIDTH / CW_HEIGHT name the desired ant CANVAS size, not the outer
-  // window size. The outer window has to be larger by the OS chrome
-  // (borders + titlebar + menu, computed by AdjustWindowRectEx) plus
-  // the toolbar's measured height (set by CreateAppToolbar inside
-  // WM_CREATE) plus the status bar's measured height (set by
-  // InitStatusBar inside WM_CREATE - both have already returned by
-  // the time we get here).
-  RECT outer = {0, 0, CW_WIDTH, CW_HEIGHT + g_toolbarHeight + g_statusBarHeight};
-  AdjustWindowRectEx(&outer, style, TRUE, exStyle);
-  const int outerW = outer.right - outer.left;
-  const int outerH = outer.bottom - outer.top;
-  int xPos         = CW_USEDEFAULT;
-  int yPos         = CW_USEDEFAULT;
-  if (gotWorkArea) {
-    xPos = workArea.left + ((workArea.right - workArea.left) - outerW) / 2;
-    yPos = workArea.top + ((workArea.bottom - workArea.top) - outerH) / 2;
-  }
-  SetWindowPos(mainHwnd, nullptr, xPos, yPos, outerW, outerH, SWP_NOZORDER | SWP_NOACTIVATE);
-
-  ShowWindow(mainHwnd, iCmdShow);
-  if (!UpdateWindow(mainHwnd)) {
-    LOG(ERROR) << L"UpdateWindow failed for main window " << mainHwnd;
-    return 5;
   }
 
   HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
@@ -335,7 +354,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       // the menu so the UI doesn't keep promising audio that never plays.
       if (!SyncBgm()) {
         g_playsound     = false;
-        HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+        HMENU hSettings = GetSettingsMenu(hWnd);
         CheckMenuItem(hSettings, IDM_SOUND, MF_BYCOMMAND | MF_UNCHECKED);
       }
       SetSoundButton(g_playsound);
@@ -623,19 +642,19 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         // IDM_SLOW..IDM_HYPER handlers - no duplicate items, no manual
         // state sync needed.
         if (pnmtb->iItem == IDM_ANTS) {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hAnts     = GetSubMenu(hSettings, 4);
           TrackPopupMenu(hAnts, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_SPEED) {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hSpeed    = GetSubMenu(hSettings, 5);
           TrackPopupMenu(hSpeed, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_CUSTOM) {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hCustom   = GetSubMenu(hSettings, 8);
           TrackPopupMenu(hCustom, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
@@ -643,7 +662,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         if (pnmtb->iItem == IDM_CELLOPTIONS) {
           // Cell Options is now a top-level entry in Settings (index 10),
           // no longer nested inside Customize.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             TrackPopupMenu(hCells, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
@@ -651,7 +670,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           return TBDDRET_DEFAULT;
         }
         if (pnmtb->iItem == IDM_COLORS) {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hBkg      = GetSubMenu(hSettings, 6);
           TrackPopupMenu(hBkg, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hWnd, nullptr);
           return TBDDRET_DEFAULT;
@@ -685,14 +704,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Button-body click on the Num Ants split button. Show the same
           // dropdown the arrow does so users don't have to hit the arrow's
           // narrow hit box.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hAnts     = GetSubMenu(hSettings, 4);
           PopupUnderToolbarButton(hWnd, IDM_ANTS, hAnts);
           break;
         }
         case IDM_SPEED: {
           // Button-body click on the Speed split button - mirrors IDM_ANTS.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hSpeed    = GetSubMenu(hSettings, 5);
           PopupUnderToolbarButton(hWnd, IDM_SPEED, hSpeed);
           break;
@@ -700,7 +719,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_CUSTOM: {
           // Button-body click on the Custom split button - mirrors IDM_ANTS.
           // Place-ant mode lives on its own menu item now (IDM_CUSTOMPLACE).
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hCustom   = GetSubMenu(hSettings, 8);
           PopupUnderToolbarButton(hWnd, IDM_CUSTOM, hCustom);
           break;
@@ -709,7 +728,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // Button-body click on the Cells split button - mirrors IDM_CUSTOM.
           // Cell Options now lives directly under Settings (index 10), not
           // nested inside Customize.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             PopupUnderToolbarButton(hWnd, IDM_CELLOPTIONS, hCells);
@@ -721,7 +740,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // The dropdown is the existing Settings -> Colors submenu so the
           // IDM_*_BKG / IDM_MONOCHROME handlers below pick up the selection
           // unchanged.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hBkg      = GetSubMenu(hSettings, 6);
           PopupUnderToolbarButton(hWnd, IDM_COLORS, hBkg);
           break;
@@ -735,7 +754,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // placement session. Audio follows the pause via SyncBgm.
           if (!g_paused) {
             TogglePaintAnts(hWnd);
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            HMENU hSettings = GetSettingsMenu(hWnd);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
           }
           // Refresh the pause/play button label unconditionally - when
@@ -777,7 +796,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SOUND: {
           if (ToggleSound()) {
             // Only update check state if toggling sound on/off succeeded.
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            HMENU hSettings = GetSettingsMenu(hWnd);
             CheckMenuItem(hSettings, IDM_SOUND,
                           MF_BYCOMMAND | (g_playsound ? MF_CHECKED : MF_UNCHECKED));
             // Mirror the state on the toolbar: swap icon + label.
@@ -798,7 +817,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                       : was_stopped ? L"Ants started."
                                     : L"Ants resumed.");
           // Reflect the new paused state in the menu check mark.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           CheckMenuItem(hSettings, IDM_PAUSED,
                         MF_BYCOMMAND | (g_paused ? MF_CHECKED : MF_UNCHECKED));
           // Mirror the state on the toolbar: swap icon + label.
@@ -817,7 +836,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // discarded too, since a Stop is a clean-slate intent.
           if (!g_paused) {
             TogglePaintAnts(hWnd);
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            HMENU hSettings = GetSettingsMenu(hWnd);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
           }
           if (g_place_mode) {
@@ -862,7 +881,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // resumes with no extra logic needed here.
           if (!g_paused) {
             TogglePaintAnts(hWnd); // toggles g_paused=true and KillTimer
-            HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+            HMENU hSettings = GetSettingsMenu(hWnd);
             CheckMenuItem(hSettings, IDM_PAUSED, MF_BYCOMMAND | MF_CHECKED);
             // Mirror the paused state onto the toolbar's Pause/Resume
             // button so icon + label match the menu check mark.
@@ -896,7 +915,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // doesn't disturb the simulation. Just update the menu mark and
           // invalidate the canvas so WM_PAINT redraws with/without lines.
           g_show_grid     = !g_show_grid;
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hCells    = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             CheckMenuItem(hCells, IDM_SHOWGRID,
@@ -916,7 +935,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // canvas wipe needed; existing trails stay put. The change takes
           // effect on the very next tick, no need to invalidate.
           g_no_client_bounds = !g_no_client_bounds;
-          HMENU hSettings    = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings    = GetSettingsMenu(hWnd);
           HMENU hCells       = (hSettings != nullptr) ? GetSubMenu(hSettings, 10) : nullptr;
           if (hCells != nullptr) {
             CheckMenuItem(hCells, IDM_NOCLIENTBOUNDS,
@@ -933,7 +952,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // calls from InitMenuDefaults).
           SetUseSmallToolbar(!use_small_toolbar);
           // Settings menu is at index 1; reflect the new state on the entry.
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           if (hSettings != nullptr) {
             CheckMenuItem(hSettings, IDM_SMALLTOOLBAR,
                           MF_BYCOMMAND | (use_small_toolbar ? MF_CHECKED : MF_UNCHECKED));
@@ -1033,7 +1052,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             s_pre_mono_bg = g_bkg_color;
           }
           g_monochrome    = !g_monochrome;
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           // Toggle the check mark on the menu item to show current state.
           CheckMenuItem(hSettings, IDM_MONOCHROME,
                         MF_BYCOMMAND | (g_monochrome ? MF_CHECKED : MF_UNCHECKED));
@@ -1116,7 +1135,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_RED_BKG:
         case IDM_GREEN_BKG:
         case IDM_BLUE_BKG: {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 6);
           CheckMenuRadioItem(hBkgMenu, IDM_WHITE_BKG, IDM_BLUE_BKG, command, MF_BYCOMMAND);
           const COLORREF oldColor = g_bkg_color;
@@ -1171,7 +1190,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           // running ant to re-roll its cached marker against the new
           // preference (RefreshAntColors keeps position, direction, and
           // per-cell state intact and only swaps the visible color).
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hBkgMenu  = GetSubMenu(hSettings, 6);
           CheckMenuRadioItem(hBkgMenu, IDM_CYANANT, IDM_ALLCOLORANT, command, MF_BYCOMMAND);
           const wchar_t* antName = L"?";
@@ -1207,7 +1226,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_FAST:
         case IDM_HYPER:
         case IDM_REALTIME: {
-          HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+          HMENU hSettings = GetSettingsMenu(hWnd);
           HMENU hDelay    = GetSubMenu(hSettings, 5);
           CheckMenuRadioItem(hDelay, IDM_SLOW, IDM_REALTIME, command, MF_BYCOMMAND);
           const wchar_t* speedName = L"?";
@@ -1297,7 +1316,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         x = pt.x;
         y = pt.y;
       }
-      HMENU hSettings = GetSubMenu(GetMenu(hWnd), 1);
+      HMENU hSettings = GetSettingsMenu(hWnd);
       TrackPopupMenu(hSettings, TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN, x, y, 0, hWnd,
                      nullptr);
       break;

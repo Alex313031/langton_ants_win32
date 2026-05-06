@@ -125,9 +125,6 @@ bool ValidateCellSize(LPCWSTR cCell);
 // Gets version as human readable wstring.
 const std::wstring GetVersionString();
 
-// Gets version as human readable wstring.
-const std::wstring GetVersionString();
-
 // Returns APP_NAME as wstring, for easier usage.
 const std::wstring GetAppName();
 

@@ -11,6 +11,12 @@ static const std::wstring kDefaultStatusText = GetAppName() + L" Version " + Get
 // Default status bar 2nd part "cpu bubble" text
 static const std::wstring kDefaultCpuBubbleText = L"CPU Usage: NaN";
 
+// Registers our window class, one of the first things to run.
+bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className);
+
+// Creates the main window and shows it
+bool InitWindow(HINSTANCE hInstance, LPCWSTR className, LPCWSTR title, int iCmdShow);
+
 // Main window procedure
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 

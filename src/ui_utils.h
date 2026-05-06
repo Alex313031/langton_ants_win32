@@ -69,6 +69,13 @@ void SetAlgorithmCheck(AntAlgorithm algo);
 // The check mark goes on Settings -> Customize -> IDM_CUSTOMSEED.
 void SetCustomSeedCheck(bool active);
 
+// Convenience wrapper for `GetSubMenu(GetMenu(hWnd), 1)` - the Settings
+// popup is the second top-level menu (after File). Returns nullptr if the
+// window has no menu or the Settings popup is missing. Used by the many
+// WM_COMMAND handlers that need the Settings HMENU as their starting point
+// before drilling further into a submenu.
+HMENU GetSettingsMenu(HWND hWnd);
+
 // Handles a TTN_GETDISPINFOW / TTN_NEEDTEXTW notification from the toolbar's
 // tooltip control by supplying a descriptive string based on the hovered
 // button's command ID (and, for state-toggling buttons, the current state).
