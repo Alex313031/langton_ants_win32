@@ -86,6 +86,9 @@ HICON kSmallIcon = nullptr;
 // Set by ShutDownApp
 static bool clean_shutdown = false;
 
+// Whether we have commctl32 5.82 (XP/I.E 6.0)
+static bool can_use_582_controls = false;
+
 int APIENTRY wWinMain(HINSTANCE hInstance,
                       HINSTANCE hPrevInstance,
                       LPWSTR lpCmdLine,
@@ -175,6 +178,9 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
              L"Failed to initialize the background music subsystem. "
              L"Audio will be unavailable.");
   }
+
+  // Set for later functions to pick up for Win2000 compatibility.
+  can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
 
   // WS_EX_COMPOSITED was tried here historically but is not used: the canvas
   // is already double-buffered via g_hdcMem/g_hbmMem (see WM_PAINT), so the
@@ -1450,7 +1456,6 @@ bool InitStatusBar(HWND hWnd) {
   s_statusTipText[0] = L"Current Status.";
   s_statusTipText[1] = L"Total CPU usage of this app.";
 
-  static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
     SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
@@ -1486,7 +1491,6 @@ void LayoutStatusTooltips() {
   // (including uFlags), which forces the subclass to re-pick up the new rect.
   // cbSize must match the comctl32 version that registered the tool: 5.82+
   // accepts the full V3 size, 5.81 (Win2000) only V2.
-  static const bool can_use_582_controls = IsCommCtrlAtLeast(dwComCtl32TargetVer);
   for (UINT_PTR i = 0; i < 2; ++i) {
     RECT partRc = {};
     SendMessageW(hStatusBar, SB_GETRECT, static_cast<WPARAM>(i), reinterpret_cast<LPARAM>(&partRc));
