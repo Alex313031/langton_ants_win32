@@ -1,7 +1,7 @@
 #ifndef LANGTON_ANTS_MAIN_H_
 #define LANGTON_ANTS_MAIN_H_
 
-#include "ants.h"
+#include "framework.h"
 #include "globals.h"
 #include "utils.h"
 

@@ -5,6 +5,7 @@
 
 #include "main.h"
 
+#include "ants.h"
 #include "cpu.h"
 #include "resource.h"
 #include "sound.h"
