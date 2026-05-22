@@ -38,7 +38,7 @@
 #if __cplusplus < 201103L
  // For old compilers without constexpr or inline
  #if !defined(constexpr) || !defined(__cpp_constexpr)
-  typedef const constexpr;
+  #define constexpr const
  #endif // constexpr
  #if !defined(inline)
   #define inline

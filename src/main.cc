@@ -91,6 +91,9 @@ static bool clean_shutdown = false;
 bool can_use_582_controls = false;
 
 bool RegisterWndClass(HINSTANCE hInstance, LPCWSTR className) {
+  if (kMainIcon == nullptr || kSmallIcon == nullptr) {
+    return false;
+  }
   WNDCLASSEXW wndclass;
   wndclass.cbSize      = sizeof(WNDCLASSEX);
   wndclass.style       = 0;
@@ -279,6 +282,11 @@ int APIENTRY wWinMain(HINSTANCE hInstance,
     LOG(ERROR) << L"InitWindow failed! Exiting...";
     return 4;
   }
+  // Sync the Dev -> Hide/Show Console menu entry to whatever console state
+  // InitLogging left us in. With no flags (open_console == false), no console
+  // was attached and the entry is greyed out; otherwise it picks "Hide" or
+  // "Show" based on the console's current visibility.
+  UpdateConsoleToggleMenu(mainHwnd);
 
   HACCEL hAccel = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDR_MAIN));
   if (hAccel == nullptr) {
@@ -785,14 +793,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                      CustomCellSizeDlgProc);
           break;
         }
-        case IDM_UNDO: {
+        case IDM_UNDO:
           // Ctrl+Z accelerator. Only does anything in place mode -
           // pops the most recent placement off the list and erases its
           // marker. UndoLastPlacement logs and no-ops outside place
           // mode or when there's nothing left to undo.
           UndoLastPlacement();
           break;
-        }
         case IDM_SOUND: {
           if (ToggleSound()) {
             // Only update check state if toggling sound on/off succeeded.
@@ -1270,6 +1277,26 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             // old interval - the next WM_TIMER tick fires at the new rate.
             SignalAntsTick();
           }
+          break;
+        }
+        case IDM_TOGGLECONSOLE: {
+          // The menu item is greyed out when no console is attached, so the
+          // user shouldn't normally be able to reach this case in that state -
+          // but guard anyway so a stray accelerator / programmatic dispatch
+          // doesn't crash on a null console HWND.
+          const HWND console = logging::GetCurrentConsole();
+          if (console == nullptr) {
+            LOG(WARN) << L"IDM_TOGGLECONSOLE clicked but no console exists";
+            break;
+          }
+          if (IsWindowVisible(console)) {
+            logging::HideConsole();
+          } else {
+            // pass false so the console doesn't steal focus from the main
+            // window when re-shown.
+            logging::ShowConsole(false);
+          }
+          UpdateConsoleToggleMenu(hWnd);
           break;
         }
         case IDM_TESTTRAP:

@@ -848,6 +848,27 @@ bool HandleToolbarTooltips(NMHDR* pnmh) {
   return true;
 }
 
+void UpdateConsoleToggleMenu(HWND hWnd) {
+  HMENU hDev = GetSubMenu(GetMenu(hWnd), 2); // Dev menu (File=0, Settings=1, Dev=2, About=3)
+  if (hDev == nullptr) {
+    return;
+  }
+  if (!logging::GetIsConsoleAttached()) {
+    EnableMenuItem(hDev, IDM_TOGGLECONSOLE, MF_BYCOMMAND | MF_GRAYED);
+    return;
+  }
+  EnableMenuItem(hDev, IDM_TOGGLECONSOLE, MF_BYCOMMAND | MF_ENABLED);
+  const HWND console = logging::GetCurrentConsole();
+  const bool visible = (console != nullptr) && (IsWindowVisible(console) != 0);
+  // SetMenuItemInfoW with MIIM_STRING copies the string, so passing a
+  // string-literal pointer through const_cast is safe.
+  MENUITEMINFOW mii = {};
+  mii.cbSize        = sizeof(mii);
+  mii.fMask         = MIIM_STRING;
+  mii.dwTypeData    = const_cast<LPWSTR>(visible ? L"Hide Console" : L"Show Console");
+  SetMenuItemInfoW(hDev, IDM_TOGGLECONSOLE, FALSE, &mii);
+}
+
 void UpdateStatusBar(const unsigned int part, const std::wstring& text) {
   // DCHECK trips in dev builds if a caller passes an out-of-range part index.
   // Goes BEFORE the early-return - DCHECKs only fire when the condition is

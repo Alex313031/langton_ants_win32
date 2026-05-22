@@ -8,6 +8,7 @@
 
 #define APSTUDIO_HIDDEN_SYMBOLS
 #include <windows.h>
+#include <commctrl.h>
 #undef APSTUDIO_HIDDEN_SYMBOLS
 
 #include <winres.h>
@@ -58,6 +59,10 @@ IDR_BGM_WAVE   WAVE   "res/ants.wav"
 // loaded PE image without needing a temp file.
 IDR_FAHH_WAVE  WAVE   "res/fahh.wav"
 
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
+#endif
+
 #ifdef APSTUDIO_INVOKED
 
 1 TEXTINCLUDE
@@ -78,10 +83,6 @@ BEGIN
 END
 
 #endif // APSTUDIO_INVOKED
-
-#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
-LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
-#endif
 
 // Main Application Menu
 IDR_MAIN MENU
@@ -174,6 +175,7 @@ BEGIN
         MENUITEM "&Repaint Now",                    IDM_REPAINT
         MENUITEM "&Single Step Drawing (Spacebar)", IDM_SINGLE
         MENUITEM "&Stop Ants",                      IDM_STOP
+        MENUITEM "Hide Console",                    IDM_TOGGLECONSOLE
         MENUITEM SEPARATOR
         MENUITEM "&Test Trap (Crashes app)",        IDM_TESTTRAP
     END

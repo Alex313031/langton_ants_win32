@@ -319,24 +319,25 @@ static DWORD GetCommCtrlVersion() {
   if (length == 0 || length >= MAX_PATH) {
     const DWORD error = GetLastError();
     LOG(ERROR) << L"Failed to get system directory! Error: " << logging::Hex(error);
-    return 0;
+    return 0x0;
   }
   const std::wstring comctl32_path = std::wstring(systemDir) + L"\\" + kComCtl32Dll;
 
-  HINSTANCE hComCtl32Dll = LoadLibraryW(comctl32_path.c_str());
+  HMODULE hComCtl32Dll = LoadLibraryW(comctl32_path.c_str());
   if (hComCtl32Dll == nullptr) {
     const DWORD error = GetLastError();
     LOG(ERROR) << L"Failed to load " << kComCtl32Dll << L", hComCtl32Dll was null! Error: "
                << logging::Hex(error);
-    return 0;
+    return 0x0;
   }
 
-  DWORD dwVersion = 0;
+  DWORD dwVersion = 0x0;
   DLLGETVERSIONPROC pDllGetVersion =
       reinterpret_cast<DLLGETVERSIONPROC>(GetProcAddress(hComCtl32Dll, "DllGetVersion"));
   if (pDllGetVersion == nullptr) {
     const DWORD error = GetLastError();
     LOG(ERROR) << L"Failed to get DllGetVersion address. Error: " << logging::Hex(error);
+    return 0x0;
   } else {
     DLLVERSIONINFO dvi = {sizeof(dvi)};
     const HRESULT hr   = pDllGetVersion(&dvi);

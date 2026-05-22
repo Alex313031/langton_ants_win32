@@ -137,6 +137,9 @@
 // Toggle small/regular sized toolbar
 #define IDM_SMALLTOOLBAR            278
 
+// Toggle logging console on/off
+#define IDM_TOGGLECONSOLE           279
+
 // Dev menu item, test debug trap
 #define IDM_TESTTRAP                280
 
@@ -148,7 +151,7 @@
                                         // kStatusBarResetDelay ms of inactivity
 
 // Embedded background-music WAV. Loaded as a user-defined "WAVE" resource
-// when kUseEmbeddedBgm is true (see utils.h). The RC file binds this ID
+// when kUseEmbeddedBgm is true (see sound.h). The RC file binds this ID
 // to res/ants.wav; FindResourceW(L"WAVE") picks it up at runtime.
 #define IDR_BGM_WAVE                500
 

@@ -1089,14 +1089,14 @@ bool PlaceAntAtClient(int clientX, int clientY) {
   InvalidateRect(mainHwnd, &inval, FALSE);
   UserMessage(std::wstring(L"Ant placed at cell (") + std::to_wstring(cellX) + L"," +
               std::to_wstring(cellY) + L"). " + std::to_wstring(g_placed_ants_count) + L" of " +
-              std::to_wstring(kMaxAntThreads) + L" threads remain.");
+              std::to_wstring(kMaxAntThreads) + L" slots remain.");
   return true;
 }
 
 bool UndoLastPlacement() {
   bool ok = true;
   if (!g_place_mode) {
-    LOG(ERROR) << L"UndoLastPlacement() called outside place mode!";
+    LOG(WARN) << L"UndoLastPlacement() called outside place mode!";
     return false;
   }
   if (g_placed_ants_count <= 0) {
@@ -1120,10 +1120,13 @@ bool UndoLastPlacement() {
   LeaveCriticalSection(&g_paintCS);
   g_placed_ants_count--;
   RECT inval = {px, py + g_toolbarHeight, px + CELL_PX, py + CELL_PX + g_toolbarHeight};
-  InvalidateRect(mainHwnd, &inval, FALSE);
+  ok = InvalidateRect(mainHwnd, &inval, FALSE);
   UserMessage(std::wstring(L"Undid placement at cell (") + std::to_wstring(cellX) + L"," +
               std::to_wstring(cellY) + L"). " + std::to_wstring(g_placed_ants_count) + L" of " +
-              std::to_wstring(kMaxAntThreads) + L" threads remain.");
+              std::to_wstring(kMaxAntThreads) + L" slots remain.");
+  if (!ok) {
+    LOG(ERROR) << L"Undo rect failed!";
+  }
   return ok;
 }
 

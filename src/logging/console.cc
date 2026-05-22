@@ -33,6 +33,14 @@ int logging::AttachConsoleImpl() {
 
     if (attached_console) {
       retval = 0; // 0 Means TRUE/OK
+      // Title the console so the user can tell at a glance which process's
+      // logging window this is. Only on the fresh-attach path - if a console
+      // was already attached (retval == 1) it was set up by something else
+      // and we shouldn't rename it. kProgName is populated by InitLogging
+      // before it calls us.
+      if (!kProgName.empty()) {
+        SetLogConsoleTitle(kProgName + L" Logging Console");
+      }
     } else {
       MessageBoxW(nullptr, L"Failed to attach console!", L"Console Attach Error",
                   MB_OK | MB_ICONERROR);

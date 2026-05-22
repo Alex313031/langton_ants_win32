@@ -97,6 +97,16 @@ bool PopupUnderToolbarButton(HWND hOwner, int idCommand, HMENU hMenu);
 // Updates text in a specified part of the status bar.
 void UpdateStatusBar(const unsigned int part, const std::wstring& text);
 
+// Refreshes the IDM_TOGGLECONSOLE entry in the Dev menu to reflect the
+// current console state:
+//   - No console attached at all (open_console was false at startup) -> grey
+//     out, since there's nothing to show or hide.
+//   - Console attached and visible -> "Hide Console", enabled.
+//   - Console attached but hidden -> "Show Console", enabled.
+// Call once at startup (after the window exists) and again whenever
+// console visibility flips (e.g. from the IDM_TOGGLECONSOLE handler).
+void UpdateConsoleToggleMenu(HWND hWnd);
+
 // Logs to console at INFO level, and updates status bar 1st part.
 void UserMessage(const std::wstring& message);
 
