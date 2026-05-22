@@ -701,7 +701,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         case IDM_SAVE_AS: {
           std::wstring savepath;
           if (SaveClientBitmap(hWnd, &savepath)) {
-            UserMessage(std::wstring(L"Saved canvas to ") + savepath);
+            // SaveClientBitmap also returns false when the user just
+            // cancels the Save dialog. CommDlgExtendedError() is 0 in
+            // that case (no actual error), non-zero on a real common-
+            // dialog failure. Only show the box on a real failure.
+            if (CommDlgExtendedError() != 0) {
+              ErrorBox(hWnd, L"Save Screenshot Error", L"Failed to save screenshot!");
+            } else {
+              UserMessage(std::wstring(L"Saved canvas to ") + savepath);
+            }
           }
           break;
         }

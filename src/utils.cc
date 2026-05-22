@@ -122,19 +122,18 @@ bool SaveClientBitmap(HWND hWnd, std::wstring* outSavedPath) {
   }
 
   DWORD written;
-  const bool ok = WriteFile(hFile, &bf, sizeof(bf), &written, nullptr) &&
-                  WriteFile(hFile, &bi, sizeof(bi), &written, nullptr) &&
-                  WriteFile(hFile, pixels.data(), bi.biSizeImage, &written, nullptr);
-
+  const bool success = WriteFile(hFile, &bf, sizeof(bf), &written, nullptr) &&
+                       WriteFile(hFile, &bi, sizeof(bi), &written, nullptr) &&
+                       WriteFile(hFile, pixels.data(), bi.biSizeImage, &written, nullptr);
   CloseHandle(hFile);
-  if (ok) {
+  if (success) {
     if (outSavedPath != nullptr) {
       *outSavedPath = szFile;
     }
   } else {
     LOG(WARN) << L"Failed to write canvas BMP to " << szFile;
   }
-  return ok;
+  return success;
 }
 
 void TestTrap(const bool dcheck) {
