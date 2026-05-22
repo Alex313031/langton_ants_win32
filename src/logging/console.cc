@@ -76,21 +76,27 @@ HWND logging::GetCurrentConsole() {
   return GetConsoleWindow();
 }
 
+// ShowWindow's BOOL return is "was the window previously visible",
+// NOT "did the call succeed" - so SW_SHOW / SW_SHOWNOACTIVATE on a
+// hidden window returns 0 even though the show worked, and SW_HIDE
+// on an already-hidden window also returns 0. We can't use it as a
+// success indicator. Just trust the call to do its job; both
+// helpers report true unless the console isn't even attached.
+
 bool logging::ShowConsole(const bool activate) {
   const int showstate = activate ? SW_SHOW : SW_SHOWNOACTIVATE;
   const HWND console  = GetCurrentConsole();
   if (console == nullptr) {
-    LOG(ERROR) << L"Console not attached.";
+    CLOG(ERROR) << L"ShowConsole() called when console not attached!";
+    FLOG(ERROR) << L"ShowConsole() called when console not attached.";
     return false;
-  } else {
-    const bool visible = IsWindowVisible(console);
-    if (visible) {
-      LOG(INFO) << L"Console already visible";
-      return true;
-    } else {
-      return ShowWindow(console, showstate); // Show console
-    }
   }
+  // IsWindowVisible is unreliable for the conhost pseudo-window on
+  // Win10/11 Terminal (it's the wrong HWND), so we skip the early-out
+  // and just call ShowWindow - it's a no-op when already in the
+  // requested state.
+  ShowWindow(console, showstate);
+  return true;
 }
 
 bool logging::HideConsole() {
@@ -98,14 +104,9 @@ bool logging::HideConsole() {
   if (console == nullptr) {
     LOG(WARN) << L"Console not attached.";
     return false;
-  } else {
-    if (ShowWindow(console, SW_HIDE)) {
-      return true; // Hid console
-    } else {
-      LOG(WARN) << L"Running SW_HIDE on console again!"; // Doesn't work on Win11 Terminal (¬_¬)
-      return ShowWindow(console, SW_HIDE);               // It is sometimes necessary to call twice
-    }
   }
+  ShowWindow(console, SW_HIDE);
+  return true;
 }
 
 bool logging::ToggleShowConsole(const bool activate) {
@@ -114,21 +115,13 @@ bool logging::ToggleShowConsole(const bool activate) {
   if (console == nullptr) {
     LOG(WARN) << L"Console not attached.";
     return false;
-  } else {
-    const bool visible = IsWindowVisible(console);
-    if (visible) {
-      // Hide console
-      if (ShowWindow(console, SW_HIDE)) {
-        return true;
-      } else {
-        LOG(WARN) << L"Running SW_HIDE on console again!";
-        return ShowWindow(console, SW_HIDE);
-      }
-    } else {
-      // Show console
-      return ShowWindow(console, showstate);
-    }
   }
+  // ShowWindow's BOOL return is "was previously visible", not success;
+  // see ShowConsole / HideConsole. Use IsWindowVisible to pick which
+  // direction to flip, then trust the call.
+  const bool visible = IsWindowVisible(console);
+  ShowWindow(console, visible ? SW_HIDE : showstate);
+  return true;
 }
 
 bool logging::RouteStdioToConsole(bool create_console_if_not_found) {
