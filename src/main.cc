@@ -693,9 +693,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
           ShutDownApp();
           break;
         case IDM_ABOUT:
-          if (!g_playsound) {
-            PlaySoundW(L"SystemNotification", nullptr, SND_ALIAS | SND_ASYNC);
-          }
           DialogBoxW(g_hInstance, MAKEINTRESOURCEW(IDD_ABOUTDLG), hWnd, AboutDlgProc);
           break;
         case IDM_HELP:
@@ -1626,6 +1623,9 @@ INT_PTR CALLBACK AboutDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
       static const HICON kAboutIcon = LoadIconW(g_hInstance, MAKEINTRESOURCEW(IDI_ABOUT));
       SendMessageW(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)kAboutIcon);
       SendMessageW(hDlg, WM_SETICON, ICON_BIG, (LPARAM)kAboutIcon);
+      if (!g_playsound) {
+        PlaySoundW(MAKEINTRESOURCEW(IDR_NOTIFY_WAVE), g_hInstance, SND_RESOURCE | SND_ASYNC | SND_NODEFAULT);
+      }
       LOG(INFO) << L"Showed About Dialog.";
       return TRUE;
     case WM_CLOSE:

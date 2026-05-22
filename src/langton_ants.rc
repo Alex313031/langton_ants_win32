@@ -59,6 +59,9 @@ IDR_BGM_WAVE   WAVE   "res/ants.wav"
 // loaded PE image without needing a temp file.
 IDR_FAHH_WAVE  WAVE   "res/fahh.wav"
 
+// Windows 2000 notify ding sound
+IDR_NOTIFY_WAVE WAVE  "res/notify.wav"
+
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
 #endif

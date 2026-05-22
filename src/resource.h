@@ -161,6 +161,9 @@
 // resource out of memory.
 #define IDR_FAHH_WAVE               501
 
+// For the About dialog
+#define IDR_NOTIFY_WAVE             502
+
 // Custom posted-message IDs (WM_APP range, guaranteed to not clash with any
 // system / common-control message). Used to defer work that mustn't run
 // inside WM_CREATE — see WM_APP_AUTOPLAY usage in main.cc.
