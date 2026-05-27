@@ -79,6 +79,10 @@ namespace logging {
   // Gets whether file is currently open
   bool IsFileOpen();
 
+  // Returns the full path of the currently open log file, or an empty string
+  // if file logging is not active.
+  const std::wstring GetLogFilePath();
+
 } // namespace logging
 
 #endif // MINI_LOGGER_FILE_UTIL_H_

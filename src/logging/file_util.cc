@@ -7,6 +7,7 @@
 namespace logging {
   HANDLE g_log_file       = INVALID_HANDLE_VALUE;
   volatile bool file_open = false;
+  std::wstring g_log_file_path;
 }
 
 const std::wstring logging::GetCurrentRelDir() {
@@ -90,8 +91,9 @@ bool logging::OpenFileForWriting(const std::wstring& logfile_path) {
         file_open = false;
         return false;
       } else {
-        file_open = true;
-        write_bom = should_truncate_file;
+        file_open       = true;
+        g_log_file_path = logfile_path;
+        write_bom       = should_truncate_file;
         if (!should_truncate_file && dwCreationFlag == OPEN_EXISTING) {
           // Move to end of file for append mode
           if (SetFilePointer(g_log_file, 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER &&
@@ -118,8 +120,9 @@ bool logging::OpenFileForWriting(const std::wstring& logfile_path) {
     if (GetIsConsoleAttached()) {
       std::wcout << L"Note: Creating new log file with UTF-16 BOM: " << logfile_path << std::endl;
     }
-    file_open = true;
-    write_bom = true;
+    file_open       = true;
+    g_log_file_path = logfile_path;
+    write_bom       = true;
   }
   if (file_open && write_bom) {
     return WriteUTF16BOM(g_log_file);
@@ -147,7 +150,8 @@ bool logging::OpenFileForWritingAlt(const std::wstring& alt_logfile_path,
                                FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, dwCreationFlag,
                                FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
       if (g_log_file != INVALID_HANDLE_VALUE) {
-        out_write_bom = should_truncate;
+        g_log_file_path = alt_logfile_path;
+        out_write_bom   = should_truncate;
         if (!should_truncate && dwCreationFlag == OPEN_EXISTING) {
           if (SetFilePointer(g_log_file, 0, nullptr, FILE_END) == INVALID_SET_FILE_POINTER &&
               GetLastError() != NO_ERROR) {
@@ -166,7 +170,8 @@ bool logging::OpenFileForWritingAlt(const std::wstring& alt_logfile_path,
       std::wcout << L"Note: Creating new log file with UTF-16 BOM: " << alt_logfile_path
                  << std::endl;
     }
-    out_write_bom = true; // New file always needs BOM
+    g_log_file_path = alt_logfile_path;
+    out_write_bom   = true; // New file always needs BOM
   }
   return g_log_file != INVALID_HANDLE_VALUE;
 }
@@ -184,6 +189,7 @@ bool logging::CloseFileHandle() {
   if (closed) {
     g_log_file = INVALID_HANDLE_VALUE;
     file_open  = false;
+    g_log_file_path.clear();
     std::wcerr << L"[DEBUG] Closed file handle " << this_handle.c_str() << std::endl;
   } else {
     const std::wstring msg = L"Failed to close file handle " + this_handle;
@@ -239,4 +245,11 @@ bool logging::IsFileOpen() {
     return false;
   }
   return file_open;
+}
+
+const std::wstring logging::GetLogFilePath() {
+  if (!IsFileOpen()) {
+    return std::wstring();
+  }
+  return g_log_file_path;
 }
