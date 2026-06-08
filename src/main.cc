@@ -1392,6 +1392,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
       ShutDownApp();
       break;
     case WM_QUERYENDSESSION:
+      LOG(DEBUG) << L"Window station is going down now!";
       return TRUE;
     case WM_DESTROY:
       // In case these weren't already torn down by ShutDownApp - i.e.

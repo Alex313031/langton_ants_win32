@@ -294,7 +294,7 @@ BEGIN
             VALUE "LegalCopyright", LEGAL_COPYRIGHT
             VALUE "LegalTrademarks", TRADEMARKS
             VALUE "OriginalFilename", ORIG_FILENAME
-            VALUE "ProductName", APP_NAME
+            VALUE "ProductName", PRODUCT_NAME
             VALUE "ProductVersion", VERSION_STRING
         END
     END

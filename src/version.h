@@ -53,24 +53,28 @@
 
 // clang-format off: Version DEFINES left alone
 
-// Macro to convert to string
-#if !defined(_STRINGIZER_)
- #define _STRINGIZER_
- #define _STRINGIZER(in) #in
- #define STRINGIZE(in) _STRINGIZER(in)
-#endif // !defined(_STRINGIZER_)
-
-// Main version constant
-#ifndef _VERSION
- // Run stringizer above
- #define _VERSION(major,minor,build) STRINGIZE(major) "." STRINGIZE(minor) "." STRINGIZE(build)
-#endif // _VERSION
-
 // These next few lines are where we control version number and copyright year
 // Adhere to semver > semver.org
 #define MAJOR_VERSION 1
 #define MINOR_VERSION 6
 #define BUILD_VERSION 4
+
+// Macro to convert to string
+#if !defined(_STRINGIZER_)
+ #define _STRINGIZER_
+ #define _STRINGIZER(in) #in
+ #define STRINGIZE(in) _STRINGIZER(in)
+ // Wide-string variant: L ## "x" -> L"x". Two levels so the argument expands
+ // before the L## paste widens the resulting narrow literal.
+ #define _WIDEN(in) L ## in
+ #define WIDEN(in) _WIDEN(in)
+#endif // !defined(_STRINGIZER_)
+
+// Main version constant
+#ifndef _VERSION
+ // Run stringizer above
+ #define _VERSION(major,minor,build) WIDEN(STRINGIZE(major.minor.build))
+#endif // _VERSION
 
 // String constants
 #define VERSION_STRING _VERSION(MAJOR_VERSION, MINOR_VERSION, BUILD_VERSION)
@@ -81,15 +85,19 @@
 #define COMMENTS        L"https://github.com/Alex313031/langton_ants_win32" // Project GitHub URL
 #define COMPANYNAME     L"Alex313031" // My developer name
 #define FILE_DESCRIPT   L"Win32 Langton's Ants Demonstration" // File description
-#define INTERNAL_NAME   L"langton_ants" // "Internal" name, also used for .exe name
-#define ORIG_FILENAME   INTERNAL_NAME L".exe" // Generated .exe file name
+// Bare-token internal name so STRINGIZE can fold it into a single literal.
+#define INTERNAL_TOKENS langton_ants
+#define INTERNAL_NAME   WIDEN(STRINGIZE(INTERNAL_TOKENS)) // L"langton_ants"
+#define ORIG_FILENAME   WIDEN(STRINGIZE(INTERNAL_TOKENS.exe)) // L"langton_ants.exe"
 #define PRODUCT_NAME    APP_NAME // Product name
 #define TRADEMARKS      L"BSD-3" // License
 #define LEGAL_COPYRIGHT L"\251 2026 Alex313031" // \251 is the © symbol
 
-#define ABOUT_TITLE     L"About " APP_NAME
+// APP_NAME has an apostrophe, which can't be a bare STRINGIZE token, so this
+// title is written out in full instead of composed from APP_NAME.
+#define ABOUT_TITLE     L"About Langton's Ants"
 #define ABOUT_CONTENT   L"Langton's Ants for Win32"
-#define ABOUT_VERSION   L"Version " VERSION_STRING
+#define ABOUT_VERSION   WIDEN(STRINGIZE(Version MAJOR_VERSION.MINOR_VERSION.BUILD_VERSION))
 #define ABOUT_COPYRIGHT LEGAL_COPYRIGHT
 
 #ifndef _PACKVERSION
