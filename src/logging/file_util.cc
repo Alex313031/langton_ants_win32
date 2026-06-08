@@ -33,10 +33,80 @@ const std::wstring logging::GetCurrentRelDir() {
   return retval;
 }
 
+typedef HRESULT(WINAPI* FnSHGetFolderPathW)(HWND, int, HANDLE, DWORD, LPWSTR);
+
+// Resolves SHGetFolderPathW at runtime. Tries shfolder.dll first (the
+// redistributable form that shipped with IE5, available on NT4 + IE5,
+// Win98 and Win2k+); falls back to shell32.dll (XP+ exports it directly,
+// Win2k forwards it). Returns nullptr on pure NT4 with no IE5 shell update.
+static FnSHGetFolderPathW ResolveSHGetFolderPathW() {
+  static FnSHGetFolderPathW pfn = nullptr;
+  static bool s_resolved        = false;
+  if (!s_resolved) {
+    HMODULE hShfolder = LoadLibraryW(L"shfolder.dll");
+    if (hShfolder != nullptr) {
+      pfn = reinterpret_cast<FnSHGetFolderPathW>(GetProcAddress(hShfolder, "SHGetFolderPathW"));
+    }
+    if (pfn == nullptr) {
+      HMODULE hShell32 = GetModuleHandleW(L"shell32.dll");
+      if (hShell32 == nullptr) {
+        hShell32 = LoadLibraryW(L"shell32.dll");
+      }
+      if (hShell32 != nullptr) {
+        pfn = reinterpret_cast<FnSHGetFolderPathW>(GetProcAddress(hShell32, "SHGetFolderPathW"));
+      }
+    }
+    s_resolved = true;
+  }
+  return pfn;
+}
+
+static HRESULT SHGetFolderPathWCompat(HWND hWnd,
+                                      int csIdl,
+                                      HANDLE hToken,
+                                      DWORD dwFlags,
+                                      LPWSTR pszPath) {
+  if (pszPath == nullptr) {
+    return E_INVALIDARG;
+  }
+  FnSHGetFolderPathW pfn = ResolveSHGetFolderPathW();
+  if (pfn != nullptr) {
+    return pfn(hWnd, csIdl, hToken, dwFlags, pszPath);
+  }
+  // Pure NT4 (no IE5 shell update) fallback. CSIDL_LOCAL_APPDATA / CSIDL_APPDATA
+  // map to %APPDATA% when set; CSIDL_PERSONAL to %USERPROFILE%. Final fallback
+  // is GetTempPathW so logging always has somewhere writable to land.
+  pszPath[0]              = L'\0';
+  const wchar_t* env_name = nullptr;
+  if (csIdl == CSIDL_LOCAL_APPDATA || csIdl == CSIDL_APPDATA) {
+    env_name = L"APPDATA";
+  } else if (csIdl == CSIDL_PERSONAL) {
+    env_name = L"USERPROFILE";
+  }
+  if (env_name != nullptr) {
+    const DWORD got = GetEnvironmentVariableW(env_name, pszPath, MAX_PATH);
+    if (got > 0 && got < MAX_PATH) {
+      return S_OK;
+    }
+  }
+  // Should never be reached: shfolder.dll has shipped with IE5+ since 1999,
+  // and any sane NT4 install has %APPDATA% / %USERPROFILE% set. Logged so
+  // it's obvious in the log trail when an unusual environment falls through.
+  const DWORD temp = GetTempPathW(MAX_PATH, pszPath);
+  if (temp > 0 && temp < MAX_PATH) {
+    std::wcerr << L"[ERROR] SHGetFolderPathWCompat fell back to GetTempPathW: "
+               << L"no shfolder.dll/shell32.dll export and no env var for "
+               << L"CSIDL " << csIdl << L". Path: " << pszPath << std::endl;
+    return S_OK;
+  }
+  return E_FAIL;
+}
+
 // Usually %LOCALAPPDATA%\kProgName
 const std::wstring logging::GetAppDataDir() {
   wchar_t kLocalAppData[MAX_PATH];
-  HRESULT shAppData = SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, kLocalAppData);
+  HRESULT shAppData =
+      SHGetFolderPathWCompat(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, kLocalAppData);
   if (S_OK == shAppData) {
     const std::wstring log_dir = std::wstring(kLocalAppData) + L"\\" + kProgName + L"\\";
     CreateDirectoryW(log_dir.c_str(), nullptr); // Fails silently if exists

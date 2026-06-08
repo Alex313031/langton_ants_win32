@@ -72,8 +72,59 @@ bool logging::SetLogConsoleTitle(const std::wstring& title) {
   return SetConsoleTitleW(title.c_str());
 }
 
+typedef HWND(WINAPI* FnGetConsoleWindow)(void);
+
+// Resolves GetConsoleWindow at runtime. Win2k+ exports it from kernel32.dll;
+// pure NT4 does not. Returns nullptr when unavailable so the caller can
+// dispatch to the FindWindow fallback below.
+static FnGetConsoleWindow ResolveGetConsoleWindow() {
+  static FnGetConsoleWindow pfn = nullptr;
+  static bool s_resolved        = false;
+  if (!s_resolved) {
+    HMODULE hKernel32 = GetModuleHandleW(L"kernel32.dll");
+    if (hKernel32 != nullptr) {
+      pfn = reinterpret_cast<FnGetConsoleWindow>(GetProcAddress(hKernel32, "GetConsoleWindow"));
+    }
+    s_resolved = true;
+  }
+  return pfn;
+}
+
+// NT4 fallback: there is no documented HWND lookup for a console, but a
+// long-standing workaround is to set a unique title, FindWindowW for it,
+// then restore the original. csrss.exe processes the rename asynchronously
+// so a short Sleep gives it time to land. Cached after first success so the
+// title only flickers once per process.
+static HWND FindConsoleHwndNT4() {
+  static HWND s_cached   = nullptr;
+  static bool s_searched = false;
+  if (s_searched) {
+    return s_cached;
+  }
+  s_searched = true;
+
+  wchar_t saved_title[1024];
+  wchar_t unique_title[64];
+  if (GetConsoleTitleW(saved_title, ARRAYSIZE(saved_title)) == 0) {
+    saved_title[0] = L'\0';
+  }
+  swprintf(unique_title, ARRAYSIZE(unique_title), L"__console_hwnd_lookup_%lu__",
+           static_cast<unsigned long>(GetCurrentProcessId()));
+  if (!SetConsoleTitleW(unique_title)) {
+    return nullptr;
+  }
+  Sleep(40u); // Give csrss 40ms. to apply the rename.
+  s_cached = FindWindowW(nullptr, unique_title);
+  SetConsoleTitleW(saved_title);
+  return s_cached;
+}
+
 HWND logging::GetCurrentConsole() {
-  return GetConsoleWindow();
+  FnGetConsoleWindow pfn = ResolveGetConsoleWindow();
+  if (pfn != nullptr) {
+    return pfn();
+  }
+  return FindConsoleHwndNT4();
 }
 
 // ShowWindow's BOOL return is "was the window previously visible",
