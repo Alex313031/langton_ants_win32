@@ -21,9 +21,7 @@
    If you wish to build your application for a previous Windows platform, include WinSDKVer.h and
    set the _WIN32_WINNT macro to the platform you wish to support before including SDKDDKVer.h. */
 
-#ifndef __MINGW32__
- #include <WinSDKVer.h> // Doesn't exist in MinGW
-#endif
+#include "winsdkver.h"
 
 #ifndef _WIN32_WINNT
  #define _WIN32_WINNT 0x0500 // Windows 2000
@@ -47,9 +45,7 @@
  #endif
 #endif
 
-#ifndef __MINGW32__
- #include <SDKDDKVer.h> // Doesn't exist in MinGW
-#endif
+#include "sdkddkver.h"
 
 // clang-format off: Version DEFINES left alone
 
@@ -105,5 +101,9 @@
 #endif
 
 // clang-format on: Done with version DEFINES
+
+#ifndef VS_FF_RELEASE
+ #define VS_FF_RELEASE 0x00000000L
+#endif
 
 #endif // LANGTON_ANTS_VERSION_H_
